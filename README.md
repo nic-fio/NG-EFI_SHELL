@@ -1,5 +1,8 @@
 # NESH — New EFI Shell
 
+[![CI](https://github.com/nic-fio/NG-EFI_SHELL/actions/workflows/ci.yml/badge.svg)](https://github.com/nic-fio/NG-EFI_SHELL/actions/workflows/ci.yml)
+[Documentation](https://nic-fio.github.io/NG-EFI_SHELL/) · [Download](https://github.com/nic-fio/NG-EFI_SHELL/releases/latest)
+
 A modern command shell for UEFI firmware, with a real scripting language.
 One file, `nesh.efi`: nothing to install, one signature for Secure Boot, no
 EDK2 code.

@@ -269,7 +269,7 @@ All work took place in one long working session (2026-09-19), in phases.
 | **5. Script-friendly output** | `-sfo` replaced by `-data` with `RECORDS`/`FIELD$` (D14). The QEMU test runner was found to report "OK" for scripts that stopped on an error; the pass rule was tightened (D19). |
 | **6. IPv6** | `ifconfig6`, `ping6`, IPv6 in `ping`/`tftp`/`http` (D15), tested with QEMU user networking; an IPv6 address parser/formatter checked against 29 cases; `ifconfig` now shows the DHCP gateway. |
 | **7. Documentation** | Help texts written for all 84 commands by reading their code. That review found and fixed real defects: `mv` could lose the target file if the rename failed; `exit` did not stop a running script; `which` ignored `path`; `load` did not connect drivers when one file failed; `mkdir -p` accepted a file in the path; `vol fs1` without colon showed the wrong volume; missing UEFI Shell options (`reset -c/-fwui`, `pause -q`, `exit /b`, `memmap -b`, `sermode` stop bits 0); the editor lost tab characters and the UTF-8 BOM; the example boot menu failed on read-only volumes and listed hidden entries. User and developer manuals written; examples executed by the test suite. |
-| **8. Publication** | Repository published on GitHub as `NG-EFI_SHELL` (owner's request). |
+| **8. Publication** | Repository published on GitHub as `NG-EFI_SHELL`, public (owner's request); provisional all-rights-reserved license; manuals online with GitHub Pages; GitHub Actions builds and tests every push and publishes a Release with `nesh.efi` for each version tag (binaries are distributed as Releases, not committed to the repository). |
 
 ### The original plan and what came of it
 

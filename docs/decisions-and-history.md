@@ -114,8 +114,9 @@ From it came the working rules of the project:
 - **Note.** While writing the manual the guard was briefly extended to
   `sermode` and `timezone`; it was restored to the scope above because `date`
   and `time` (same firmware service as `timezone`) were not covered and the
-  extension had not been agreed. Whether clock and serial settings should also
-  be blocked is an [open question](#4-open-questions-and-known-gaps).
+  extension had not been agreed. The owner then confirmed the scope: clock and
+  serial port settings stay allowed ("orologio e porta seriale non dovrebbero
+  rappresentare un pericolo per la sicurezza").
 
 ### D7. No EDK2 code, own toolchain
 
@@ -285,7 +286,6 @@ listing), `bootmgr scan`, and the language's `ON ERROR`.
 | Topic | Status |
 |---|---|
 | Secure Boot | The read-only rule (D6) is implemented but NESH has not yet been run with Secure Boot actually enabled (signing and enrolling a test key in OVMF). |
-| Scope of D6 | Should clock (`date`, `time`, `timezone`) and serial port (`sermode`) settings also be blocked under Secure Boot? To be decided by the owner. |
 | Real hardware | All tests run in QEMU/OVMF. Behavior on real firmware (AMI, Insyde, Phoenix) is untested. |
 | Architectures | x86-64 only; AArch64 and IA32 builds are possible future work. |
 | `https` | Needs a TLS driver in the firmware; untested. Host names in `http` URLs (DNS) are untested. |

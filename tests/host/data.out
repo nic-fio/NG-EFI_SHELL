@@ -1,0 +1,18 @@
+records:3
+sub size=0 type=dir
+a.txt size=5 type=file
+b.txt size=12 type=file
+missing: [] ERR=1
+found ERR=0
+stat size=12
+set: 42 temporary
+alias: dir
+ver records:1
+echo: -data is not supported by this command
+echo -data ERR=2
+ls: -sfo (UEFI Shell format) is not supported: use -data
+ls -sfo ERR=2
+empty:0
+2
+12
+[exit 0]

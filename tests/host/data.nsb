@@ -1,0 +1,44 @@
+' -data output: key=value records, read with RECORDS and FIELD$
+RUN "mkdir d"
+WRITEFILE "d\a.txt", "hello"
+WRITEFILE "d\b.txt", "twelve bytes"
+RUN "mkdir d\sub"
+t$ = RUN$("ls -data d")
+n = RECORDS(t$, r$())
+PRINT "records:"; n
+FOR i = 0 TO n - 1
+  PRINT FIELD$(r$(i), "name"); " size="; FIELD$(r$(i), "size"); " type="; FIELD$(r$(i), "type")
+NEXT
+x$ = FIELD$(r$(0), "nosuchfield")
+PRINT "missing: ["; x$; "] ERR="; ERR
+y$ = FIELD$(r$(0), "name")
+PRINT "found ERR="; ERR
+' stat on one file
+s$ = RUN$("stat -data d\b.txt")
+PRINT "stat size="; FIELD$(s$, "size")
+' environment and aliases
+RUN "set -v datatest 42"
+e$ = RUN$("set -data")
+n = RECORDS(e$, ev$())
+FOR i = 0 TO n - 1
+  IF FIELD$(ev$(i), "name") = "datatest" THEN PRINT "set: "; FIELD$(ev$(i), "value"); " "; FIELD$(ev$(i), "kind")
+NEXT
+RUN "alias -v dd dir"
+a$ = RUN$("alias -data")
+n = RECORDS(a$, al$())
+FOR i = 0 TO n - 1
+  IF FIELD$(al$(i), "name") = "dd" THEN PRINT "alias: "; FIELD$(al$(i), "value")
+NEXT
+' ver: one record
+v$ = RUN$("ver -data")
+PRINT "ver records:"; RECORDS(v$, vv$())
+' commands without -data support fail; -sfo points to -data
+RUN "echo -data hi"
+PRINT "echo -data ERR="; ERR
+RUN "ls -sfo"
+PRINT "ls -sfo ERR="; ERR
+' empty text: no records
+PRINT "empty:"; RECORDS("", z$())
+' records separated by several blank lines, CRLF endings
+PRINT RECORDS("a=1" + CHR$(13) + CHR$(10) + CHR$(13) + CHR$(10) + CHR$(10) + "a=2" + CHR$(10), w$())
+PRINT FIELD$(w$(0), "a"); FIELD$(w$(1), "a")

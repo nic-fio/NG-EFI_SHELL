@@ -1,0 +1,3 @@
+before
+fs0:\test.nsb:3: error: type mismatch: y$ is a string variable
+[exit 1]

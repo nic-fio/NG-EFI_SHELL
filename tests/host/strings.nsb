@@ -1,0 +1,13 @@
+s$ = "Perché più così"
+PRINT LEN(s$), LEFT$(s$, 6), RIGHT$(s$, 4), MID$(s$, 8, 3), MID$(s$, 13)
+PRINT INSTR(s$, "più"), INSTR(8, s$, "i"), INSTR(s$, "zzz")
+PRINT UCASE$("abc XYZ"), LCASE$("ABC xyz")
+PRINT "[" + TRIM$("  a b  ") + "]", "[" + LTRIM$("  a") + "]", "[" + RTRIM$("a  ") + "]"
+PRINT REPLACE$("a-b-c", "-", "+"), STRING$(3, "*"), "[" + SPACE$(2) + "]"
+PRINT LPAD$("7", 3, "0"), RPAD$("ab", 5, "."), LPAD$("abcdef", 3)
+DIM p$(0)
+n = SPLIT("fs0:\EFI\BOOT\BOOTX64.EFI", "\", p$)
+PRINT n, p$(0), p$(n - 1), UBOUND(p$)
+n = SPLIT("  uno   due tre ", "", w$)
+PRINT n; ":"; JOIN$(w$, ",")
+PRINT "quote "" inside"

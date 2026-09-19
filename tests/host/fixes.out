@@ -1,0 +1,17 @@
+inner start
+after inner, ERR=5
+ll: alias for ls -l
+cp: built-in command
+hello: not found
+not in path: ERR=127
+-1
+LEN: BASIC function
+mv: new a exists=0
+mkdir: fs0:\f: not a directory
+mkdir -p through a file: ERR=1
+mkdir -p: -1
+rm -f no match: ERR=0
+rm: *.nothing: no match
+rm no match: ERR=1
+echo switches: ERR=0
+[exit 3]

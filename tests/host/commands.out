@@ -1,0 +1,22 @@
+-1            -1            0             17
+alpha
+beta
+gamma
+[2:beta] ERR=0
+no match ERR=1
+list: b.txt
+one/two/three/
+found a.txt
+-1            0
+alpha
+beta
+gamma
+rm: fs0:\dir is a directory (use -r)
+rm without -r ERR=1
+rm -r ERR=00
+nosuchcommand: command not found
+not found ERR=127
+missing file ERR=1
+cd: dir with space: not found
+fs0:\dir with space
+[exit 0]

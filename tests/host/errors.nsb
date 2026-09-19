@@ -1,0 +1,4 @@
+PRINT "before"
+x = 1
+y$ = x
+PRINT "not reached"

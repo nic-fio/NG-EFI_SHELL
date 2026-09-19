@@ -1,0 +1,2 @@
+fs0:\test.nsb:4: syntax error: FOR without NEXT (opened at line 2)
+[exit 1]

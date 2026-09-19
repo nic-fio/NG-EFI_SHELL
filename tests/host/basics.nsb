@@ -1,0 +1,14 @@
+' values, operators, conversions
+PRINT 1 + 2 * 3, (1 + 2) * 3, 2 ^ 10, 7 \ 2, 7 MOD 3, -7 / 2
+PRINT &HFF, 0x10, &B1010, &O17, 1_000_000
+PRINT 5 > 3, 5 < 3, NOT 0, 6 AND 3, 6 OR 3, 6 XOR 3, 1 SHL 8, &H100 SHR 4
+PRINT HEX$(255), HEX$(255, 4), BIN$(5, 8), OCT$(8), HEX$(-1)
+PRINT VAL("42"), VAL("&H1F"), VAL("0x10"), VAL(" -12abc"), VAL("x")
+PRINT STR$(-5) + "|", CHR$(65) + CHR$(0xE8), ASC("A"), ASC("è")
+PRINT ABS(-3), SGN(-9), SGN(0), MIN(4, 2, 9), MAX(4, 2, 9)
+PRINT 9223372036854775807 + 1 = -9223372036854775807 - 1
+x = 10: x = x * 2: PRINT "x ="; x
+a$ = "abc": b$ = a$ + "def": PRINT b$; LEN(b$)
+PRINT "abc" < "abd", "b" > "abc", "x" = "x"
+PRINT "done";
+PRINT

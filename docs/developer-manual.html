@@ -1,0 +1,1072 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NESH Developer Manual</title>
+<meta name="description" content="Developer manual of NESH, the New EFI Shell: architecture, build, platform layer, shell core, BASIC interpreter, UEFI modules, testing and conventions.">
+<link rel="stylesheet" href="assets/docs.css">
+</head>
+<body>
+<div class="topbar">
+  <button class="btn menu-btn" type="button" aria-label="Open the table of contents">&#9776; Contents</button>
+  <strong>NESH Developer Manual</strong>
+</div>
+<div class="layout">
+<nav class="sidebar" aria-label="Table of contents">
+  <div class="brand">
+    <div class="brand-logo">{ }</div>
+    <div class="brand-text"><strong>NESH Developer Manual</strong><span>New EFI Shell 0.1.0</span></div>
+  </div>
+  <div class="search">
+    <input type="search" placeholder="Search files, functions, topics  ( / )" aria-label="Search">
+    <div class="search-results" role="listbox"></div>
+  </div>
+  <div class="toc"></div>
+  <div class="side-tools">
+    <button class="btn print-btn" type="button">Print / PDF</button>
+    <a class="btn" href="user-manual.html">User manual</a>
+  </div>
+</nav>
+
+<main>
+
+<header class="titlepage">
+  <div class="kicker">Developer manual</div>
+  <h1>Inside NESH</h1>
+  <p class="lead">Everything a programmer needs to understand, build, test and extend NESH: architecture, build
+  pipeline, platform layer, shell core, the BASIC interpreter, the UEFI modules and the project's conventions.</p>
+  <div class="meta">
+    <span><b>Version</b> 0.1.0</span>
+    <span><b>Language</b> C (gnu11), Python 3 tools</span>
+    <span><b>Size</b> ~23,400 lines of C</span>
+    <span><b>Target</b> UEFI x86-64 · Linux host build for tests</span>
+  </div>
+</header>
+
+<section class="unnumbered no-toc">
+  <h2 class="unnumbered" id="contents">Contents</h2>
+  <div class="toc-print" id="contents-list"></div>
+  <p>Press <kbd>/</kbd> to search. The <a href="#index">index</a> lists files, functions and topics.</p>
+</section>
+
+<!-- ===================================================================== -->
+<h2 id="overview">Overview</h2>
+
+<p class="chapter-intro">What NESH is from the inside, the principles that shaped it, and a map of this manual.</p>
+
+<h3 id="what-you-learn">What this manual covers</h3>
+<p>The <a href="user-manual.html">user manual</a> explains what NESH does. This manual explains <em>how</em>. After reading
+it you should be able to find your way in every source file, build and test the shell, add commands and BASIC
+functions, and change the firmware-facing parts without breaking the others. It assumes you know C; UEFI concepts are
+explained where they are needed, and the <a href="#glossary">glossary</a> summarizes them.</p>
+
+<h3 id="principles">Design principles</h3>
+<div class="cards">
+  <div class="card"><div class="icon">1</div><h4>One file</h4>
+    <p>The whole shell is one PE32+ image, <code>nesh.efi</code>: nothing to install, one signature for Secure Boot.</p></div>
+  <div class="card"><div class="icon">0</div><h4>No EDK2 code</h4>
+    <p>No EDK2 libraries or headers. UEFI definitions, libc, printf, compression and the UEFI Shell commands are written from scratch.</p></div>
+  <div class="card"><div class="icon">&#8646;</div><h4>Portable core</h4>
+    <p>The shell and the interpreter only talk to a small platform layer (PAL). The same core builds for UEFI and for Linux.</p></div>
+  <div class="card"><div class="icon">&#10003;</div><h4>Test on Linux first</h4>
+    <p>The Linux build runs the language and command tests in seconds; QEMU with OVMF firmware tests the UEFI parts.</p></div>
+  <div class="card"><div class="icon">&#8801;</div><h4>Compatible, not a copy</h4>
+    <p>UEFI Shell command names, options, variables and the EFI_SHELL_PROTOCOL are honored, so existing tools and habits keep working.</p></div>
+  <div class="card"><div class="icon">?</div><h4>Docs are code</h4>
+    <p>The command reference is generated from the help texts, and the manual's examples are run by the test suite.</p></div>
+</div>
+
+<h3 id="numbers">The project in numbers</h3>
+<table>
+  <thead><tr><th>Area</th><th>Directory</th><th>Lines</th><th>Content</th></tr></thead>
+  <tbody>
+    <tr><td>Runtime library</td><td><code>src/lib</code></td><td>1,523</td><td>libc subset, printf, string buffer, UTF-8, UEFI compression</td></tr>
+    <tr><td>Platform layer</td><td><code>src/pal</code></td><td>1,830</td><td>PAL interface, UEFI and Linux implementations</td></tr>
+    <tr><td>Shell core</td><td><code>src/core</code></td><td>2,615</td><td>command execution, console, environment, aliases, line editor, menus</td></tr>
+    <tr><td>BASIC</td><td><code>src/basic</code></td><td>4,003</td><td>lexer, parser, interpreter, built-in functions</td></tr>
+    <tr><td>Portable commands</td><td><code>src/cmd</code></td><td>3,262</td><td>files, text, utilities, editors</td></tr>
+    <tr><td>UEFI modules</td><td><code>src/platform/efi</code></td><td>10,076</td><td>shell protocol, variables, boot, drivers, disks, hardware, network</td></tr>
+    <tr><td>UEFI definitions</td><td><code>include</code></td><td>724</td><td>UEFI types and protocols used by NESH</td></tr>
+    <tr><td>Tools and tests</td><td><code>tools</code>, <code>tests</code></td><td>1,606</td><td>ELF→PE converter, QEMU runner, doc generators, test scripts</td></tr>
+  </tbody>
+</table>
+<p>The resulting <code>nesh.efi</code> is about 360 KB.</p>
+
+<!-- ===================================================================== -->
+<h2 id="getting-the-source">Source tree and tools</h2>
+
+<h3 id="layout">Repository layout</h3>
+<table>
+  <thead><tr><th>Path</th><th>Content</th></tr></thead>
+  <tbody>
+    <tr><td><code>Makefile</code></td><td>All build and test targets.</td></tr>
+    <tr><td><code>include/efi.h</code>, <code>include/efi_shell.h</code></td><td>UEFI types, services and protocols (written for NESH), EFI_SHELL_PROTOCOL.</td></tr>
+    <tr><td><code>src/lib/</code></td><td>Runtime: <code>rt.h</code> (the C subset every module includes), <code>libc.c</code>, <code>fmt.c</code> (vsnprintf),
+        <code>util.c</code> (Sbuf, UTF-8, glob, parse_int), <code>eficomp.c</code> (UEFI compression).</td></tr>
+    <tr><td><code>src/pal/</code></td><td><code>pal.h</code> (the platform interface), <code>pal_efi.c</code>, <code>pal_host.c</code>, <code>pal_common.c</code>,
+        <code>efi_glue.h</code> (UEFI globals for EFI-only modules).</td></tr>
+    <tr><td><code>src/core/</code></td><td><code>shell.c</code> (registry, execution, paths, REPL, <code>nesh_main</code>), <code>con.c</code> (output sinks, keys),
+        <code>env.c</code>, <code>alias.c</code>, <code>lineedit.c</code>, <code>ui.c</code> (menu).</td></tr>
+    <tr><td><code>src/basic/</code></td><td><code>lexer.c</code>, <code>parser.c</code>, <code>interp.c</code>, <code>bfuncs.c</code>, <code>basic.h</code>, <code>interp_int.h</code>.</td></tr>
+    <tr><td><code>src/cmd/</code></td><td>Portable commands: <code>cmd_core.c</code> (help, ver, echo…), <code>cmd_fs.c</code> (files, map…), <code>cmd_text.c</code>,
+        <code>cmd_util.c</code>, <code>cmd_edit.c</code> (edit, hexedit).</td></tr>
+    <tr><td><code>src/platform/efi/</code></td><td>UEFI-only modules (see <a href="#efi-modules">UEFI modules</a>).</td></tr>
+    <tr><td><code>src/platform/host.c</code></td><td>Stubs of the platform hooks for the Linux build.</td></tr>
+    <tr><td><code>tools/</code></td><td><code>efi.lds</code>, <code>elf2efi.py</code>, <code>run-qemu.sh</code>, <code>gen-docs.py</code>, <code>check-doc-examples.py</code>.</td></tr>
+    <tr><td><code>tests/</code></td><td><code>host/*.nsb</code> + <code>.out</code> (Linux tests), <code>efi/*.nsb</code> (QEMU tests), <code>apps/shelltest.c</code>,
+        <code>fixtures/</code> (EDK2 test binaries).</td></tr>
+    <tr><td><code>examples/</code></td><td>Example scripts shipped with NESH.</td></tr>
+    <tr><td><code>docs/</code></td><td>This manual, the user manual, <code>decisions-and-history.md</code>, <code>assets/</code> (CSS, JS, Mermaid).</td></tr>
+  </tbody>
+</table>
+
+<h3 id="tools-needed">Tools needed</h3>
+<table>
+  <thead><tr><th>Tool</th><th>Used for</th></tr></thead>
+  <tbody>
+    <tr><td>GCC (x86-64) and GNU ld</td><td>Both builds. No cross-compiler is needed: the EFI image is linked as an ELF shared object and converted.</td></tr>
+    <tr><td>Python 3</td><td><code>elf2efi.py</code> and the documentation tools.</td></tr>
+    <tr><td>QEMU (<code>qemu-system-x86_64</code>) and OVMF</td><td>UEFI tests. <code>OVMF=</code> selects the firmware image, a single-file <code>OVMF.fd</code> (default: the first of <code>/usr/share/ovmf/OVMF.fd</code> and <code>/usr/share/OVMF/OVMF.fd</code> that exists).</td></tr>
+    <tr><td><code>mkfs.fat</code> (dosfstools)</td><td>The writable test disk of the QEMU runs.</td></tr>
+  </tbody>
+</table>
+
+<h3 id="make-targets">Make targets</h3>
+<table>
+  <thead><tr><th>Target</th><th>Does</th></tr></thead>
+  <tbody>
+    <tr><td><code>make</code></td><td>Builds <code>build/nesh.efi</code> and <code>build/nesh-host</code> (Linux build with AddressSanitizer and UBSan).</td></tr>
+    <tr><td><code>make test</code></td><td>Host tests, documentation consistency check, manual examples.</td></tr>
+    <tr><td><code>make qemu</code></td><td>Boots NESH in QEMU with a serial console, interactively.</td></tr>
+    <tr><td><code>make qemu-test</code></td><td>Runs <code>tests/efi/run.nsb</code> inside QEMU and checks the result.</td></tr>
+    <tr><td><code>make qemu-nettest</code></td><td>Network tests (IPv4 and IPv6) inside QEMU with user networking.</td></tr>
+    <tr><td><code>make docs</code></td><td>Regenerates the command reference of the user manual from the help texts.</td></tr>
+    <tr><td><code>make clean</code></td><td>Removes <code>build/</code>.</td></tr>
+  </tbody>
+</table>
+<div class="callout tip"><span class="callout-title">Daily loop</span>
+<p>Change code → <code>make test</code> (seconds) → <code>make qemu-test</code> when the change touches UEFI code (about a
+minute) → <code>make qemu-nettest</code> when it touches the network.</p></div>
+
+<!-- ===================================================================== -->
+<h2 id="architecture">Architecture</h2>
+
+<p class="chapter-intro">NESH is a stack of layers. Each layer only calls the layers below it, and everything that
+depends on the firmware is kept out of the portable core.</p>
+
+<h3 id="layers">Layers</h3>
+<figure>
+<pre class="mermaid">
+flowchart TB
+  subgraph Portable["Portable (UEFI and Linux builds)"]
+    CMD["Portable commands&lt;br/&gt;src/cmd"]
+    BASIC["NESH BASIC&lt;br/&gt;src/basic"]
+    CORE["Shell core&lt;br/&gt;src/core"]
+    LIB["Runtime library&lt;br/&gt;src/lib"]
+  end
+  subgraph EFI["UEFI only"]
+    PLAT["UEFI modules&lt;br/&gt;src/platform/efi"]
+    PALE["pal_efi.c"]
+  end
+  subgraph HOST["Linux only"]
+    PALH["pal_host.c + host.c"]
+  end
+  CMD --> CORE
+  BASIC --> CORE
+  PLAT --> CORE
+  CORE --> PAL["pal.h interface"]
+  PAL --> PALE
+  PAL --> PALH
+  CORE --> LIB
+  PALE --> FW["UEFI firmware services"]
+</pre>
+<figcaption>Layers and dependencies</figcaption>
+</figure>
+<ul>
+  <li><strong>Runtime library</strong> — the C functions everybody uses. In the UEFI build they are implemented by NESH
+      (<code>libc.c</code>, <code>fmt.c</code>); in the Linux build <code>rt.h</code> includes the system headers instead.</li>
+  <li><strong>PAL</strong> (<code>pal.h</code>) — console, time, files, volumes, reset. The only way the portable code reaches
+      the machine.</li>
+  <li><strong>Shell core</strong> — command registry and execution, output sinks, environment, aliases, line editor.</li>
+  <li><strong>BASIC</strong> — the language; it runs commands through the core.</li>
+  <li><strong>Commands</strong> — portable ones in <code>src/cmd</code>; UEFI ones in <code>src/platform/efi</code>, which also
+      register BASIC functions and implement the platform hooks declared by the core
+      (<code>platform_run_image</code>, <code>platform_env_store</code>, <code>secure_boot_active</code>…). In the Linux build
+      <code>src/platform/host.c</code> implements the same hooks as stubs.</li>
+</ul>
+
+<h3 id="startup">Start-up sequence</h3>
+<figure>
+<pre class="mermaid">
+sequenceDiagram
+  participant FW as UEFI firmware
+  participant EM as efi_main (pal_efi.c)
+  participant NM as nesh_main (shell.c)
+  participant PC as platform_cmds_init
+  FW->>EM: StartImage(nesh.efi)
+  EM->>EM: globals gST/gBS/gRT, watchdog off,&lt;br/&gt;TSC calibration, volumes, arguments
+  EM->>EM: allocate a 1 MiB stack and switch to it
+  EM->>NM: nesh_main(argc, argv)
+  NM->>NM: register BASIC functions and portable commands
+  NM->>PC: platform_cmds_init()
+  PC->>PC: install EFI_SHELL_PROTOCOL,&lt;br/&gt;register UEFI commands and functions
+  NM->>NM: cd to the boot volume, env_init, alias_init
+  NM->>NM: parse -n / -c / -k / SCRIPT
+  NM->>NM: banner, startup.nsb, REPL
+  NM-->>EM: exit code
+  EM->>EM: efi_exit_hook: uninstall the shell protocol
+  EM-->>FW: EFI status
+</pre>
+<figcaption>From the firmware to the prompt</figcaption>
+</figure>
+<p>Two details matter. First, UEFI only guarantees 128 KiB of stack and the interpreter is recursive, so
+<code>efi_main</code> allocates 1 MiB of pages and calls <code>nesh_main</code> on that stack (<code>call_on_stack</code>).
+Second, when NESH exits nothing may keep pointing into its image: <code>efi_exit_hook</code> uninstalls (or restores) the
+shell protocol.</p>
+<pre class="code" data-lang="c" data-title="src/pal/pal_efi.c">EFI_STATUS EFIAPI efi_main(EFI_HANDLE image, EFI_SYSTEM_TABLE *st)
+{
+    gImage = image;
+    gST = st;
+    gBS = st->BootServices;
+    gRT = st->RuntimeServices;
+    gBS->SetWatchdogTimer(0, 0, 0, NULL);
+    ...
+    /* The interpreter is recursive: run on a private 1 MiB stack instead of
+     * the firmware stack (UEFI only guarantees 128 KiB). */
+    if (gBS->AllocatePages(AllocateAnyPages, EfiLoaderData, STACK_PAGES, &stack) == EFI_SUCCESS) {
+        call_on_stack(main_on_stack, (void *)(uintptr_t)(stack + STACK_PAGES * 4096));
+        ...
+    if (efi_exit_hook)
+        efi_exit_hook(); /* nothing may point into this image after it exits */
+    return rc ? EFIERR(rc &amp; 0xFF) : EFI_SUCCESS;
+}</pre>
+
+<h3 id="command-flow">Life of a command line</h3>
+<figure>
+<pre class="mermaid">
+flowchart TD
+  L["line typed at the prompt"] --> B{"interp_is_basic_line?"}
+  B -- yes --> I["interp_exec_interactive&lt;br/&gt;(may ask for more lines)"]
+  B -- no --> S["shell_exec_line&lt;br/&gt;split words, extract &gt; / &gt;&gt;"]
+  S --> R{"redirection?"}
+  R -- yes --> P["out_push_file"]
+  R -- no --> X
+  P --> X["shell_exec_argv"]
+  X --> A{"alias?"}
+  A -- yes --> X
+  A -- no --> V{"fsN: alone?"}
+  V -- yes --> CD["shell_chdir"]
+  V -- no --> C{"built-in command?"}
+  C -- yes --> D["strip -data, set data mode,&lt;br/&gt;call Cmd.fn(argc, argv)"]
+  C -- no --> F["shell_find_executable&lt;br/&gt;(path, .nsb, .efi)"]
+  F --> K{".nsb?"}
+  K -- yes --> BR["basic_run_file"]
+  K -- no --> EI["platform_run_image&lt;br/&gt;(efi_start_image)"]
+</pre>
+<figcaption>What happens to a line</figcaption>
+</figure>
+<p>Scripts take the same route: <code>RUN "cmd"</code> calls <code>shell_exec_line</code>, <code>RUN "cmd", a$</code> calls
+<code>shell_exec_argv</code> directly (no word splitting), and <code>RUN$</code> does the same inside a capture sink.</p>
+
+<!-- ===================================================================== -->
+<h2 id="build">The build</h2>
+
+<p class="chapter-intro">NESH is built with the ordinary Linux GCC, linked as a position-independent ELF shared
+object, and converted to a PE32+ EFI application by a small Python tool.</p>
+
+<h3 id="pipeline">Pipeline</h3>
+<figure>
+<pre class="mermaid">
+flowchart LR
+  C["*.c"] -- "gcc -ffreestanding -fPIC&lt;br/&gt;-mno-red-zone -fshort-wchar" --> O["*.o"]
+  O -- "ld -shared -Bsymbolic&lt;br/&gt;-T tools/efi.lds" --> SO["nesh.so&lt;br/&gt;(ELF, base 0)"]
+  SO -- "tools/elf2efi.py" --> EFI["nesh.efi&lt;br/&gt;(PE32+, subsystem 10)"]
+  C -- "gcc -DNESH_HOST&lt;br/&gt;-fsanitize=address,undefined" --> H["nesh-host&lt;br/&gt;(Linux)"]
+</pre>
+<figcaption>From sources to the two executables</figcaption>
+</figure>
+
+<h3 id="cflags">Compiler flags and why</h3>
+<table>
+  <thead><tr><th>Flag</th><th>Reason</th></tr></thead>
+  <tbody>
+    <tr><td><code>-ffreestanding -fno-builtin</code></td><td>No hosted C library; GCC must not assume one.</td></tr>
+    <tr><td><code>-mno-red-zone</code></td><td>Firmware interrupt handlers run on the current stack and would overwrite the 128-byte red zone.</td></tr>
+    <tr><td><code>-fshort-wchar</code></td><td>UEFI strings are UCS-2: <code>L"..."</code> must be 16-bit.</td></tr>
+    <tr><td><code>-fPIC -fvisibility=hidden</code> + <code>ld -Bsymbolic</code></td><td>The image can be loaded at any address; with hidden symbols the only dynamic
+        relocations left are <code>R_X86_64_RELATIVE</code>, which map 1:1 to PE <code>DIR64</code> fixups.</td></tr>
+    <tr><td><code>-mgeneral-regs-only</code></td><td>No SSE/x87 code: the firmware does not promise that FPU state is usable, and NESH has no floating point.</td></tr>
+    <tr><td><code>-fno-stack-protector -fno-stack-check</code></td><td>No runtime support for them in firmware.</td></tr>
+    <tr><td><code>-fno-asynchronous-unwind-tables</code></td><td>No unwinding; smaller image.</td></tr>
+    <tr><td><code>-fno-tree-loop-distribute-patterns</code></td><td>Stops GCC from turning the loops of <code>memset</code>/<code>memcpy</code> into calls to themselves.</td></tr>
+    <tr><td><code>-fno-strict-aliasing</code></td><td>UEFI structures are often reinterpreted through casts.</td></tr>
+  </tbody>
+</table>
+<p>Warnings: <code>-Wall -Wextra</code> without <code>-Wunused-parameter</code> and <code>-Wmissing-field-initializers</code>. A clean build has
+no warnings; keep it that way.</p>
+
+<h3 id="linker-script">The linker script</h3>
+<p><code>tools/efi.lds</code> links at base address 0 with page-aligned <code>.text</code>, <code>.rodata</code>, <code>.data</code> (with the GOT)
+and <code>.bss</code>, and discards notes, comments and unwind tables. Base 0 makes ELF virtual addresses equal to PE relative
+virtual addresses, which keeps the conversion trivial. Page alignment gives each PE section its own memory
+protection (code read+execute, data read+write, never both).</p>
+
+<h3 id="elf2efi">elf2efi.py</h3>
+<p>The converter reads the ELF sections and writes a PE32+ image:</p>
+<ol>
+  <li>keeps <code>.text</code>, <code>.rodata</code> (as <code>.rdata</code>), <code>.data</code> and <code>.bss</code>, checking page alignment;</li>
+  <li>for every <code>R_X86_64_RELATIVE</code> relocation writes the addend into the section data and records a
+      <code>DIR64</code> fixup; <strong>any other relocation type is a build error</strong> (it means a symbol escaped the hidden
+      visibility);</li>
+  <li>builds a <code>.reloc</code> section with one block per 4 KiB page;</li>
+  <li>writes the DOS stub, COFF header (machine 0x8664), optional header (subsystem 10 = EFI application,
+      DllCharacteristics <code>DYNAMIC_BASE | NX_COMPAT</code>) and the section table.</li>
+</ol>
+<p>Why not <code>objcopy --target=efi-app-x86_64</code>? It was tried first: it dropped sections and produced corrupted
+relocations with this layout. The converter is 170 lines, easy to audit, and fails loudly.</p>
+
+<h3 id="freestanding">The freestanding runtime</h3>
+<ul>
+  <li><strong>Memory</strong>: <code>malloc</code> uses <code>AllocatePool</code> with a small header that stores the size (needed by
+      <code>realloc</code>). Code calls the <code>x</code> wrappers (<code>xmalloc</code>, <code>xstrdup</code>, <code>xasprintf</code>…), which
+      stop the shell with <code>rt_fatal</code> on out-of-memory, so callers never check for NULL.</li>
+  <li><strong>printf</strong>: <code>fmt.c</code> implements <code>vsnprintf</code> with <code>%d %i %u %x %X %o %c %s %p %%</code>, flags,
+      width, precision and the length modifiers <code>hh h l ll z j t</code>. There is no <code>%f</code>.</li>
+  <li><strong>Strings</strong>: <code>libc.c</code> has the usual <code>mem*</code>/<code>str*</code> functions, <code>strto*</code> and <code>qsort</code>;
+      <code>rt.h</code> has inline <code>ctype</code> functions (ASCII only).</li>
+</ul>
+
+<!-- ===================================================================== -->
+<h2 id="pal">The platform layer (PAL)</h2>
+
+<p class="chapter-intro"><code>src/pal/pal.h</code> is the contract between the portable code and the machine.
+Everything in it has two implementations: <code>pal_efi.c</code> and <code>pal_host.c</code>.</p>
+
+<h3 id="pal-contract">The contract</h3>
+<table>
+  <thead><tr><th>Group</th><th>Functions</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td>Errors</td><td><code>PAL_OK</code>, <code>PAL_ENOENT</code>… <code>pal_strerror</code></td><td>Negative codes; <code>efi_to_pal</code> maps EFI_STATUS.</td></tr>
+    <tr><td>Console</td><td><code>pal_con_write</code> (UTF-8), <code>pal_con_read_key</code>, colors, cursor, size</td><td>Keys arrive as <code>PalKey</code>:
+        Unicode <code>ch</code> or a <code>KEY_*</code> scan code, plus modifiers.</td></tr>
+    <tr><td>Time</td><td><code>pal_ticks_ms</code>, <code>pal_sleep_ms/us</code>, <code>pal_get_time</code>, <code>pal_set_time</code></td><td>EFI: TSC calibrated against <code>Stall</code> at start-up.</td></tr>
+    <tr><td>Files</td><td><code>pal_open/read/write/seek/close</code>, <code>pal_stat</code>, <code>pal_opendir/readdir</code>, <code>pal_mkdir</code>,
+        <code>pal_remove</code>, <code>pal_rename</code>, attributes, size, time, label</td><td><strong>Paths are canonical</strong>: <code>fsN:\dir\file</code>.
+        Resolution of relative paths, <code>.</code> and <code>..</code> happens in the core (<code>path_resolve</code>).</td></tr>
+    <tr><td>Volumes</td><td><code>pal_volumes_refresh</code>, <code>pal_volume_count</code>, <code>pal_volume(i)</code>, <code>pal_boot_volume</code></td><td><code>PalVolume</code>:
+        name, label, device path text, size, free, read-only, removable.</td></tr>
+    <tr><td>System</td><td><code>pal_reset</code>, <code>pal_exit</code>, <code>pal_platform_name</code>, <code>pal_argc/argv</code></td><td></td></tr>
+  </tbody>
+</table>
+
+<h3 id="pal-efi">pal_efi.c</h3>
+<ul>
+  <li><strong>Console</strong>: output converts UTF-8 to UCS-2 and calls <code>ConOut-&gt;OutputString</code> (turning
+      <code>\n</code> into <code>\r\n</code>); input uses <code>SimpleTextInputEx</code> when available (modifier keys) and
+      <code>WaitForEvent</code> with a timer for timeouts. <code>pal_con_ansi()</code> is false: the editor and the menus position
+      the cursor absolutely.</li>
+  <li><strong>Volumes</strong>: every handle with <code>SimpleFileSystem</code> becomes a volume; they are sorted by device
+      path text so that numbering is stable, and the one whose device matches the loaded image is the boot volume.</li>
+  <li><strong>Files</strong>: <code>efi_open_path</code> opens the volume root and then the path through <code>EFI_FILE_PROTOCOL</code>.
+      <code>pal_rename</code> uses <code>SetInfo</code> with a new file name, so it only works within one volume (the core falls back to
+      copy + delete).</li>
+  <li><strong>Extras for EFI modules</strong> (<code>efi_glue.h</code>): the globals <code>gST</code>, <code>gBS</code>, <code>gRT</code>, <code>gImage</code>,
+      device path helpers, <code>efi_volume_handle</code>, <code>efi_file_devpath</code>.</li>
+</ul>
+
+<h3 id="pal-host">pal_host.c and host.c</h3>
+<p>The Linux build maps volumes to directories: <code>NESH_FS="dir1;dir2"</code> gives <code>fs0:</code> and <code>fs1:</code> (default: the
+current directory). The console uses termios raw mode when stdin is a terminal and plain line reading otherwise, which
+is what the tests use. Other environment variables of the host build:</p>
+<table>
+  <thead><tr><th>Variable</th><th>Effect</th></tr></thead>
+  <tbody>
+    <tr><td><code>NESH_FS</code></td><td>Directories exposed as volumes.</td></tr>
+    <tr><td><code>NESH_HISTORY</code></td><td>History file (no history file when unset).</td></tr>
+    <tr><td><code>NESH_SECUREBOOT</code></td><td>When set, <code>secure_boot_active()</code> returns true, to test the read-only mode.</td></tr>
+  </tbody>
+</table>
+<p><code>src/platform/host.c</code> implements the platform hooks with stubs: running <code>.efi</code> files fails, UEFI variables
+do not exist, only a minimal set of platform commands is registered.</p>
+
+<!-- ===================================================================== -->
+<h2 id="core">The shell core</h2>
+
+<p class="chapter-intro"><code>src/core</code> turns lines into actions: it keeps the command registry, splits and executes
+command lines, manages output, the environment, aliases and the prompt.</p>
+
+<h3 id="registry">Commands and the registry</h3>
+<p>A command is a C function <code>int fn(int argc, char **argv)</code> described by a <code>Cmd</code> entry. Modules keep a
+static table and register it at start-up with <code>shell_register</code>; the registry is a sorted array of pointers,
+searched case-insensitively by <code>shell_find_cmd</code>.</p>
+<pre class="code" data-lang="c" data-title="src/core/shell.h">typedef int (*CmdFn)(int argc, char **argv);
+
+typedef struct {
+    const char *name;
+    CmdFn fn;
+    const char *usage;   /* "cp [-r] SRC... DST" */
+    const char *summary; /* one line */
+    const char *help;    /* detailed help, may be NULL */
+    int flags;           /* CMD_* */
+} Cmd;
+
+#define CMD_KEEP_QUOTES 1 /* arguments keep their double quotes (setvar "text" vs L"text") */
+#define CMD_DATA 2        /* supports "-data" (key=value records, see out_data_mode) */</pre>
+<ul>
+  <li><code>argv[0]</code> is the command name; the strings belong to the caller.</li>
+  <li>The return value is the exit code: <code>RC_OK</code> 0, <code>RC_FAIL</code> 1, <code>RC_USAGE</code> 2, <code>RC_NOTFOUND</code> 127,
+      <code>RC_BREAK</code> 130.</li>
+  <li><code>-data</code> is removed from <code>argv</code> by <code>shell_exec_argv</code> before the call; the command sees
+      <code>out_data_mode()</code>. A command without <code>CMD_DATA</code> never receives it (the core rejects the option), and
+      <code>-sfo</code> is rejected for every command.</li>
+  <li>The help texts are shown by <code>help NAME</code> and extracted into the user manual; see <a href="#docs-system">The documentation system</a>.</li>
+</ul>
+<p>Helpers for commands: <code>cmd_err(cmd, fmt, …)</code> prints <code>cmd: message</code> on the error output and returns
+<code>RC_FAIL</code>; <code>cmd_perr</code> formats a PAL error for a path; <code>cmd_usage</code> prints the usage line and returns
+<code>RC_USAGE</code>; <code>getopts(argc, argv, "lr", flags)</code> parses single-letter options that may appear anywhere and
+returns the index of the first operand.</p>
+
+<h3 id="line-splitting">Splitting and redirection</h3>
+<p><code>split_ex</code> in <code>shell.c</code> splits a line at spaces and tabs. Double quotes group words and <code>""</code> inside
+quotes is a literal quote; with <code>CMD_KEEP_QUOTES</code> the quotes are kept, because <code>setvar</code> distinguishes
+<code>"text"</code> from <code>L"text"</code>. An unquoted <code>&gt; file</code> or <code>&gt;&gt; file</code> is removed from the words and
+becomes a file sink around the command. There is no variable expansion and no pipe.</p>
+
+<h3 id="sinks">Output sinks</h3>
+<figure>
+<pre class="mermaid">
+flowchart LR
+  W["out_write / out_printf"] --> T{"top of the sink stack"}
+  T -- "none" --> C["console (pal_con_write)"]
+  T -- "capture" --> B["Sbuf (RUN$)"]
+  T -- "file" --> F["PalFile (&gt; file, RUN … TO)"]
+  E["err_printf"] --> C
+</pre>
+<figcaption>Where output goes</figcaption>
+</figure>
+<p><code>con.c</code> keeps a stack of up to 16 sinks. Normal output goes to the innermost one, so nested
+<code>RUN$</code> captures and redirections compose naturally; error messages always go to the console. Colors are only
+applied when the output is the console (<code>out_is_console</code>). The <code>-data</code> helpers live here too:
+<code>data_record()</code> starts a record (an empty line before every record but the first), <code>data_field(key, fmt, …)</code>
+writes one line (newlines in values become spaces), and <code>info_line</code> prints either <code>Label: value</code> or
+<code>label=value</code> depending on the mode, so a command can describe fields once for both outputs.</p>
+<p>UEFI applications started by NESH write to the firmware console directly. When the output is not the console,
+<code>efi_start_image</code> swaps <code>gST-&gt;ConOut</code> for a proxy that forwards text to the current sink; see
+<a href="#running-images">Running images</a>.</p>
+
+<h3 id="paths-impl">Paths</h3>
+<p>Inside NESH every path is <em>canonical</em> before it reaches the PAL: <code>fsN:\dir\file</code>, backslashes, no
+<code>.</code> or <code>..</code>. <code>path_resolve</code> does the conversion: it resolves map aliases (<code>usb:</code>), relative paths
+against the current directory, <code>/</code> separators, and returns NULL if the volume does not exist. Wildcards are expanded
+by <code>path_glob</code> (one directory level, sorted, case-insensitive match); commands decide whether to accept them.</p>
+
+<h3 id="env-impl">Environment variables and aliases</h3>
+<p><code>env.c</code> keeps variables in memory; non-volatile ones are also written through the platform hook
+<code>platform_env_store</code>, which stores them as UEFI variables with the EDK2 shell environment GUID, exactly like the
+UEFI Shell (so both shells share them). A few names are computed on read (<code>cwd</code>, <code>lasterror</code>, versions).
+The <em>overlay</em> (<code>env_overlay_push/pop</code>) temporarily hides or replaces variables without touching the firmware; it
+implements the environment parameter of <code>EFI_SHELL_PROTOCOL.Execute</code>. Aliases (<code>alias.c</code>) work the same way
+with the shell alias GUID.</p>
+
+<h3 id="prompt-impl">Prompt, line editor, history and Ctrl-C</h3>
+<ul>
+  <li>The REPL (<code>repl()</code> in <code>shell.c</code>) reads a line with <code>lineedit_read</code>, asks the interpreter whether
+      it is BASIC (<code>interp_is_basic_line</code>) and otherwise runs it as a command. An incomplete BASIC block is
+      accumulated until the parser accepts it, with a <code>...</code> prompt.</li>
+  <li><code>lineedit.c</code> works in two modes: ANSI escape sequences (Linux terminals) or absolute cursor positioning (UEFI
+      consoles, which have no ANSI support). History has 500 entries and is appended to
+      <code>\nesh_history.txt</code> on the boot volume.</li>
+  <li><kbd>Ctrl</kbd>+<kbd>C</kbd>: <code>con_poll</code> reads pending keys into a type-ahead buffer and sets a break flag when it sees
+      Ctrl-C; on UEFI a key notification registered by the shell protocol module catches it even while an application
+      runs. Long loops call <code>con_break()</code>; the interpreter checks it before every statement.</li>
+</ul>
+
+<!-- ===================================================================== -->
+<h2 id="interpreter">The BASIC interpreter</h2>
+
+<p class="chapter-intro">NESH BASIC is implemented as a classic pipeline: a lexer produces tokens, a recursive-descent
+parser builds an abstract syntax tree, and a tree-walking interpreter executes it.</p>
+<figure>
+<pre class="mermaid">
+flowchart LR
+  SRC["source text"] --> LEX["lexer.c&lt;br/&gt;tokens"]
+  LEX --> PAR["parser.c&lt;br/&gt;Program: Block + Procs"]
+  PAR --> INT["interp.c&lt;br/&gt;exec_block / eval"]
+  INT --> BF["built-ins&lt;br/&gt;bfuncs.c, efi_var.c, efi_boot.c"]
+  INT --> SH["shell core&lt;br/&gt;RUN / RUN$"]
+</pre>
+<figcaption>From text to execution</figcaption>
+</figure>
+
+<h3 id="lexer">Lexer</h3>
+<p><code>lex_next</code> produces one <code>Token</code> at a time: numbers (decimal, <code>0x</code>, <code>0b</code>, <code>&amp;H</code>, <code>&amp;B</code>,
+<code>&amp;O</code>, with <code>_</code> separators; overflow is an error), strings (<code>""</code> escape, no newline inside), identifiers
+(a trailing <code>$</code> is part of the name), keywords (matched case-insensitively from a table), punctuation and newlines.
+Comments (<code>'</code>, <code>REM</code>) and the line continuation <code> _</code> are skipped here, so the parser never sees them. A
+UTF-8 BOM and a <code>#!</code> first line are ignored. Errors are sticky: after <code>T_ERROR</code> the lexer stops.</p>
+
+<h3 id="parser">Parser and AST</h3>
+<p>The parser keeps one token of look-ahead. Expressions follow this precedence (lowest first): <code>OR</code>/<code>XOR</code> →
+<code>AND</code> → <code>NOT</code> → comparisons → <code>SHL</code>/<code>SHR</code> → <code>+ -</code> → <code>* / \ MOD</code> → unary sign → <code>^</code>
+(right-associative) → primary. Depth is limited (64 levels) to protect the stack.</p>
+<p>Statements are parsed by <code>parse_block</code>, which loops until it meets a <em>terminator</em> (<code>NEXT</code>, <code>WEND</code>,
+<code>LOOP</code>, <code>ELSE</code>, <code>ELSEIF</code>, <code>CASE</code>, <code>END IF</code>, <code>END SUB</code>…) and returns which one it found; the
+caller checks that it is the expected one and reports mismatches with the line where the block was opened. A label is
+an identifier followed by <code>:</code> <em>alone on its line</em>; labels are recorded per block with the index of the next
+statement. <code>SUB</code>/<code>FUNCTION</code> definitions are only allowed at the top level and are collected in
+<code>Program.procs</code>.</p>
+<p>When the parse fails because the input ended inside an open block, <code>Program.incomplete</code> is set: the REPL uses it
+to ask for more lines instead of reporting an error.</p>
+<table>
+  <thead><tr><th>Node kind</th><th>Used for</th></tr></thead>
+  <tbody>
+    <tr><td><code>E_NUM</code>, <code>E_STR</code>, <code>E_VAR</code></td><td>Literals and variables (names are lower-cased by the parser).</td></tr>
+    <tr><td><code>E_CALL</code></td><td><code>name(args)</code>: array element, user FUNCTION or built-in — decided at run time.</td></tr>
+    <tr><td><code>E_UNOP</code>, <code>E_BINOP</code></td><td>Operators (<code>op</code> is the token type).</td></tr>
+    <tr><td><code>S_ASSIGN</code>, <code>S_PRINT</code> (<code>seps</code>), <code>S_INPUT</code></td><td>Assignment and I/O.</td></tr>
+    <tr><td><code>S_IF</code> (<code>ifs[]</code>), <code>S_FOR</code>, <code>S_WHILE</code>, <code>S_DO</code> (<code>flags</code>), <code>S_SELECT</code> (<code>cases[]</code>)</td><td>Control flow.</td></tr>
+    <tr><td><code>S_EXIT</code>, <code>S_CONTINUE</code>, <code>S_GOTO</code>, <code>S_RETURN</code>, <code>S_END</code></td><td>Jumps.</td></tr>
+    <tr><td><code>S_CALL</code>, <code>S_DIM</code>, <code>S_LOCAL</code>, <code>S_RUN</code>, <code>S_CLS</code>, <code>S_COLOR</code>, <code>S_LOCATE</code>, <code>S_SLEEP</code>, <code>S_PAUSE</code></td><td>Other statements.</td></tr>
+  </tbody>
+</table>
+
+<h3 id="values">Values, strings and variables</h3>
+<p>A <code>Value</code> is either a 64-bit integer or a pointer to a reference-counted <code>Str</code> (length + bytes, always
+NUL-terminated). Copying a string value only increments the count (<code>v_copy</code>); <code>v_free</code> releases it.
+Arithmetic wraps around (it is done on unsigned integers to avoid undefined behavior); division by zero is a run-time
+error.</p>
+<p>Variables live in hash tables (<code>VarTable</code>, FNV-1a hash). There is one global table and, during a procedure call,
+a <code>Frame</code> with the local table; lookup checks the current frame's locals, then the globals — never the caller's
+locals. A variable is created on first assignment; reading an unknown variable gives 0 or <code>""</code>. Arrays are the same
+<code>Var</code> with <code>is_array</code> set and a vector of values.</p>
+
+<h3 id="execution">Execution and control flow</h3>
+<p><code>exec_block</code> runs statements in order and returns an <code>Exec</code> code that tells the enclosing constructs what
+happened:</p>
+<table>
+  <thead><tr><th>Exec</th><th>Produced by</th><th>Handled by</th></tr></thead>
+  <tbody>
+    <tr><td><code>X_OK</code></td><td>normal completion</td><td>—</td></tr>
+    <tr><td><code>X_EXIT_FOR</code>, <code>X_EXIT_WHILE</code>, <code>X_EXIT_DO</code></td><td><code>EXIT FOR/WHILE/DO</code></td><td>the matching loop</td></tr>
+    <tr><td><code>X_CONT_FOR</code>, <code>X_CONT_WHILE</code>, <code>X_CONT_DO</code></td><td><code>CONTINUE …</code></td><td>the matching loop</td></tr>
+    <tr><td><code>X_RETURN</code></td><td><code>RETURN</code>, <code>EXIT SUB/FUNCTION</code></td><td><code>call_proc</code></td></tr>
+    <tr><td><code>X_GOTO</code></td><td><code>GOTO</code> (label name in <code>in-&gt;goto_label</code>)</td><td>the first enclosing block that has the label</td></tr>
+    <tr><td><code>X_END</code></td><td><code>END</code>, <code>EXIT n</code>, <code>exit</code> commands</td><td>everybody unwinds to the top</td></tr>
+    <tr><td><code>X_ERROR</code></td><td>run-time error (<code>rt_err</code>)</td><td><code>finish_exec</code> prints it</td></tr>
+  </tbody>
+</table>
+<p>This explains the GOTO rule: a block that does not contain the label returns <code>X_GOTO</code> to its parent, so a jump can
+leave loops but never enter them. <code>rt_err</code> records the first error with its line and returns false; every
+evaluation function propagates false upward, and <code>finish_exec</code> prints <code>file:line: error: message</code>.</p>
+<p>Procedures: <code>call_proc</code> evaluates the arguments in the caller's context, type-checks them against the
+parameter names, creates a <code>Frame</code>, runs the body and converts <code>X_RETURN</code> into the return value. The call depth
+is limited to 200.</p>
+
+<h3 id="run-impl">RUN, RUN$ and exit</h3>
+<p><code>basic_run_command</code> implements both: with one argument it calls <code>shell_exec_line</code>, with several it builds
+an <code>argv</code> and calls <code>shell_exec_argv</code>; <code>RUN$</code> pushes a capture sink first and strips the final newlines.
+The exit code goes to <code>in-&gt;err</code> (the <code>ERR</code> function). After the command it checks two flags set by the
+<code>exit</code> command:</p>
+<ul>
+  <li><code>shell_exit_requested</code> (<code>exit CODE</code>): the script ends like <code>END CODE</code>; every calling script sees the
+      same flag after its own <code>RUN</code> and ends too, and finally the REPL loop stops.</li>
+  <li><code>shell_script_exit_requested</code> (<code>exit /b CODE</code>): the innermost script clears the flag and ends with
+      <code>CODE</code>, which its caller receives in <code>ERR</code>.</li>
+</ul>
+
+<h3 id="interactive">Interactive mode</h3>
+<p>The REPL keeps one long-lived interpreter, so variables and SUBs defined at the prompt persist; programs that define
+procedures are kept alive (<code>in-&gt;progs</code>) because the procedures point into their AST. Scripts, instead, each get a
+fresh interpreter from <code>basic_run_file</code>. <code>interp_is_basic_line</code> decides whether a prompt line is BASIC: it
+is if it starts with a statement keyword (but a lone <code>exit</code> is the shell command), assigns (<code>x =</code>,
+<code>a(1) =</code>) or calls a SUB defined earlier.</p>
+
+<h3 id="builtins">Built-in functions</h3>
+<p>Built-ins are C functions registered in tables of <code>BFunc</code>:</p>
+<pre class="code" data-lang="c" data-title="src/basic/interp_int.h">/* Built-in functions. Argument type letters: 's' string, 'n' number,
+ * '?' any, 'a' array (passed unevaluated, see interp_array_arg).
+ * The last letter repeats for extra arguments. */
+typedef bool (*BFn)(Interp *in, Node *call, Value *args, int nargs, Value *out);
+typedef struct {
+    const char *name; /* lower case, with '$' for string results */
+    int minargs, maxargs;
+    const char *types;
+    BFn fn;
+} BFunc;</pre>
+<p><code>call_builtin</code> checks the number of arguments, evaluates and type-checks them according to <code>types</code>, calls the
+function and frees the arguments. A function returns <code>false</code> only for a run-time error (after <code>rt_err</code>);
+functions that can fail softly (files, variables) set <code>in-&gt;err</code> instead, so scripts test <code>ERR</code>. The result type
+must match the name: a name ending in <code>$</code> returns a string. Array arguments (<code>'a'</code>) are not evaluated; the
+function gets the variable with <code>interp_array_arg</code>. Portable functions are in <code>bfuncs.c</code>
+(<code>basic_core_funcs_init</code>); UEFI ones are registered by <code>efi_var.c</code> and <code>efi_boot.c</code>.</p>
+
+<!-- ===================================================================== -->
+<h2 id="efi-modules">UEFI modules</h2>
+
+<p class="chapter-intro">Everything that needs the firmware lives in <code>src/platform/efi</code>. The modules register
+their commands and BASIC functions from <code>platform_cmds_init</code>.</p>
+<table>
+  <thead><tr><th>File</th><th>Content</th></tr></thead>
+  <tbody>
+    <tr><td><code>efi_platform.c</code></td><td>Starting images, output capture proxy, Secure Boot state, <code>ver</code>, <code>reset</code>, <code>memmap</code>, <code>sysinfo</code>, <code>platform_cmds_init</code>.</td></tr>
+    <tr><td><code>efi_shellproto.c</code></td><td>EFI_SHELL_PROTOCOL 2.2 and the shell file handles; Ctrl-C key notification; device names.</td></tr>
+    <tr><td><code>efi_var.c</code></td><td>UEFI variables: <code>var</code>, <code>dmpstore</code>, <code>setvar</code>, storage of environment variables and aliases, BASIC variable functions.</td></tr>
+    <tr><td><code>efi_boot.c</code></td><td>Load options, <code>bootmgr</code> (plans, backups), <code>bcfg</code>, BASIC boot functions.</td></tr>
+    <tr><td><code>efi_drivers.c</code></td><td>Handle numbering, <code>drivers</code>, <code>devices</code>, <code>devtree</code>, <code>dh</code>, <code>openinfo</code>, <code>connect</code>…, <code>load</code>, <code>unload</code>, <code>drvdiag</code>, <code>drvcfg</code>.</td></tr>
+    <tr><td><code>efi_disk.c</code></td><td>Block devices (<code>blkN</code>), <code>map</code>'s block part, <code>dblk</code>, <code>timezone</code>, <code>getmtc</code>, block and memory back-ends of <code>hexedit</code>.</td></tr>
+    <tr><td><code>efi_hw.c</code></td><td><code>dmem</code>, <code>mm</code>, <code>pci</code>, <code>smbiosview</code>, <code>acpiview</code>, <code>mode</code>, <code>sermode</code>, <code>loadpcirom</code>, <code>gop</code>, <code>cpuid</code>.</td></tr>
+    <tr><td><code>efi_net.c</code>, <code>efi_net6.c</code>, <code>efi_net.h</code></td><td>IPv4 and IPv6: <code>ifconfig</code>, <code>ifconfig6</code>, <code>ping</code>, <code>ping6</code>, <code>tftp</code>, <code>http</code>.</td></tr>
+    <tr><td><code>efi_guids.c</code></td><td>Names of well-known protocol GUIDs (for <code>dh</code> and the shell protocol).</td></tr>
+  </tbody>
+</table>
+
+<h3 id="handles">Handle numbers</h3>
+<p>UEFI handles are opaque pointers. <code>efi_drivers.c</code> keeps a list of every handle ever seen
+(<code>hdb</code>); a handle's number is its position in that list, printed in hex. The list only grows, so a number keeps its
+meaning for the whole session, even after other handles disappear. <code>efi_handle_index</code> and
+<code>efi_parse_handle</code> convert in both directions.</p>
+
+<h3 id="running-images">Running images</h3>
+<p><code>efi_start_image</code> runs applications (<code>load</code> and <code>loadpcirom</code> start drivers with <code>LoadImage</code>/<code>StartImage</code> directly, without shell parameters):</p>
+<ol class="steps">
+  <li>Read the file and call <code>LoadImage</code> with its device path (the firmware checks the Secure Boot signature here).</li>
+  <li>Put the command line (UCS-2) into <code>LoadedImage.LoadOptions</code>, as UEFI loaders expect.</li>
+  <li>Install <code>EFI_SHELL_PARAMETERS_PROTOCOL</code> on the image handle: <code>Argc</code>/<code>Argv</code> and the three standard
+      file handles, as ShellLib programs expect.</li>
+  <li>If output is being captured or redirected, replace <code>gST-&gt;ConOut</code> with the proxy (and fix the system table
+      CRC); the proxy's <code>OutputString</code> writes into the current sink.</li>
+  <li><code>StartImage</code>; then restore everything, print the exit data if any, and map the status to an exit code.</li>
+</ol>
+
+<h3 id="shell-protocol">EFI_SHELL_PROTOCOL</h3>
+<p>Programs built with the EDK2 ShellLib locate <code>EFI_SHELL_PROTOCOL</code> and call it for files, environment, current
+directory, mappings and to run commands. NESH implements all of version 2.2 (<code>efi_shellproto.c</code>).</p>
+<ul>
+  <li><strong>Installation</strong>: if another shell's protocol exists (NESH started from the UEFI Shell), NESH replaces it
+      with <code>ReinstallProtocolInterface</code> and restores it on exit; otherwise it installs its own on its image handle.</li>
+  <li><strong>File handles</strong>: a <code>SHELL_FILE_HANDLE</code> is a <code>NeshFile</code> whose first member is an
+      <code>EFI_FILE_PROTOCOL</code>, so programs can also call the file methods directly. Special kinds implement standard
+      input, output (into the current sink), error and <code>NUL</code>.</li>
+  <li><strong>Memory ownership</strong>: data returned for the caller to free (file info, device paths, help text, file
+      lists) is allocated with <code>AllocatePool</code>; strings returned as <code>CONST</code> stay owned by NESH (small caches keep
+      them alive).</li>
+  <li><strong>Execute</strong> runs a command line through <code>shell_exec_line</code>, with the environment overlay when the
+      caller passes an environment.</li>
+</ul>
+<p><code>tests/apps/shelltest.c</code> exercises every function of the protocol and is run by <code>make qemu-test</code>.</p>
+
+<h3 id="variables-impl">UEFI variables and boot entries</h3>
+<p><code>efi_var_read</code> / <code>efi_var_write</code> wrap <code>GetVariable</code>/<code>SetVariable</code> with UTF-8 names. GUID names
+(<code>global</code>, <code>security</code>, <code>shell</code>…) are resolved by <code>guid_parse</code>. <code>efi_boot.c</code> parses
+<code>EFI_LOAD_OPTION</code> structures (attributes, description, device path list, optional data) and never writes a
+variable directly: changes are collected in a <em>plan</em>.</p>
+<pre class="code" data-lang="c" data-title="src/platform/efi/efi_boot.c (outline)">Plan p = { .dry = a-&gt;n, .yes = a-&gt;y, .nobackup = a-&gt;B };
+plan_add(&amp;p, "BootOrder", data, size, xstrdup("new boot order ..."));
+int rc = plan_apply(&amp;p); /* show; stop if dry run; confirm; back up; write */
+plan_free(&amp;p);</pre>
+<p>This one function gives every <code>bootmgr</code> subcommand the same dry run, confirmation and backup behavior.</p>
+
+<h3 id="network-impl">Network</h3>
+<figure>
+<pre class="mermaid">
+flowchart BT
+  SNP["SimpleNetwork (NIC driver)"] --> MNP["MNP"]
+  MNP --> IP4["IP4 / IP4Config2"]
+  MNP --> IP6["IP6 / IP6Config"]
+  IP4 --> UDP4["UDP4"] --> MT4["MTFTP4 → tftp"]
+  IP4 --> TCP["TCP"]
+  IP6 --> UDP6["UDP6"] --> MT6["MTFTP6 → tftp"]
+  IP6 --> TCP
+  TCP --> HTTP["HTTP → http"]
+  IP4 --> PING4["ICMP → ping"]
+  IP6 --> PING6["ICMPv6 → ping6"]
+</pre>
+<figcaption>Firmware network protocols used by NESH</figcaption>
+</figure>
+<p>NESH uses the firmware's protocols through their <em>service binding</em>: <code>CreateChild</code> gives a private instance,
+which is configured, used and destroyed. Configuration commands talk to <code>IP4Config2</code> and <code>IP6Config</code>. Ping builds
+ICMP echo packets itself and sends them through a raw IP instance; for ICMPv6 NESH also computes the checksum over the
+IPv6 pseudo-header. <code>net6_prepare</code> picks the IPv6 source address that can reach the destination (link-local for
+<code>fe80::</code>, otherwise a global one) and waits up to 10 s for router autoconfiguration. <code>tftp</code> uses MTFTP4 or
+MTFTP6, which have the same function table and token, so only the configuration differs; <code>http</code> selects the IPv6
+access point when the URL host is in brackets.</p>
+
+<h3 id="compression">UEFI compression</h3>
+<p><code>src/lib/eficomp.c</code> implements the EFI 1.1 compression format used by option ROMs and firmware volumes, both
+directions: LZ77 with an 8 KiB window, blocks with three canonical Huffman trees (NT = 19 for code lengths, NC = 510
+for literals and match lengths, NP = 14 for position classes), bits written most significant first. The output is
+verified against the firmware's own decompressor in the QEMU tests.</p>
+
+<h3 id="secure-boot-impl">Secure Boot guard</h3>
+<p><code>secure_boot_active()</code> reads the <code>SecureBoot</code> variable. Low-level writes call
+<code>hw_write_allowed("cmd")</code> first, which prints the standard message and returns false while Secure Boot is active:
+today <code>mm</code> writes and <code>hexedit -m</code> saves. A new command that writes memory, I/O ports or PCI registers must use it.</p>
+
+<!-- ===================================================================== -->
+<h2 id="extending">Extending NESH</h2>
+
+<p class="chapter-intro">Two complete walkthroughs: a new command and a new BASIC function. The code below is compiled
+and tested as shown.</p>
+
+<h3 id="add-command">Tutorial: adding a command</h3>
+<p>We add <code>sum</code>, which prints the size and a 16-bit checksum (the BSD <code>sum</code> algorithm) of files, with a
+<code>-q</code> option and <code>-data</code> support. It only uses the PAL through the core, so it is portable: it goes in
+<code>src/cmd</code> and works in both builds.</p>
+<p><strong>1. Write the command</strong> in a new file <code>src/cmd/cmd_sum.c</code>:</p>
+<pre class="code" data-lang="c" data-title="src/cmd/cmd_sum.c">/* sum: size and 16-bit checksum of files (tutorial example of the developer manual). */
+#include "../core/shell.h"
+
+static int cmd_sum(int argc, char **argv)
+{
+    bool f[1];
+    int first = getopts(argc, argv, "q", f); /* -q: only the checksum */
+    if (first &lt; 0)
+        return RC_USAGE;
+    if (first == argc)
+        return cmd_usage("sum");
+    int rc = RC_OK;
+    for (int i = first; i &lt; argc; i++) {
+        char *path = path_resolve(argv[i]);
+        char *data;
+        size_t len;
+        int e = path ? file_read_all(path, &amp;data, &amp;len) : PAL_ENOENT;
+        if (e) {
+            rc = cmd_perr("sum", argv[i], e);
+            free(path);
+            continue;
+        }
+        unsigned s = 0;
+        for (size_t k = 0; k &lt; len; k++) {
+            s = (s &gt;&gt; 1) | ((s &amp; 1) &lt;&lt; 15); /* BSD sum: rotate right, then add */
+            s = (s + (uint8_t)data[k]) &amp; 0xFFFF;
+        }
+        if (out_data_mode()) {
+            data_record();
+            data_field("path", "%s", path);
+            data_field("size", "%zu", len);
+            data_field("sum", "%04X", s);
+        } else if (f[0]) {
+            out_printf("%04X\n", s);
+        } else {
+            out_printf("%04X %8zu  %s\n", s, len, path);
+        }
+        free(data);
+        free(path);
+    }
+    return rc;
+}
+
+static const Cmd sum_cmds[] = {
+    { "sum", cmd_sum, "sum [-q] FILE...", "Show the size and a 16-bit checksum of files",
+      "  -q        print only the checksum\n"
+      "  sum *.efi              one line per file: checksum, size, path\n"
+      "With -data: path, size, sum.\n", CMD_DATA },
+};
+
+void cmds_sum_init(void)
+{
+    shell_register(sum_cmds, ARRAY_SIZE(sum_cmds));
+}</pre>
+<p>Points to notice:</p>
+<ul>
+  <li><code>getopts</code> handles <code>-q</code> anywhere on the line and returns the first operand.</li>
+  <li>Paths are made canonical with <code>path_resolve</code> before any file function.</li>
+  <li>Errors are reported with <code>cmd_perr</code>/<code>cmd_err</code> and the loop continues with the next file; the exit code
+      remembers the failure.</li>
+  <li><code>-data</code> needs no parsing: the flag <code>CMD_DATA</code> and <code>out_data_mode()</code> are enough.</li>
+  <li>The help text follows the rules: lines of at most 78 columns, options first, examples, the <code>-data</code> fields
+      last.</li>
+</ul>
+<p><strong>2. Register it.</strong> Declare the init function in <code>src/core/shell.h</code> next to the others
+(<code>void cmds_sum_init(void);</code>), call it from <code>nesh_main</code> in <code>src/core/shell.c</code> after
+<code>cmds_edit_init()</code>, and add <code>src/cmd/cmd_sum.c</code> to <code>COMMON_SRC</code> in the <code>Makefile</code>. (A UEFI-only
+command goes in <code>src/platform/efi</code> instead: add its table to one of the modules or register it from
+<code>platform_cmds_init</code>.)</p>
+<p><strong>3. Give it a chapter in the reference</strong>: add <code>"sum"</code> to a category of <code>CATEGORIES</code> in
+<code>tools/gen-docs.py</code> (for example “Text and data”) and run <code>make docs</code>. <code>make test</code> fails until this is
+done, so a command can never be left out of the manual.</p>
+<p><strong>4. Test it.</strong> Add a host test, e.g. <code>tests/host/sum.nsb</code>, and generate its expected output:</p>
+<pre class="code" data-lang="basic" data-title="tests/host/sum.nsb">WRITEFILE "a.txt", "hello" + CHR$(10)
+RUN "sum a.txt"
+RUN "sum -q a.txt"
+PRINT FIELD$(RUN$("sum -data a.txt"), "size")
+RUN "sum missing.txt"
+PRINT "ERR="; ERR</pre>
+<pre class="terminal">$ make build/nesh-host
+$ UPDATE=1 tests/run-host-tests.sh build/nesh-host   # writes tests/host/sum.out
+$ cat tests/host/sum.out                              # check it by hand once
+$ make test</pre>
+<p>The expected output is <code>9073        6  fs0:\a.txt</code>, then <code>9073</code>, then <code>6</code>, then the error message and
+<code>ERR=1</code> (0x9073 = 36979, the same value the Unix <code>sum</code> command prints). If the command uses firmware services,
+also add checks to <code>tests/efi/run.nsb</code> and run <code>make qemu-test</code>.</p>
+
+<h3 id="add-function">Tutorial: adding a BASIC function</h3>
+<p>We add <code>REVERSE$(s$)</code>, which reverses a string character by character (not byte by byte: UTF-8 characters
+must stay intact). Portable functions go in <code>src/basic/bfuncs.c</code>:</p>
+<pre class="code" data-lang="c" data-title="src/basic/bfuncs.c">/* REVERSE$(s$): the characters of s$ in reverse order. */
+FN(f_reverse)
+{
+    UNUSED;
+    const Str *s = a[0].s;
+    Sbuf b;
+    sb_init(&amp;b);
+    for (size_t i = s-&gt;len; i &gt; 0;) {
+        size_t start = i - 1;
+        while (start &gt; 0 &amp;&amp; ((uint8_t)s-&gt;s[start] &amp; 0xC0) == 0x80) /* UTF-8 continuation byte */
+            start--;
+        sb_add(&amp;b, s-&gt;s + start, i - start);
+        i = start;
+    }
+    *out = v_str(str_take_sb(&amp;b));
+    return true;
+}</pre>
+<p>and one line in the <code>core_funcs</code> table (name in lower case with the <code>$</code>, one argument, type letter
+<code>s</code>):</p>
+<pre class="code" data-lang="c">    { "reverse$", 1, 1, "s", f_reverse },</pre>
+<p>That is all: the parser needs no change, because any <code>name(args)</code> is resolved at run time.
+<code>PRINT REVERSE$("NESH è bello")</code> prints <code>olleb è HSEN</code>. Then document the function in the
+<a href="user-manual.html#function-reference">function reference</a> of the user manual (a <code>&lt;dt id="fn-…"&gt;</code> entry):
+<code>make test</code> fails for a built-in function without an entry.</p>
+<div class="callout"><span class="callout-title">Rules for built-ins</span>
+<ul>
+  <li>Return <code>false</code> only after <code>rt_err</code> (a real error that stops the script). For expected failures (a missing
+      file) set <code>in-&gt;err</code> and return a neutral value.</li>
+  <li>Never keep pointers to <code>args</code>: they are freed after the call. Build the result with <code>v_str</code>/<code>v_int</code>.</li>
+  <li>UEFI-dependent functions go in the UEFI module that owns the topic and are registered with
+      <code>basic_register_funcs</code> from its init function.</li>
+</ul></div>
+
+<!-- ===================================================================== -->
+<h2 id="testing">Testing</h2>
+
+<p class="chapter-intro">Three levels of tests, all automatic: host tests for the language and portable commands,
+documentation checks, and QEMU tests for everything that needs firmware.</p>
+<figure>
+<pre class="mermaid">
+flowchart LR
+  subgraph T1["make test (seconds)"]
+    H["tests/host/*.nsb&lt;br/&gt;vs *.out"]
+    G["gen-docs.py --check"]
+    X["check-doc-examples.py"]
+  end
+  subgraph T2["make qemu-test (~1 min)"]
+    Q["tests/efi/run.nsb&lt;br/&gt;in OVMF"]
+    SA["shelltest.efi&lt;br/&gt;EDK2 apps"]
+  end
+  subgraph T3["make qemu-nettest"]
+    N["tests/efi/net.nsb&lt;br/&gt;IPv4 + IPv6"]
+  end
+</pre>
+<figcaption>Test levels</figcaption>
+</figure>
+
+<h3 id="host-tests">Host tests</h3>
+<p><code>tests/run-host-tests.sh</code> copies each <code>tests/host/NAME.nsb</code> into an empty temporary directory, runs it with
+<code>NESH_FS=.</code> and the arguments <code>arg1 "arg two"</code>, and compares stdout+stderr and the exit code with
+<code>NAME.out</code>. <code>UPDATE=1</code> rewrites the <code>.out</code> files — review the diff before committing. The host build uses
+AddressSanitizer and UBSan, so memory errors and undefined behavior make tests fail loudly.</p>
+
+<h3 id="qemu-tests">QEMU tests</h3>
+<p><code>tools/run-qemu.sh --test</code> builds a virtual FAT disk (<code>build/esp</code>, read-only, becomes <code>fs0:</code>) with
+<code>nesh.efi</code> as <code>\EFI\BOOT\BOOTX64.EFI</code>, the tests, the examples and the fixtures, plus a writable FAT image
+(<code>build/work.img</code>, <code>fs1:</code>). OVMF boots NESH, which runs <code>startup.nsb</code> → <code>tests\run.nsb</code> and shuts the
+machine down. The serial output is saved in <code>build/qemu-test.log</code>. The run passes only if the log contains the end
+marker, the line <code>failures:0</code> and no line starting with <code>FAIL</code>.</p>
+<p>Inside the tests, a small SUB does the bookkeeping:</p>
+<pre class="code" data-lang="basic" data-title="tests/efi/run.nsb">fails = 0
+SUB check(name$, ok)
+  IF ok THEN
+    PRINT "PASS "; name$
+  ELSE
+    PRINT "FAIL "; name$
+    fails = fails + 1
+  END IF
+END SUB
+...
+check "map lists fs0", INSTR(RUN$("map"), "fs0") &gt; 0</pre>
+<p><code>--nettest</code> adds a virtio network card with QEMU user networking (DHCP on 10.0.2.0/24, router advertisements for
+fec0::/64, a TFTP server) and an HTTP server on the host, and loads the firmware network drivers from
+<code>tests/fixtures/netdrv</code>.</p>
+
+<h3 id="fixtures">Fixtures</h3>
+<table>
+  <thead><tr><th>Path</th><th>What and why</th></tr></thead>
+  <tbody>
+    <tr><td><code>tests/fixtures/edk2/*.efi</code></td><td>EDK2 UEFI Shell applications (<code>edit</code>, <code>pci</code>, <code>ping</code>, <code>tftp</code>, <code>usb</code>): run under NESH
+        to prove ShellLib compatibility. Test data only; <code>tests/fixtures/README.md</code> gives origin and license of every fixture.</td></tr>
+    <tr><td><code>tests/fixtures/netdrv/*.efi</code></td><td>Network drivers extracted from the OVMF image (Debian's OVMF only loads them for
+        network boot).</td></tr>
+    <tr><td><code>efi-virtio.rom</code> (not in the repository)</td><td>A compressed PCI option ROM for <code>loadpcirom</code>, copied from the QEMU
+        installation at test time (<code>QEMU_ROM=</code>, default <code>/usr/share/qemu/efi-virtio.rom</code>); the test is skipped without it.</td></tr>
+    <tr><td><code>tests/apps/shelltest.c</code></td><td>Built by the Makefile with the NESH toolchain; checks every EFI_SHELL_PROTOCOL function.</td></tr>
+  </tbody>
+</table>
+
+<h3 id="docs-system">The documentation system</h3>
+<ul>
+  <li><strong>Command reference</strong>: <code>tools/gen-docs.py</code> reads every <code>static const Cmd …[]</code> table in the
+      sources (a small C tokenizer joins adjacent string literals and expands <code>NESH_VERSION</code>/<code>SCRIPT_EXT</code>) and
+      rewrites the part of <code>docs/user-manual.html</code> between the <code>BEGIN GENERATED</code>/<code>END GENERATED</code> markers.
+      <code>--check</code> fails when the manual is out of date, when a command has no category, when a help line is longer
+      than 78 columns, or when a BASIC function has no entry in the function reference.</li>
+  <li><strong>Examples</strong>: <code>tools/check-doc-examples.py</code> takes every <code>&lt;pre data-example="NAME"&gt;</code> of the
+      user manual, writes it as <code>NAME.nsb</code>, checks the syntax of all of them (<code>nesh -k</code>), then runs the ones that
+      have an output block (<code>data-example-output="NAME"</code>) in page order and compares the output. Examples marked
+      <code>data-platform="efi"</code> are only syntax-checked.</li>
+  <li><strong>Pages</strong>: plain HTML with <code>assets/docs.css</code> and <code>assets/docs.js</code> (table of contents, numbering,
+      search, index, syntax colors) and a local copy of Mermaid for the diagrams, so the manuals work offline. In a
+      Mermaid block write line breaks as <code>&amp;lt;br/&amp;gt;</code>: a literal tag would be eaten by the HTML parser.</li>
+</ul>
+
+<!-- ===================================================================== -->
+<h2 id="conventions">Conventions</h2>
+
+<h3 id="code-style">Code style</h3>
+<ul>
+  <li>C11 with GNU extensions, 4-space indentation, braces on the same line, <code>snake_case</code>; file-local functions and
+      data are <code>static</code>.</li>
+  <li>Comments explain <em>why</em>, in English, and are short. Every file starts with a comment saying what it contains.</li>
+  <li>Text inside NESH is UTF-8. Conversion to and from UCS-2 happens only at the firmware boundary
+      (<code>utf8_to_ucs2</code>, <code>ucs2_to_utf8</code>).</li>
+  <li>Functions that return allocated memory say so in their comment; the caller frees it. Allocation never fails
+      (<code>x*</code> wrappers).</li>
+  <li>Command options: the NESH form and the UEFI Shell form are both accepted when they do not conflict; UEFI Shell
+      options that make no sense in NESH (such as <code>-b</code>) are accepted and ignored, never rejected.</li>
+  <li>No code, headers or libraries from EDK2. Protocol and structure definitions are written from the UEFI
+      specification.</li>
+  <li>Keep the build free of warnings and the tests green; add a test with every fix.</li>
+</ul>
+
+<h3 id="help-rules">Help text rules</h3>
+<ul>
+  <li><code>summary</code>: one line, at most 78 columns, starting with a verb (“List…”, “Show…”).</li>
+  <li><code>help</code>: option lines indented by two spaces with aligned descriptions, then short notes, then 1–3 examples;
+      every line at most 78 columns (checked by <code>make test</code>).</li>
+  <li>Document only what the code does. Options accepted for compatibility and ignored are said to be ignored.</li>
+  <li>With <code>CMD_DATA</code>, the last line lists the <code>-data</code> fields.</li>
+</ul>
+
+<h3 id="decisions-log">Recording decisions</h3>
+<p>Design decisions — what was chosen, the alternatives and why — are recorded in
+<a href="decisions-and-history.md">docs/decisions-and-history.md</a>. Read it before changing a behavior that looks
+arbitrary: there is usually a reason.</p>
+
+<!-- ===================================================================== -->
+<h2 id="debugging">Debugging</h2>
+<table>
+  <thead><tr><th>Symptom</th><th>Likely cause and cure</th></tr></thead>
+  <tbody>
+    <tr><td><code>elf2efi: unsupported relocation type</code></td><td>A symbol is not hidden or a construct needs the GOT. Check for
+        global data without <code>static</code> referenced across files through non-PIC paths; rebuild with the Makefile flags.</td></tr>
+    <tr><td>Random crashes only on UEFI</td><td>Stack overflow (deep recursion beyond 1 MiB), a missing <code>-mno-red-zone</code>, or a
+        UEFI structure with the wrong layout (check field types against the specification: <code>UINTN</code> is 64-bit,
+        <code>BOOLEAN</code> 8-bit, CHAR16 strings).</td></tr>
+    <tr><td>Works on the host, fails in QEMU</td><td>Firmware differences: file systems are case-insensitive, <code>Read</code> may return
+        fewer bytes, strings are UCS-2, events need the right TPL. Reproduce with <code>make qemu</code> and add a check to
+        <code>tests/efi/run.nsb</code>.</td></tr>
+    <tr><td>A ShellLib application misbehaves</td><td>Compare with the EDK2 UEFI Shell running the same program (the OVMF image has one:
+        <code>EFI Internal Shell</code>); check memory ownership rules of the protocol function it uses.</td></tr>
+    <tr><td>Memory errors in portable code</td><td>Run the failing script with <code>build/nesh-host</code>: AddressSanitizer reports the exact
+        line.</td></tr>
+  </tbody>
+</table>
+<p><code>make qemu</code> gives an interactive NESH on the serial console of your terminal; <kbd>Ctrl</kbd>+<kbd>A</kbd> <kbd>X</kbd>
+leaves QEMU. Debug output can be printed with <code>err_printf</code>, which always reaches the console even while output is
+captured.</p>
+
+<!-- ===================================================================== -->
+<h2 id="file-map">Source file map</h2>
+<table>
+  <thead><tr><th>File</th><th>Lines</th><th>Purpose</th></tr></thead>
+  <tbody>
+    <tr><td><code>include/efi.h</code></td><td>569</td><td>Minimal UEFI definitions (UEFI Specification 2.10), written for NESH</td></tr>
+    <tr><td><code>include/efi_shell.h</code></td><td>155</td><td>UEFI Shell 2.2 protocols (from the UEFI Shell Specification), plus the few extra UEFI protocols the shell implementation needs</td></tr>
+    <tr><td><code>src/basic/basic.h</code></td><td>186</td><td>NESH BASIC: lexer, parser (AST) and tree-walking interpreter</td></tr>
+    <tr><td><code>src/basic/bfuncs.c</code></td><td>816</td><td>Core built-in functions of NESH BASIC (portable)</td></tr>
+    <tr><td><code>src/basic/interp.c</code></td><td>1432</td><td>NESH BASIC interpreter: values and variables, expression evaluation, statement execution (tree walking), procedures, RUN/RUN$ and the public API</td></tr>
+    <tr><td><code>src/basic/interp_int.h</code></td><td>85</td><td>Interpreter internals shared by interp.c and the built-in function modules</td></tr>
+    <tr><td><code>src/basic/lexer.c</code></td><td>286</td><td>NESH BASIC lexer: turns source text into tokens (numbers, strings, names, keywords, punctuation); skips comments and " _" line continuations</td></tr>
+    <tr><td><code>src/basic/parser.c</code></td><td>1204</td><td>NESH BASIC parser: recursive descent from tokens to the AST (Program: main block + procedures); detects incomplete input for the interactive prompt</td></tr>
+    <tr><td><code>src/cmd/cmd_core.c</code></td><td>315</td><td>Shell and session commands: help, ver, cls, exit, history, echo, pause, sleep, which</td></tr>
+    <tr><td><code>src/cmd/cmd_edit.c</code></td><td>1009</td><td>Full-screen editors: edit (text) and hexedit (files, disk blocks, memory)</td></tr>
+    <tr><td><code>src/cmd/cmd_fs.c</code></td><td>1357</td><td>File and volume commands</td></tr>
+    <tr><td><code>src/cmd/cmd_text.c</code></td><td>390</td><td>Text and data commands, date/time</td></tr>
+    <tr><td><code>src/cmd/cmd_util.c</code></td><td>191</td><td>Utilities: stall, parse, eficompress, efidecompress</td></tr>
+    <tr><td><code>src/core/alias.c</code></td><td>183</td><td>Command aliases: permanent (stored in UEFI variables like the UEFI Shell) and temporary</td></tr>
+    <tr><td><code>src/core/con.c</code></td><td>269</td><td>Console services: stack of output sinks (console, capture, file), -data record helpers, colors, keyboard with type-ahead buffer and Ctrl-C detection</td></tr>
+    <tr><td><code>src/core/con.h</code></td><td>45</td><td>Console services used by the whole shell: output sinks (console, capture buffer, file), colors, key input with type-ahead buffer, Ctrl-C handling</td></tr>
+    <tr><td><code>src/core/env.c</code></td><td>268</td><td>Shell environment variables (separate from BASIC variables)</td></tr>
+    <tr><td><code>src/core/lineedit.c</code></td><td>644</td><td>Line editor: cursor movement, history (persistent), Ctrl-R search, Tab completion</td></tr>
+    <tr><td><code>src/core/shell.c</code></td><td>972</td><td>Shell core: command registry, option parsing, canonical paths and wildcards, file helpers, command-line splitting and execution, the prompt (REPL) and nesh_main, the portable entry point</td></tr>
+    <tr><td><code>src/core/shell.h</code></td><td>130</td><td>Shell core: command registry, execution, paths, file helpers</td></tr>
+    <tr><td><code>src/core/ui.c</code></td><td>109</td><td>Interactive selection menu (MENU function)</td></tr>
+    <tr><td><code>src/lib/eficomp.c</code></td><td>547</td><td>UEFI compression format (EFI 1.1 / "version 1"): LZ77 with an 8 KiB window and canonical Huffman codes, as decoded by EFI_DECOMPRESS_PROTOCOL</td></tr>
+    <tr><td><code>src/lib/eficomp.h</code></td><td>12</td><td>UEFI (EFI 1.1) compression format</td></tr>
+    <tr><td><code>src/lib/fmt.c</code></td><td>192</td><td>vsnprintf for the EFI build: %d %i %u %x %X %o %c %s %p %%, flags '-' '0' '+' ' ', width/precision (also '*'), length hh h l ll z j t</td></tr>
+    <tr><td><code>src/lib/libc.c</code></td><td>320</td><td>Freestanding C library subset for the EFI build</td></tr>
+    <tr><td><code>src/lib/rt.h</code></td><td>115</td><td>NESH runtime: standard C subset + shared helpers</td></tr>
+    <tr><td><code>src/lib/util.c</code></td><td>337</td><td>Shared helpers: allocation wrappers, string buffer, UTF-8, globbing</td></tr>
+    <tr><td><code>src/pal/efi_glue.h</code></td><td>38</td><td>Access to UEFI services for EFI-only modules</td></tr>
+    <tr><td><code>src/pal/pal.h</code></td><td>156</td><td>Platform abstraction layer: everything the portable core needs from the machine</td></tr>
+    <tr><td><code>src/pal/pal_common.c</code></td><td>25</td><td>Parts of the platform layer shared by the UEFI and Linux builds: error names</td></tr>
+    <tr><td><code>src/pal/pal_efi.c</code></td><td>1019</td><td>Platform layer for UEFI</td></tr>
+    <tr><td><code>src/pal/pal_host.c</code></td><td>593</td><td>Platform layer for Linux: used for fast development and automated tests</td></tr>
+    <tr><td><code>src/platform/efi/efi_boot.c</code></td><td>1604</td><td>Boot manager: Boot#### / BootOrder / BootNext / Timeout</td></tr>
+    <tr><td><code>src/platform/efi/efi_cmds.h</code></td><td>47</td><td>Shared declarations of the EFI-only command modules</td></tr>
+    <tr><td><code>src/platform/efi/efi_disk.c</code></td><td>449</td><td>Block devices and disk-level commands: blkN: names, dblk, timezone, getmtc</td></tr>
+    <tr><td><code>src/platform/efi/efi_drivers.c</code></td><td>1372</td><td>Drivers and devices: drivers, devices, devtree, dh, openinfo, connect, disconnect, reconnect, load, unload, drvdiag, drvcfg</td></tr>
+    <tr><td><code>src/platform/efi/efi_guids.c</code></td><td>136</td><td>Names of well-known GUIDs (protocols, tables, variable vendors), plus the names registered at run time through the shell protocol</td></tr>
+    <tr><td><code>src/platform/efi/efi_hw.c</code></td><td>1441</td><td>Memory and hardware: dmem, mm, pci, smbiosview, acpiview, mode, sermode, loadpcirom, gop, cpuid</td></tr>
+    <tr><td><code>src/platform/efi/efi_net.c</code></td><td>1025</td><td>Network commands on top of the firmware IPv4 stack: ifconfig, ping, tftp, http</td></tr>
+    <tr><td><code>src/platform/efi/efi_net.h</code></td><td>39</td><td>Shared by the IPv4 (efi_net.c) and IPv6 (efi_net6.c) network commands</td></tr>
+    <tr><td><code>src/platform/efi/efi_net6.c</code></td><td>791</td><td>IPv6 network commands on top of the firmware IPv6 stack: ifconfig6, ping6</td></tr>
+    <tr><td><code>src/platform/efi/efi_platform.c</code></td><td>587</td><td>EFI platform services: running images, Secure Boot state, system commands</td></tr>
+    <tr><td><code>src/platform/efi/efi_shellproto.c</code></td><td>1317</td><td>EFI_SHELL_PROTOCOL 2.2, implemented by NESH so that applications written for the UEFI Shell (ShellLib, ShellCEntryLib...) run under NESH</td></tr>
+    <tr><td><code>src/platform/efi/efi_var.c</code></td><td>1268</td><td>UEFI variables: the "var" command and the BASIC functions VAR$, VAREXISTS</td></tr>
+    <tr><td><code>src/platform/host.c</code></td><td>122</td><td>Platform-specific commands for the Linux test build: firmware features are not available, so only a minimal set is provided</td></tr>
+    <tr><td><code>tests/apps/shelltest.c</code></td><td>293</td><td>Test application for NESH's EFI_SHELL_PROTOCOL implementation</td></tr>
+    <tr><td><code>tests/run-host-tests.sh</code></td><td>25</td><td>Runs tests/host/*.nsb with the host build and compares the output with the .out files</td></tr>
+    <tr><td><code>tools/check-doc-examples.py</code></td><td>69</td><td>Runs the NESH BASIC examples of the user manual with the host build and compares their output with the output printed in the manual</td></tr>
+    <tr><td><code>tools/efi.lds</code></td><td>26</td><td>Linker script for NESH: ELF image at base 0, page-aligned sections</td></tr>
+    <tr><td><code>tools/elf2efi.py</code></td><td>172</td><td>Convert an x86_64 ELF shared object (linked with tools/efi.lds) into a PE32+ EFI application with native base relocations</td></tr>
+    <tr><td><code>tools/gen-docs.py</code></td><td>231</td><td>Generates the command reference of the user manual from the command tables in the C sources, so that the manual and the built-in 'help' never disagree</td></tr>
+    <tr><td><code>tools/run-qemu.sh</code></td><td>86</td><td>Boots nesh.efi in QEMU/OVMF: interactive, --test and --nettest modes</td></tr>
+  </tbody>
+</table>
+
+<!-- ===================================================================== -->
+<h2 id="glossary">Glossary</h2>
+<dl class="defs">
+  <dt id="g-bootservices" data-kind="term" data-index="Boot services">Boot services</dt><dd>Firmware functions available until the OS takes over (<code>gBS</code>): memory, events, protocols, images.</dd>
+  <dt id="g-devicepath" data-kind="term" data-index="Device path">Device path</dt><dd>A chain of nodes describing where a device or file is, e.g. <code>PciRoot(0x0)/Pci(0x2,0x0)/HD(1,…)</code>.</dd>
+  <dt id="g-driverbinding" data-kind="term" data-index="Driver binding">Driver binding</dt><dd>The protocol through which a driver is connected to controllers.</dd>
+  <dt id="g-esp" data-kind="term" data-index="ESP">ESP</dt><dd>EFI System Partition: the FAT partition with boot loaders.</dd>
+  <dt id="g-guid" data-kind="term" data-index="GUID">GUID</dt><dd>128-bit identifier of protocols and variable namespaces.</dd>
+  <dt id="g-handle" data-kind="term" data-index="Handle">Handle</dt><dd>An object in the firmware database carrying protocols.</dd>
+  <dt id="g-loadoption" data-kind="term" data-index="Load option">Load option</dt><dd>The content of a <code>Boot####</code>/<code>Driver####</code> variable.</dd>
+  <dt id="g-ovmf" data-kind="term" data-index="OVMF">OVMF</dt><dd>The UEFI firmware for virtual machines built from EDK2; used by the tests.</dd>
+  <dt id="g-pe" data-kind="term" data-index="PE32+">PE32+</dt><dd>The executable format of UEFI images (the 64-bit Windows format).</dd>
+  <dt id="g-protocol" data-kind="term" data-index="Protocol">Protocol</dt><dd>A table of functions (and data) identified by a GUID and installed on a handle.</dd>
+  <dt id="g-runtime" data-kind="term" data-index="Runtime services">Runtime services</dt><dd>Firmware functions still available to the OS (<code>gRT</code>): variables, time, reset.</dd>
+  <dt id="g-servicebinding" data-kind="term" data-index="Service binding">Service binding</dt><dd>A protocol that creates private child instances of a network protocol.</dd>
+  <dt id="g-shelllib" data-kind="term" data-index="ShellLib">ShellLib</dt><dd>The EDK2 library that UEFI Shell applications use; it relies on EFI_SHELL_PROTOCOL.</dd>
+  <dt id="g-tpl" data-kind="term" data-index="TPL">TPL</dt><dd>Task priority level: UEFI's simple interrupt-priority mechanism for events.</dd>
+  <dt id="g-ucs2" data-kind="term" data-index="UCS-2">UCS-2</dt><dd>16-bit character encoding of UEFI strings (<code>CHAR16</code>).</dd>
+</dl>
+
+<!-- ===================================================================== -->
+<h2 id="index" class="unnumbered">Index</h2>
+<div id="index-list"></div>
+
+<footer class="doc-footer">
+  NESH Developer Manual — for NESH 0.1.0. See also the <a href="user-manual.html">user manual</a> and the
+  <a href="decisions-and-history.md">design decisions and project history</a>.
+</footer>
+
+</main>
+</div>
+<script src="assets/vendor/mermaid.min.js"></script>
+<script src="assets/docs.js"></script>
+</body>
+</html>

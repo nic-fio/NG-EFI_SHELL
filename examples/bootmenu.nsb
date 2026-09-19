@@ -1,0 +1,40 @@
+' bootmenu.nsb - interactive boot menu built from the firmware boot entries.
+' Copy it to the root of the boot volume as startup.nsb to show it at every start.
+
+' The entries, from "bootmgr -data": one record per entry, in boot order.
+n = RECORDS(RUN$("bootmgr -data"), rec$())
+DIM id$(n), desc$(n)
+count = 0
+items$ = ""
+FOR i = 0 TO n - 1
+  r$ = rec$(i)
+  ' keep the entries that are in the boot order, active, not hidden and
+  ' not the one that started this shell
+  IF FIELD$(r$, "kind") = "entry" AND FIELD$(r$, "order") <> "-" AND _
+     FIELD$(r$, "active") = "yes" AND FIELD$(r$, "hidden") = "no" AND _
+     FIELD$(r$, "current") = "no" THEN
+    id$(count) = FIELD$(r$, "id")
+    desc$(count) = FIELD$(r$, "description")
+    items$ = items$ + desc$(count) + "|"
+    count = count + 1
+  END IF
+NEXT
+items$ = items$ + "Firmware setup|Power off|Stay in the shell"
+
+' 10 seconds to choose; then the first entry starts
+choice = MENU("Start which system?", items$, 10, 1)
+
+SELECT CASE choice
+  CASE 1 TO count
+    PRINT "Starting "; desc$(choice - 1); "..."
+    ' BootNext: used once at the next boot; -B: no backup for this change
+    RUN "bootmgr next -B " + id$(choice - 1)
+    IF ERR = 0 THEN RUN "reset"
+    PRINT "Cannot set the next boot entry (error "; ERR; ")"
+  CASE count + 1
+    RUN "reset setup"
+  CASE count + 2
+    RUN "reset -s"
+  CASE ELSE
+    PRINT "Staying in the shell."
+END SELECT

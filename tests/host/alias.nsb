@@ -1,0 +1,16 @@
+WRITEFILE "a.txt", "x"
+RUN "alias -v ll ls -l"
+RUN "alias ll"
+out$ = RUN$("ll a.txt")
+PRINT "ll works: "; INSTR(out$, "a.txt") > 0
+RUN "alias -v ls ls -a"
+out$ = RUN$("ls")
+PRINT "self alias works: "; INSTR(out$, "a.txt") > 0; " ERR="; ERR
+RUN "alias -d ls"
+RUN "alias -v copy cp"
+RUN "copy a.txt b.txt"
+PRINT "copy alias: "; FILEEXISTS("b.txt")
+RUN "alias -v cp x"
+PRINT "builtin name refused ERR="; ERR
+RUN "alias -d nosuch"
+PRINT "delete missing ERR="; ERR

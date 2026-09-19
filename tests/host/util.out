@@ -1,0 +1,12 @@
+a.z: 9121 -> 149 bytes
+compressed smaller: -1
+b.txt: 149 -> 9121 bytes
+roundtrip: -1
+efidecompress: bad.z is not in the UEFI compressed format or is damaged
+damaged input ERR=1
+b, with comma
+d
+c
+parse missing ERR=127
+stall ok: -1
+[exit 0]

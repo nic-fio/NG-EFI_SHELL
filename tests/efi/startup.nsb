@@ -1,0 +1,5 @@
+' Automated test entry point (copied to the root of the test disk)
+PRINT "=== NESH TEST START ==="
+RUN "tests\run.nsb"
+PRINT "=== NESH TEST END ==="
+RUN "reset -s"

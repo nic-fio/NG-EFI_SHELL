@@ -1,0 +1,2906 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NESH User Manual</title>
+<meta name="description" content="User manual of NESH, the New EFI Shell: commands, scripting in NESH BASIC, boot management, hardware, network.">
+<link rel="stylesheet" href="assets/docs.css">
+</head>
+<body>
+<div class="topbar">
+  <button class="btn menu-btn" type="button" aria-label="Open the table of contents">&#9776; Contents</button>
+  <strong>NESH User Manual</strong>
+</div>
+<div class="layout">
+<nav class="sidebar" aria-label="Table of contents">
+  <div class="brand">
+    <div class="brand-logo">&gt;_</div>
+    <div class="brand-text"><strong>NESH User Manual</strong><span>New EFI Shell 0.1.0</span></div>
+  </div>
+  <div class="search">
+    <input type="search" placeholder="Search commands, functions, topics  ( / )" aria-label="Search">
+    <div class="search-results" role="listbox"></div>
+  </div>
+  <div class="toc"></div>
+  <div class="side-tools">
+    <button class="btn print-btn" type="button">Print / PDF</button>
+    <a class="btn" href="developer-manual.html">Developer manual</a>
+  </div>
+</nav>
+
+<main>
+
+<header class="titlepage">
+  <div class="kicker">User manual</div>
+  <h1>NESH — the New EFI Shell</h1>
+  <p class="lead">A modern command shell for UEFI firmware: files, disks, boot entries, UEFI variables,
+  drivers, hardware and network, with a real scripting language built in.</p>
+  <div class="meta">
+    <span><b>Version</b> 0.1.0</span>
+    <span><b>Platform</b> UEFI x86-64</span>
+    <span><b>File</b> nesh.efi (one file)</span>
+    <span><b>Audience</b> users, administrators, script writers</span>
+  </div>
+</header>
+
+<section class="unnumbered no-toc">
+  <h2 class="unnumbered" id="contents">Contents</h2>
+  <div class="toc-print" id="contents-list"></div>
+  <p>The <a href="#index">alphabetical index</a> at the end lists every command, function and topic.
+  Press <kbd>/</kbd> to search.</p>
+</section>
+
+<!-- ===================================================================== -->
+<h2 id="introduction">Introduction</h2>
+
+<p class="chapter-intro">NESH is a shell that runs inside the UEFI firmware, before any operating system starts.
+It does what the classic UEFI Shell does, and it is designed to be pleasant to use and easy to script.</p>
+
+<h3 id="what-is-nesh">What NESH is</h3>
+<p>Every modern PC starts with UEFI firmware. Before Windows or Linux is loaded, the firmware can run
+<em>UEFI applications</em>: boot loaders, setup tools, firmware updaters, diagnostics. A <em>shell</em> is a
+UEFI application that gives you a command prompt in that environment, so you can look at disks and files,
+change boot entries, read hardware information and run other tools.</p>
+<p>NESH is such a shell. It is a single file, <code>nesh.efi</code>, that you start from the firmware boot menu
+or from a USB stick. It offers:</p>
+
+<div class="cards">
+  <div class="card"><div class="icon">&gt;_</div><h4>A friendly prompt</h4>
+    <p>Line editing, history with search, <kbd>Tab</kbd> completion, aliases, colors and clear error messages.</p></div>
+  <div class="card"><div class="icon">10</div><h4>Real scripting</h4>
+    <p>NESH BASIC: variables, loops, functions, strings, arrays, menus, files — instead of batch-file tricks.</p></div>
+  <div class="card"><div class="icon">&#8635;</div><h4>Boot management</h4>
+    <p><code>bootmgr</code> lists, adds, orders and checks boot entries, with dry run, confirmation and automatic backups.</p></div>
+  <div class="card"><div class="icon">&#8801;</div><h4>UEFI Shell commands</h4>
+    <p>The UEFI Shell command set, rewritten from scratch; their options are accepted too.</p></div>
+  <div class="card"><div class="icon">{ }</div><h4>Script-friendly output</h4>
+    <p>With <code>-data</code>, commands print <code>key=value</code> records that scripts read with two functions.</p></div>
+  <div class="card"><div class="icon">&#9741;</div><h4>Hardware and network</h4>
+    <p>PCI, SMBIOS, ACPI, memory map, CPU; IPv4 and IPv6, ping, TFTP and HTTP downloads.</p></div>
+</div>
+
+<h3 id="nesh-vs-uefi-shell">NESH and the UEFI Shell</h3>
+<p>The UEFI Shell (from the EDK2 project) is the standard shell of UEFI. NESH keeps what people already know —
+the same command names, the same options, the same <code>fs0:</code> volume names, the same environment
+variables — and changes what is hard to use.</p>
+<table>
+  <thead><tr><th>Topic</th><th>UEFI Shell</th><th>NESH</th></tr></thead>
+  <tbody>
+    <tr><td>Scripts</td><td><code>.nsh</code> batch files: <code>if</code>, <code>for</code>, <code>goto</code>, <code>%1</code></td>
+        <td><code>.nsb</code> scripts in NESH BASIC: variables, expressions, SUB/FUNCTION, arrays, strings</td></tr>
+    <tr><td>Using command output in scripts</td><td><code>-sfo</code> (comma separated, hard to read)</td>
+        <td><code>-data</code> (<code>key=value</code>) + <code>RECORDS</code> / <code>FIELD$</code>; <code>RUN$()</code> captures any output</td></tr>
+    <tr><td>Boot entries</td><td><code>bcfg</code> (positions, no safety net)</td>
+        <td><code>bcfg</code> <em>and</em> <code>bootmgr</code>: IDs, dry run, confirmation, automatic backup, check for missing files</td></tr>
+    <tr><td>Prompt</td><td>basic editing</td><td>history search, word movement, completion, aliases, multi-line BASIC</td></tr>
+    <tr><td>Network</td><td><code>ifconfig</code>, <code>ping</code>, <code>tftp</code>, <code>http</code> (separate IPv6 tools)</td>
+        <td>same commands; <code>ping</code>, <code>tftp</code>, <code>http</code> accept IPv4 and IPv6 addresses</td></tr>
+    <tr><td>Distribution</td><td>shell + separate command libraries</td><td>one file, <code>nesh.efi</code> — easy to copy and to sign for Secure Boot</td></tr>
+    <tr><td>Secure Boot</td><td>no special handling</td><td>low-level hardware writes are disabled while Secure Boot is active</td></tr>
+  </tbody>
+</table>
+<p>UEFI applications written for the UEFI Shell (the ones using the EDK2 <em>ShellLib</em>) run unchanged under NESH,
+because NESH provides the same programming interface. See <a href="#efi-apps">Running EFI applications</a> and
+<a href="#differences">Differences from the UEFI Shell</a>.</p>
+
+<h3 id="conventions">Conventions used in this manual</h3>
+<table>
+  <thead><tr><th>You see</th><th>It means</th></tr></thead>
+  <tbody>
+    <tr><td><code>ls -l</code></td><td>Something you type, a command, a file name or a value.</td></tr>
+    <tr><td><code>cp SRC DST</code></td><td>Words in capitals are placeholders: replace them with real values.</td></tr>
+    <tr><td><code>[-r]</code></td><td>Square brackets in a syntax line mark something optional.</td></tr>
+    <tr><td><code>a | b</code></td><td>A vertical bar in a syntax line means “one of these”.</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>R</kbd></td><td>Keys to press.</td></tr>
+  </tbody>
+</table>
+<p>Examples labeled <strong>Console</strong> show a session at the prompt: the text up to <code>&gt;</code> is the prompt,
+the rest of that line is what you type, and the lines below are the output. Examples labeled
+<strong>NESH BASIC</strong> are script files.</p>
+<pre class="terminal">fs0:\> echo Hello
+Hello</pre>
+<div class="callout tip"><span class="callout-title">Tip</span>
+<p>Every command explains itself: <code>help</code> lists the commands and <code>help NAME</code> shows the details of one.
+The same texts form the <a href="#reference">command reference</a> at the end of this manual.</p></div>
+
+<!-- ===================================================================== -->
+<h2 id="getting-started">Getting started</h2>
+
+<p class="chapter-intro">This chapter shows how to get <code>nesh.efi</code>, how to start it and what to do first.</p>
+
+<h3 id="requirements">Requirements</h3>
+<ul>
+  <li>A computer (or virtual machine) with <strong>UEFI firmware</strong> on the <strong>x86-64</strong> architecture.
+      Almost every PC made after 2012 qualifies.</li>
+  <li>A FAT-formatted volume the firmware can read: a USB stick, or the EFI System Partition (ESP) of a disk.</li>
+  <li>To build NESH yourself: a Linux system with <code>gcc</code>, GNU <code>ld</code>, <code>make</code> and <code>python3</code>
+      (see the <a href="developer-manual.html">developer manual</a>).</li>
+</ul>
+
+<h3 id="building">Building nesh.efi</h3>
+<pre class="terminal">$ make
+$ ls -l build/nesh.efi</pre>
+<p><code>make</code> produces <code>build/nesh.efi</code>, the complete shell in one file. <code>make test</code> runs the
+automatic tests; <code>make qemu</code> starts NESH in a virtual machine (QEMU with OVMF firmware), which is the easiest
+way to try it without touching a real computer.</p>
+
+<h3 id="installing">Putting NESH on a USB stick</h3>
+<p>There are two common layouts. Both need a FAT32 (or FAT16) partition.</p>
+<ol class="steps">
+  <li><strong>As the default loader of a removable disk.</strong> Copy <code>nesh.efi</code> to
+      <code>\EFI\BOOT\BOOTX64.EFI</code> on the stick. The firmware boot menu then shows the stick as a boot device,
+      and choosing it starts NESH directly.</li>
+  <li><strong>As a tool next to other loaders.</strong> Copy <code>nesh.efi</code> to any folder, for example
+      <code>\EFI\tools\nesh.efi</code>, and start it from another shell or add a boot entry for it
+      (<a href="#boot-add">see below</a>).</li>
+</ol>
+<div class="callout"><span class="callout-title">Note</span>
+<p>NESH treats the volume it was started from as its <em>boot volume</em>. It looks there for the start-up script
+<code>startup.nsb</code>, keeps the command history in <code>\nesh_history.txt</code> and puts boot-entry backups in
+<code>\nesh\backup</code>. If the volume is read-only, NESH simply works without these files.</p></div>
+
+<h3 id="starting">Starting NESH</h3>
+<p>Choose the USB stick (or the NESH boot entry) in the firmware boot menu — usually opened with <kbd>F12</kbd>,
+<kbd>F11</kbd>, <kbd>F8</kbd> or <kbd>Esc</kbd> during power-on, depending on the manufacturer. NESH starts with a short
+banner and a prompt showing the current directory:</p>
+<pre class="terminal">NESH 0.1.0 - New EFI Shell (UEFI x86_64)
+Type 'help' for the commands, 'help basic' for the scripting language.
+
+fs0:\> </pre>
+<p>If Secure Boot is active, the banner has one more line: <em>Secure Boot is active: low-level hardware writes are
+disabled.</em> (see <a href="#secure-boot">Secure Boot</a>).</p>
+<p>NESH can also be started from another UEFI shell, with optional arguments:</p>
+<table>
+  <thead><tr><th>Command line</th><th>Effect</th></tr></thead>
+  <tbody>
+    <tr><td><code>nesh.efi</code></td><td>Interactive shell; runs <code>startup.nsb</code> first if it exists.</td></tr>
+    <tr><td><code>nesh.efi -n</code></td><td>Interactive shell, without running <code>startup.nsb</code>.</td></tr>
+    <tr><td><code>nesh.efi SCRIPT [ARGS...]</code></td><td>Runs a script and exits with its exit code.</td></tr>
+    <tr><td><code>nesh.efi -c "CODE"</code></td><td>Runs one line of BASIC and exits, e.g. <code>nesh.efi -c "PRINT 6*7"</code>.</td></tr>
+  </tbody>
+</table>
+
+<h3 id="startup-script" data-index="startup.nsb;autorun">The start-up script</h3>
+<p>If the boot volume contains <code>\startup.nsb</code>, NESH runs it when it starts. Before that it counts down
+three seconds:</p>
+<pre class="terminal">Running fs0:\startup.nsb in 3 s (ESC to skip, any other key to start now)</pre>
+<p>Press <kbd>Esc</kbd> to skip the script, or any other key to run it at once. <code>startup.nsb</code> is an ordinary
+<a href="#scripting">NESH BASIC script</a>; a typical use is the <a href="#boot-menu">interactive boot menu</a>.</p>
+
+<h3 id="first-steps">First steps: a short tour</h3>
+<p>Try these commands in order. They are safe: none of them changes anything.</p>
+<pre class="terminal">fs0:\> map
+fs0:\> ls
+fs0:\> ver
+fs0:\> sysinfo
+fs0:\> bootmgr
+fs0:\> help</pre>
+<ul>
+  <li><code>map</code> lists the volumes (<code>fs0:</code>, <code>fs1:</code>…) and the raw block devices (<code>blk0</code>…).</li>
+  <li><code>ls</code> lists the files of the current directory; <code>fs1:</code> alone switches to another volume.</li>
+  <li><code>ver</code> and <code>sysinfo</code> describe NESH, the firmware and the machine.</li>
+  <li><code>bootmgr</code> shows the boot entries, in boot order.</li>
+  <li><code>help</code> lists every command; <code>help basic</code> summarizes the scripting language.</li>
+</ul>
+<p>To leave NESH type <code>exit</code>: the firmware continues with its boot order, or shows its boot menu.</p>
+
+<!-- ===================================================================== -->
+<h2 id="command-line">Using the command line</h2>
+
+<p class="chapter-intro">How to type commands, how NESH reads them, and the tools that make the prompt fast to use.</p>
+
+<h3 id="prompt">The prompt and command syntax</h3>
+<p>The prompt shows the current directory, for example <code>fs0:\efi\boot&gt;</code>. A command line is a command
+name followed by words separated by spaces:</p>
+<pre class="terminal">fs0:\> cp -r fs0:\efi fs1:\backup</pre>
+<ul>
+  <li><strong>Names are not case-sensitive</strong>: <code>LS</code>, <code>ls</code> and <code>Ls</code> are the same command,
+      and file names are not case-sensitive either (FAT file systems ignore case).</li>
+  <li><strong>Options</strong> start with <code>-</code> and may be combined when they are single letters
+      (<code>ls -lr</code>). Most commands accept options anywhere on the line; <code>--</code> ends the options.</li>
+  <li><strong>Double quotes</strong> group words: <code>mkdir "My Files"</code> creates one folder. Inside quotes, two
+      double quotes <code>""</code> stand for one double quote character.</li>
+</ul>
+
+<h3 id="paths" data-index="path names;volumes;fs0:;wildcards">Volumes, paths and wildcards</h3>
+<p>Each file system the firmware can read gets a volume name: <code>fs0:</code>, <code>fs1:</code> and so on. A full path
+starts with a volume name, and folders are separated by a backslash. The forward slash works too.</p>
+<table>
+  <thead><tr><th>Path</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td><code>fs1:\efi\boot\bootx64.efi</code></td><td>Full path on volume <code>fs1:</code>.</td></tr>
+    <tr><td><code>\efi\boot</code></td><td>From the root of the current volume.</td></tr>
+    <tr><td><code>boot\grub.cfg</code></td><td>Relative to the current directory.</td></tr>
+    <tr><td><code>..</code> &nbsp; <code>.</code></td><td>The parent directory, the current directory.</td></tr>
+    <tr><td><code>fs1:</code></td><td>Typed alone as a command: switch to volume <code>fs1:</code>.</td></tr>
+  </tbody>
+</table>
+<p><strong>Wildcards</strong> select several files: <code>*</code> matches any text and <code>?</code> one character.
+<code>cp *.efi fs1:\tools</code> copies every <code>.efi</code> file of the current folder. Commands expand wildcards
+themselves; the help of each command says whether it accepts them.</p>
+<p>Volumes can get extra names with <code>map</code>: after <code>map usb fs1:</code>, the path <code>usb:\data</code>
+means <code>fs1:\data</code>. See <a href="#volumes">Volumes and disks</a>.</p>
+
+<h3 id="line-editing" data-index="keys;line editing;history;Tab completion">Line editing, history and completion</h3>
+<table>
+  <thead><tr><th>Keys</th><th>Action</th></tr></thead>
+  <tbody>
+    <tr><td><kbd>←</kbd> <kbd>→</kbd> &nbsp; <kbd>Ctrl</kbd>+<kbd>B</kbd> <kbd>Ctrl</kbd>+<kbd>F</kbd></td><td>Move one character.</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>←</kbd> <kbd>Ctrl</kbd>+<kbd>→</kbd> &nbsp; <kbd>Alt</kbd>+<kbd>B</kbd> <kbd>Alt</kbd>+<kbd>F</kbd></td><td>Move one word.</td></tr>
+    <tr><td><kbd>Home</kbd> <kbd>End</kbd> &nbsp; <kbd>Ctrl</kbd>+<kbd>A</kbd> <kbd>Ctrl</kbd>+<kbd>E</kbd></td><td>Start / end of the line.</td></tr>
+    <tr><td><kbd>Backspace</kbd> <kbd>Del</kbd></td><td>Delete before / under the cursor.</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>K</kbd> &nbsp; <kbd>Ctrl</kbd>+<kbd>U</kbd></td><td>Delete to the end / to the start of the line.</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>W</kbd></td><td>Delete the word before the cursor.</td></tr>
+    <tr><td><kbd>Esc</kbd></td><td>Clear the line.</td></tr>
+    <tr><td><kbd>↑</kbd> <kbd>↓</kbd></td><td>Previous / next command of the history.</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>R</kbd></td><td>Search the history: type part of a command; <kbd>Ctrl</kbd>+<kbd>R</kbd> again finds older
+        matches; <kbd>Enter</kbd> or an arrow key accepts, <kbd>Esc</kbd> cancels.</td></tr>
+    <tr><td><kbd>Tab</kbd></td><td>Complete a command name, an alias or a path. If several completions are possible,
+        the common part is completed and the choices are listed.</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>L</kbd></td><td>Clear the screen.</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>C</kbd></td><td>Cancel the line; while a command or script runs, stop it.</td></tr>
+  </tbody>
+</table>
+<p>The history keeps the last 500 commands and is saved in <code>\nesh_history.txt</code> on the boot volume, so it
+survives a restart. <code>history</code> shows it, <code>history 20</code> the last 20 lines, <code>history -c</code> clears it.</p>
+
+<h3 id="redirection" data-index="redirection;output to a file">Saving output to a file</h3>
+<p><code>&gt; FILE</code> at the end of a command writes its output to a file instead of the screen; <code>&gt;&gt; FILE</code>
+appends to the file.</p>
+<pre class="terminal">fs0:\> map -v > fs1:\map.txt
+fs0:\> echo checked on %date% >> fs1:\log.txt</pre>
+<p>Error messages still appear on the screen. There are no pipes (<code>|</code>): to process the output of a command,
+use a script with <code>RUN$()</code> (see <a href="#run-commands">Running commands from a script</a>) or save it to a
+file and use <code>grep</code>, <code>head</code> or <code>tail</code>.</p>
+<div class="callout warning"><span class="callout-title">Note</span>
+<p>NESH does not replace <code>%name%</code> in command lines (that is a UEFI Shell script feature): the second example
+above writes the text <code>%date%</code> literally. In NESH, use a BASIC expression instead:
+<code>RUN "echo checked on " + DATE$ + " &gt;&gt; fs1:\log.txt"</code>.</p></div>
+
+<h3 id="exit-codes" data-index="exit code;ERR;lasterror">Exit codes</h3>
+<p>Every command ends with an <em>exit code</em>: 0 means success, any other value an error. Scripts read it in
+<code>ERR</code>; at the prompt it is kept in the read-only environment variable <code>lasterror</code>.</p>
+<table>
+  <thead><tr><th>Code</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td><code>0</code></td><td>Success.</td></tr>
+    <tr><td><code>1</code></td><td>The command failed (file not found, device error…). Some commands use 1 for “no”:
+        <code>grep</code> when nothing matched, <code>comp</code> when files differ.</td></tr>
+    <tr><td><code>2</code></td><td>Wrong usage: unknown option, missing argument.</td></tr>
+    <tr><td><code>127</code></td><td>Command not found.</td></tr>
+    <tr><td><code>130</code></td><td>Stopped with <kbd>Ctrl</kbd>+<kbd>C</kbd>.</td></tr>
+    <tr><td>other</td><td>EFI applications and scripts may return any code (a script with <code>END 5</code> returns 5).</td></tr>
+  </tbody>
+</table>
+
+<h3 id="running-programs" data-index="path variable;running scripts;.nsb;.efi">Running scripts and EFI programs</h3>
+<p>Scripts (<code>.nsb</code>) and UEFI applications (<code>.efi</code>) run like commands: type their name, with or without
+the extension, followed by their arguments.</p>
+<pre class="terminal">fs0:\> backup fs1:
+fs0:\> fs0:\efi\tools\memtest.efi</pre>
+<p>A name without a folder is searched in the directories listed in the environment variable <code>path</code>
+(separated by <code>;</code>, where <code>.</code> is the current directory). By default <code>path</code> is
+<code>.;fsN:\efi\tools;fsN:\efi\boot;fsN:\</code>, where <code>fsN:</code> is the boot volume. For each directory NESH tries
+<code>NAME</code>, then <code>NAME.nsb</code>, then <code>NAME.efi</code>; only files ending in <code>.nsb</code> or
+<code>.efi</code> can be run. <code>which NAME</code> tells what a name refers to.</p>
+
+<h3 id="environment" data-index="environment variables;set">Environment variables</h3>
+<p>Environment variables are named text values shared by the shell and the programs it starts.
+They are the same as in the UEFI Shell.</p>
+<pre class="terminal">fs0:\> set -v target fs1:\backup
+fs0:\> set target
+fs1:\backup
+fs0:\> set -d target</pre>
+<ul>
+  <li><code>set NAME VALUE</code> creates a <strong>permanent</strong> variable, kept in the firmware (NVRAM) across reboots.
+      <code>set -v NAME VALUE</code> creates a <strong>temporary</strong> one, lost when NESH exits.</li>
+  <li>Permanent variables are stored exactly like the UEFI Shell stores them, so both shells see the same values.</li>
+  <li>Some variables are computed by NESH and read-only: <code>cwd</code>, <code>lasterror</code>, <code>uefiversion</code>,
+      <code>uefishellversion</code>, <code>uefishellsupport</code>, <code>neshversion</code>.</li>
+  <li>Scripts read and write them with <code>ENV$</code>, <code>SETENV</code> and <code>DELENV</code>. They are separate
+      from BASIC variables: a script variable called <code>path$</code> does not change <code>path</code>.</li>
+</ul>
+
+<h3 id="aliases" data-index="aliases">Aliases</h3>
+<p>An alias is a short name for a command with its options:</p>
+<pre class="terminal">fs0:\> alias ll ls -l
+fs0:\> ll fs1:\efi</pre>
+<p>The second line runs <code>ls -l fs1:\efi</code>: the extra words are added at the end. Like variables, aliases are
+permanent unless created with <code>alias -v</code>, and <code>alias -d NAME</code> deletes one. NESH defines a few
+temporary aliases for names used by other shells: <code>copy</code> (cp), <code>ren</code> and <code>move</code> (mv),
+<code>rd</code> (rmdir).</p>
+
+<h3 id="basic-at-prompt">BASIC at the prompt</h3>
+<p>Lines that are BASIC statements run directly at the prompt, which makes NESH a handy calculator and a place to try
+script fragments. A line is treated as BASIC when it starts with a statement keyword (<code>PRINT</code>, <code>FOR</code>,
+<code>IF</code>, <code>DIM</code>…), assigns a variable (<code>x = 5</code>) or calls a SUB you defined. Everything else is a
+command.</p>
+<pre class="terminal">fs0:\> PRINT HEX$(&amp;HFF * 16)
+FF0
+fs0:\> n = 0
+fs0:\> FOR i = 1 TO 5
+...   n = n + i
+... NEXT
+fs0:\> PRINT n
+15</pre>
+<p>When a block (<code>FOR</code>, <code>IF</code>, <code>SUB</code>…) is not finished, the prompt becomes <code>...</code>
+until it is; <kbd>Ctrl</kbd>+<kbd>C</kbd> cancels the block. Variables and SUBs defined at the prompt stay available
+until NESH exits.</p>
+
+<h3 id="stopping">Stopping a command</h3>
+<p><kbd>Ctrl</kbd>+<kbd>C</kbd> stops the running command, script or listing (exit code 130). Long listings do not
+pause at the end of the screen; use <kbd>Ctrl</kbd>+<kbd>C</kbd>, or save the output to a file.</p>
+
+<!-- ===================================================================== -->
+<h2 id="files">Working with files and folders</h2>
+
+<p class="chapter-intro">Listing, copying, moving and deleting files; attributes; comparing files.
+The commands work on any volume the firmware can read, and write where the volume is writable.</p>
+
+<h3 id="listing">Listing files</h3>
+<p><code>ls</code> shows names; <code>ls -l</code> (or <code>dir</code>) adds date, time, attributes and size.
+Directory names end with <code>\</code>.</p>
+<pre class="terminal">fs0:\> ls
+EFI\           bootmenu.nsb   inventory.nsb  startup.nsb
+findefi.nsb    nesh.efi
+fs0:\> ls -l
+2026-09-19 22:16  d----         &lt;DIR&gt;  EFI\
+2026-09-19 22:16  ----a           684  bootmenu.nsb
+2026-09-19 22:16  ----a           506  findefi.nsb
+2026-09-19 22:16  ----a           610  inventory.nsb
+2026-09-19 22:16  ----a        369152  nesh.efi
+2026-09-19 22:16  ----a           562  startup.nsb
+5 files, 1 dir, 371514 bytes</pre>
+<p>The attribute column shows <code>d</code> directory, <code>r</code> read-only, <code>h</code> hidden, <code>s</code> system,
+<code>a</code> archive. Useful variations:</p>
+<table>
+  <thead><tr><th>Command</th><th>Lists</th></tr></thead>
+  <tbody>
+    <tr><td><code>ls -r fs0:\efi</code></td><td>The folder and all its subfolders.</td></tr>
+    <tr><td><code>ls *.efi</code></td><td>Only matching names.</td></tr>
+    <tr><td><code>ls -a</code></td><td>Also hidden and system files (normally left out).</td></tr>
+    <tr><td><code>ls -ad</code></td><td>Only directories (<code>-a</code> followed by attribute letters selects entries that have them).</td></tr>
+    <tr><td><code>stat nesh.efi</code></td><td>Every detail of one file.</td></tr>
+  </tbody>
+</table>
+
+<h3 id="copying">Copying, moving, deleting</h3>
+<pre class="terminal">fs0:\> mkdir -p fs1:\backup\efi
+fs0:\> cp -r fs0:\efi fs1:\backup
+fs0:\> cp *.nsb fs1:\backup
+fs0:\> mv fs1:\backup\old.txt fs1:\backup\notes.txt
+fs0:\> rm fs1:\backup\*.tmp
+fs0:\> rm -r fs1:\backup\efi</pre>
+<table>
+  <thead><tr><th>Command</th><th>What to know</th></tr></thead>
+  <tbody>
+    <tr><td><code>cp [-r] SRC... DST</code></td><td>Copies files; <code>-r</code> copies folders with their contents. Existing files are overwritten
+        without asking. If a copy fails or is stopped, the partial file is removed.</td></tr>
+    <tr><td><code>mv SRC... DST</code></td><td>Moves or renames. An existing target file is replaced only after the move has succeeded.
+        Between volumes it copies, then deletes the source only after a complete copy.</td></tr>
+    <tr><td><code>rm [-r] [-f] PATH...</code></td><td>Deletes files; <code>-r</code> also folders. Nothing is asked. <code>-f</code>: no error when
+        nothing matches. Read-only files must be unlocked first with <code>attrib -r</code>.</td></tr>
+    <tr><td><code>mkdir [-p] DIR...</code></td><td>Creates folders; <code>-p</code> creates the whole path.</td></tr>
+    <tr><td><code>rmdir DIR...</code></td><td>Removes empty folders.</td></tr>
+    <tr><td><code>touch FILE...</code></td><td>Creates empty files or updates their time.</td></tr>
+    <tr><td><code>setsize SIZE FILE...</code></td><td>Truncates or extends files to an exact size.</td></tr>
+  </tbody>
+</table>
+<div class="callout warning"><span class="callout-title">Be careful</span>
+<p>Like the UEFI Shell, NESH does not ask for confirmation before overwriting or deleting, and there is no recycle bin.
+Double-check wildcards: <code>ls PATTERN</code> first shows exactly what <code>rm PATTERN</code> would delete.</p></div>
+
+<h3 id="attributes">Attributes</h3>
+<p>FAT files have four attributes: <strong>r</strong>ead-only, <strong>h</strong>idden, <strong>s</strong>ystem and
+<strong>a</strong>rchive. <code>attrib</code> shows and changes them:</p>
+<pre class="terminal">fs0:\> attrib +r fs1:\tools\*.efi
+fs0:\> attrib -h -s fs0:\*</pre>
+
+<h3 id="comparing">Comparing files</h3>
+<p><code>comp</code> lists the differences between two files (offsets in hex, bytes of both files); <code>cmp</code> stops at the
+first one. Both end with <code>ERR</code> = 0 when the files are identical, which makes them useful in scripts:</p>
+<pre class="code" data-lang="basic">RUN "cmp", "fs0:\efi\boot\bootx64.efi", "fs1:\backup\bootx64.efi"
+IF ERR = 0 THEN PRINT "The backup is up to date" ELSE PRINT "The loader has changed"</pre>
+
+<!-- ===================================================================== -->
+<h2 id="volumes">Volumes and disks</h2>
+
+<p class="chapter-intro">How NESH names disks and file systems, and how to inspect them at a low level.</p>
+
+<h3 id="map">Volumes and block devices: map</h3>
+<p>The firmware exposes two kinds of storage objects. <strong>Volumes</strong> (<code>fs0:</code>, <code>fs1:</code>…) are file systems
+NESH can read and write files on. <strong>Block devices</strong> (<code>blk0</code>, <code>blk1</code>…) are raw disks, partitions and
+drives, including those with no file system the firmware understands (for example an NTFS or ext4 partition).</p>
+<pre class="terminal">fs0:\> map
+Volume Label                 Size      Free  Flags
+fs0    QEMU VVFAT          503.7M    502.9M  ro boot
+fs1    NESHWORK             31.9M     31.9M
+
+Device Type            Size  Volume
+blk0   removable          -  (no media)
+blk1   disk            504M
+blk2   partition       503M  fs0
+blk3   disk             32M  fs1</pre>
+<p>The flags say <code>ro</code> (read-only), <code>removable</code> and <code>boot</code> (the volume NESH started from).
+<code>map -v</code> adds the <em>device path</em> of each entry, the firmware's full description of where the device is.</p>
+<figure>
+<pre class="mermaid">
+flowchart LR
+  D["blk1&lt;br/&gt;whole disk"] --> P1["blk2&lt;br/&gt;partition 1"]
+  D --> P2["blk4&lt;br/&gt;partition 2"]
+  P1 --> F0["fs0:&lt;br/&gt;FAT file system"]
+  P2 --> X["no volume&lt;br/&gt;(NTFS, ext4…)"]
+</pre>
+<figcaption>A disk, its partitions and the volumes on them</figcaption>
+</figure>
+
+<h3 id="volume-names">Volume numbers and extra names</h3>
+<p>Volume numbers depend on the order in which the firmware found the devices, so <code>fs1:</code> today may be
+<code>fs2:</code> after plugging in another stick. Two ways to be independent of the numbering:</p>
+<ul>
+  <li>Give the volume an extra name for this session: <code>map usb fs1:</code>, then use <code>usb:\file</code>.
+      <code>map -d usb</code> removes the name.</li>
+  <li>In scripts, find the volume by its label with <code>map -data</code> and <code>FIELD$</code>
+      (see <a href="#data-output">Script-friendly output</a>).</li>
+</ul>
+<p>After connecting a device, <code>map -r</code> rescans the devices.</p>
+
+<h3 id="vol">Labels and free space: vol</h3>
+<pre class="terminal">fs0:\> vol
+Volume fs0: QEMU VVFAT (ro)
+     528171008 bytes total disk space
+     527351808 bytes available on disk
+fs0:\> vol fs1: -n BACKUP</pre>
+
+<h3 id="raw-blocks">Raw blocks: dblk and hexedit</h3>
+<p><code>dblk DEVICE LBA COUNT</code> shows raw disk blocks in hex and recognizes MBR partition tables, GPT headers and
+FAT boot sectors. <code>hexedit -d DEVICE LBA COUNT</code> opens blocks in the hex editor. Numbers are hexadecimal.</p>
+<pre class="terminal">fs0:\> dblk blk1 0 1</pre>
+<div class="callout warning"><span class="callout-title">Be careful</span>
+<p>Writing raw blocks with <code>hexedit -d</code> bypasses the file system: a wrong byte in a partition table or boot
+sector can make a disk unbootable. Save a copy of the blocks you change first.</p></div>
+
+<!-- ===================================================================== -->
+<h2 id="text">Text, time and data tools</h2>
+
+<p class="chapter-intro">Reading and searching text files, dumps, date and time. Text commands read UTF-8 and UCS-2
+(“Unicode”) files and ignore Windows line ends.</p>
+
+<table>
+  <thead><tr><th>Command</th><th>Use</th><th>Example</th></tr></thead>
+  <tbody>
+    <tr><td><code>cat</code> / <code>type</code></td><td>Print files.</td><td><code>cat fs0:\efi\boot\grub.cfg</code></td></tr>
+    <tr><td><code>head</code> / <code>tail</code></td><td>First / last lines.</td><td><code>tail -n 20 log.txt</code></td></tr>
+    <tr><td><code>grep</code></td><td>Lines containing a text; <code>-i</code> any case, <code>-n</code> line numbers, <code>-c</code> count, <code>-v</code> non-matching.</td><td><code>grep -in timeout *.cfg</code></td></tr>
+    <tr><td><code>wc</code></td><td>Count lines, words and bytes.</td><td><code>wc notes.txt</code></td></tr>
+    <tr><td><code>hexdump</code></td><td>Hex dump of a file.</td><td><code>hexdump -n 64 nesh.efi</code></td></tr>
+    <tr><td><code>date</code> / <code>time</code></td><td>Show or set the clock.</td><td><code>date 2026-09-19</code></td></tr>
+    <tr><td><code>timezone</code></td><td>Time zone of the real-time clock.</td><td><code>timezone -s +01:00</code></td></tr>
+    <tr><td><code>sleep</code> / <code>stall</code></td><td>Wait: <code>sleep</code> in milliseconds (<kbd>Ctrl</kbd>+<kbd>C</kbd> stops it), <code>stall</code> in microseconds.</td><td><code>sleep 500</code></td></tr>
+    <tr><td><code>eficompress</code> / <code>efidecompress</code></td><td>UEFI compression format, as used in option ROMs and firmware volumes.</td><td><code>eficompress drv.efi drv.z</code></td></tr>
+  </tbody>
+</table>
+<pre class="terminal">fs0:\> grep -n BOOT bootmenu.nsb
+4:n = BOOTCOUNT
+12:  id = BOOTID(i)
+14:  items$ = items$ + BOOTDESC$(id)
+25:    id = BOOTID(choice - 1)
+26:    PRINT "Next boot: "; BOOTDESC$(id)
+fs0:\> date
+2026-09-19</pre>
+
+<!-- ===================================================================== -->
+<h2 id="editors">The editors</h2>
+
+<p class="chapter-intro">Two full-screen editors are built in: <code>edit</code> for text files and <code>hexedit</code> for
+binary files, disk blocks and memory.</p>
+
+<h3 id="edit">edit — text editor</h3>
+<p><code>edit FILE</code> opens a file (or a new one, created when you save). Arrow keys, <kbd>Home</kbd>/<kbd>End</kbd>,
+<kbd>PgUp</kbd>/<kbd>PgDn</kbd> move around; typing inserts text. The function keys have <kbd>Ctrl</kbd> equivalents for
+terminals where function keys do not work (serial consoles):</p>
+<table>
+  <thead><tr><th>Key</th><th>Or</th><th>Action</th><th>Key</th><th>Or</th><th>Action</th></tr></thead>
+  <tbody>
+    <tr><td><kbd>F1</kbd></td><td><kbd>Ctrl</kbd>+<kbd>G</kbd></td><td>Go to line</td>
+        <td><kbd>F6</kbd></td><td><kbd>Ctrl</kbd>+<kbd>K</kbd></td><td>Cut the current line</td></tr>
+    <tr><td><kbd>F2</kbd></td><td><kbd>Ctrl</kbd>+<kbd>S</kbd></td><td>Save</td>
+        <td><kbd>F7</kbd></td><td><kbd>Ctrl</kbd>+<kbd>U</kbd></td><td>Paste the cut lines</td></tr>
+    <tr><td><kbd>F3</kbd></td><td><kbd>Ctrl</kbd>+<kbd>Q</kbd></td><td>Exit (also <kbd>Esc</kbd>)</td>
+        <td><kbd>F8</kbd></td><td><kbd>Ctrl</kbd>+<kbd>O</kbd></td><td>Open another file</td></tr>
+    <tr><td><kbd>F4</kbd></td><td><kbd>Ctrl</kbd>+<kbd>F</kbd></td><td>Find</td>
+        <td><kbd>F9</kbd></td><td><kbd>Ctrl</kbd>+<kbd>T</kbd></td><td>Switch UTF-8 / UCS-2</td></tr>
+    <tr><td><kbd>F5</kbd></td><td><kbd>Ctrl</kbd>+<kbd>R</kbd></td><td>Find and replace</td>
+        <td><kbd>F10</kbd></td><td><kbd>Ctrl</kbd>+<kbd>N</kbd></td><td>Find next</td></tr>
+  </tbody>
+</table>
+<p>Several cuts in a row form one block, and paste inserts the last block: to move lines, cut them one after the other,
+move the cursor and paste. <kbd>Ctrl</kbd>+<kbd>E</kbd> shows the key list inside the editor. The file keeps its
+encoding, its line ends (LF or CRLF), a UTF-8 byte-order mark if it had one, and its tab characters.</p>
+
+<h3 id="hexedit">hexedit — binary editor</h3>
+<table>
+  <thead><tr><th>Command</th><th>Edits</th></tr></thead>
+  <tbody>
+    <tr><td><code>hexedit FILE</code></td><td>A file.</td></tr>
+    <tr><td><code>hexedit -d DEVICE LBA COUNT</code></td><td>Disk blocks (<code>DEVICE</code>: <code>blkN</code>, <code>fsN:</code> or a handle).</td></tr>
+    <tr><td><code>hexedit -m ADDRESS SIZE</code></td><td>Memory (writing is disabled while Secure Boot is active).</td></tr>
+  </tbody>
+</table>
+<p>Arrow keys and <kbd>PgUp</kbd>/<kbd>PgDn</kbd> move, <kbd>Tab</kbd> switches between the hex and the text column,
+<kbd>F1</kbd> goes to an offset, <kbd>F2</kbd> saves, <kbd>F3</kbd> exits.</p>
+
+<!-- ===================================================================== -->
+<h2 id="scripting">Scripting with NESH BASIC</h2>
+
+<p class="chapter-intro">NESH scripts are written in NESH BASIC, a small and readable language in the tradition of
+BASIC: variables, loops, functions, strings and arrays, plus direct access to shell commands and firmware data.
+This chapter is a complete guide, from the first script to the full function reference.</p>
+
+<h3 id="first-script">Your first script</h3>
+<p>A script is a text file with the extension <code>.nsb</code>. Create it with <code>edit hello.nsb</code> (or on another
+computer) and run it by typing its name:</p>
+<pre class="code" data-lang="basic" data-example="hello" data-title="hello.nsb">' hello.nsb - my first script
+PRINT "Hello from NESH "; VERSION$
+name$ = "world"
+PRINT "Hello, " + name$ + "!"</pre>
+<pre class="terminal" data-example-output="hello">fs0:\&gt; hello
+Hello from NESH 0.1.0
+Hello, world!</pre>
+<ul>
+  <li>A line starting with <code>'</code> (or <code>REM</code>) is a comment.</li>
+  <li><code>PRINT</code> writes text; <code>;</code> between items joins them without spaces.</li>
+  <li><code>name$</code> is a variable. Names ending with <code>$</code> hold text; the others hold numbers.</li>
+  <li><code>+</code> joins strings.</li>
+</ul>
+<p>Keywords and names are not case-sensitive: <code>print</code>, <code>PRINT</code> and <code>Print</code> are the same.
+This manual writes keywords in capitals to make them stand out.</p>
+
+<h3 id="script-basics">Lines, statements and comments</h3>
+<table>
+  <thead><tr><th>Rule</th><th>Example</th></tr></thead>
+  <tbody>
+    <tr><td>One statement per line, or several separated by <code>:</code></td><td><code>a = 1 : b = 2</code></td></tr>
+    <tr><td>A long line continues on the next one when it ends with a space and <code>_</code></td><td><code>IF a = 1 AND _</code></td></tr>
+    <tr><td>Comments start with <code>'</code> or <code>REM</code> and run to the end of the line</td><td><code>x = 5 ' five</code></td></tr>
+    <tr><td>Strings are in double quotes; <code>""</code> inside a string is one quote</td><td><code>"say ""hi"""</code></td></tr>
+    <tr><td>Files are UTF-8 (a byte-order mark is allowed) or UCS-2; <code>#!</code> on the first line is ignored</td><td></td></tr>
+  </tbody>
+</table>
+
+<h3 id="variables">Variables, numbers and strings</h3>
+<p>There are two types, chosen by the name:</p>
+<ul>
+  <li><strong>Numbers</strong>: 64-bit integers, from about −9.2·10<sup>18</sup> to 9.2·10<sup>18</sup>. There are no
+      fractions: <code>7 / 2</code> is <code>3</code>. Literals can be written in decimal, hexadecimal
+      (<code>&amp;HFF</code> or <code>0xFF</code>), binary (<code>&amp;B1010</code> or <code>0b1010</code>) or octal
+      (<code>&amp;O17</code>); <code>_</code> may separate digits (<code>0xFFFF_0000</code>).</li>
+  <li><strong>Strings</strong>: names ending in <code>$</code>. Any length, UTF-8 text.</li>
+</ul>
+<p>Variables need no declaration: an unused number variable is <code>0</code> and an unused string is <code>""</code>.
+Assigning a string to a number variable (or the reverse) is an error; convert with <code>STR$</code> and <code>VAL</code>.</p>
+<pre class="code" data-lang="basic" data-example="vars" data-title="vars.nsb">count = 42                 ' a number (64-bit integer)
+size = &amp;H1000              ' hexadecimal: 4096
+mask = 0b1010              ' binary: 10
+label$ = "EFI System"      ' a string: the name ends with $
+PRINT count, size, mask
+PRINT label$; " has "; LEN(label$); " characters"
+PRINT 7 / 2, 7 MOD 2, 2 ^ 10, -7 \ 2
+PRINT "a" &lt; "b", 3 &gt; 5</pre>
+<pre class="terminal" data-example-output="vars">fs0:\&gt; vars
+42            4096          10
+EFI System has 10 characters
+3             1             1024          -3
+-1            0</pre>
+<div class="callout"><span class="callout-title">Note</span>
+<p>Unlike classic BASIC, <code>PRINT</code> adds no spaces around numbers: <code>PRINT "has"; 10</code> prints
+<code>has10</code>. Put the spaces in the strings. A comma moves to the next 14-column zone, which is handy for simple tables.</p></div>
+
+<h4 id="operators">Operators</h4>
+<table>
+  <thead><tr><th>Priority</th><th>Operators</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td>1 (first)</td><td><code>^</code></td><td>Power (right to left: <code>2^3^2</code> = 2<sup>9</sup>)</td></tr>
+    <tr><td>2</td><td><code>-x</code> &nbsp; <code>+x</code></td><td>Sign</td></tr>
+    <tr><td>3</td><td><code>*</code> &nbsp; <code>/</code> &nbsp; <code>\</code> &nbsp; <code>MOD</code></td><td>Multiply; divide (both <code>/</code> and <code>\</code> are integer divisions, rounding toward zero); remainder</td></tr>
+    <tr><td>4</td><td><code>+</code> &nbsp; <code>-</code></td><td>Add, subtract; <code>+</code> also joins strings</td></tr>
+    <tr><td>5</td><td><code>SHL</code> &nbsp; <code>SHR</code></td><td>Shift bits left / right (<code>1 SHL 4</code> = 16)</td></tr>
+    <tr><td>6</td><td><code>=</code> <code>&lt;&gt;</code> <code>&lt;</code> <code>&gt;</code> <code>&lt;=</code> <code>&gt;=</code></td><td>Comparisons (numbers or strings)</td></tr>
+    <tr><td>7</td><td><code>NOT</code></td><td>Bitwise not</td></tr>
+    <tr><td>8</td><td><code>AND</code></td><td>Bitwise and</td></tr>
+    <tr><td>9 (last)</td><td><code>OR</code> &nbsp; <code>XOR</code></td><td>Bitwise or, exclusive or</td></tr>
+  </tbody>
+</table>
+<p>A comparison gives <code>-1</code> when true and <code>0</code> when false, as in classic BASIC; any non-zero number
+(or non-empty string) counts as true in <code>IF</code> and loops. Because true is <code>-1</code> (all bits set),
+<code>AND</code>, <code>OR</code> and <code>NOT</code> work both on bits and on conditions. Both sides of <code>AND</code>/<code>OR</code>
+are always evaluated. Strings compare byte by byte, so the comparison is case-sensitive: use <code>UCASE$</code> on
+both sides to ignore case.</p>
+
+<h3 id="output-input">Output and input</h3>
+<table>
+  <thead><tr><th>Statement</th><th>Effect</th></tr></thead>
+  <tbody>
+    <tr><td><code>PRINT a; b$, c</code></td><td>Prints values; <code>;</code> joins, <code>,</code> moves to the next 14-column zone.
+        A final <code>;</code> or <code>,</code> keeps the cursor on the line.</td></tr>
+    <tr><td><code>INPUT "Name: "; n$</code></td><td>Asks for a line of text (or a number, for a number variable: it asks
+        again until one is typed). <kbd>Ctrl</kbd>+<kbd>C</kbd> stops the script.</td></tr>
+    <tr><td><code>k$ = KEY$(5000)</code></td><td>Waits up to 5 s for one key (see <a href="#fn-key">KEY$</a>).</td></tr>
+    <tr><td><code>PAUSE ["message"]</code></td><td>Waits for a key.</td></tr>
+    <tr><td><code>CLS</code></td><td>Clears the screen.</td></tr>
+    <tr><td><code>COLOR fg [, bg]</code></td><td>Text colors: foreground 0–15, background 0–7 (0 black, 1 blue, 2 green, 3 cyan,
+        4 red, 5 magenta, 6 brown, 7 light gray, 8–15 bright versions). <code>COLOR</code> alone restores the default.</td></tr>
+    <tr><td><code>LOCATE row, col</code></td><td>Moves the cursor (counted from 1).</td></tr>
+    <tr><td><code>SLEEP ms</code></td><td>Waits the given milliseconds (<kbd>Ctrl</kbd>+<kbd>C</kbd> interrupts).</td></tr>
+  </tbody>
+</table>
+
+<h3 id="strings">Working with strings</h3>
+<p>Positions count characters (not bytes) and start at 1.</p>
+<pre class="code" data-lang="basic" data-example="strings" data-title="strings.nsb">path$ = "fs0:\EFI\BOOT\BOOTX64.EFI"
+PRINT LEFT$(path$, 4)                  ' fs0:
+PRINT MID$(path$, 6, 3)                ' EFI
+PRINT RIGHT$(path$, 11)                ' BOOTX64.EFI
+PRINT INSTR(path$, "BOOT")             ' position of the first BOOT
+PRINT LCASE$(path$)
+PRINT REPLACE$(path$, "\", "/")
+PRINT "[" + TRIM$("   padded   ") + "]"
+PRINT LPAD$("7", 3, "0"); " "; RPAD$("ab", 5, "."); "|"
+PRINT HEX$(255), HEX$(255, 4), BIN$(5, 8)
+PRINT VAL("42") + 1, STR$(99) + "!", VAL("0x1F")
+PRINT CHR$(65); ASC("B"); " "; STRING$(5, "-")</pre>
+<pre class="terminal" data-example-output="strings">fs0:\&gt; strings
+fs0:
+EFI
+BOOTX64.EFI
+10
+fs0:\efi\boot\bootx64.efi
+fs0:/EFI/BOOT/BOOTX64.EFI
+[padded]
+007 ab...|
+FF            00FF          00000101
+43            99!           31
+A66 -----</pre>
+
+<h3 id="control-flow">Decisions and loops</h3>
+<p><strong>IF</strong> has a one-line form and a block form:</p>
+<pre class="code" data-lang="basic">IF free &lt; 1000000 THEN PRINT "almost full" ELSE PRINT "ok"
+
+IF ERR = 0 THEN
+  PRINT "done"
+ELSEIF ERR = 127 THEN
+  PRINT "command not found"
+ELSE
+  PRINT "failed with code "; ERR
+END IF</pre>
+<p><strong>Loops</strong>: <code>FOR</code> counts, <code>WHILE</code> repeats while a condition holds, <code>DO … LOOP</code> tests at the start
+or at the end (<code>WHILE</code> or <code>UNTIL</code>):</p>
+<pre class="code" data-lang="basic" data-example="control" data-title="control.nsb">FOR i = 1 TO 3
+  IF i = 2 THEN
+    PRINT i; " is two"
+  ELSE
+    PRINT i
+  END IF
+NEXT
+n = 10
+WHILE n &gt; 1
+  IF n MOD 2 = 0 THEN n = n / 2 ELSE n = 3 * n + 1
+  PRINT n;
+  IF n &gt; 1 THEN PRINT " ";
+WEND
+PRINT
+DO
+  tries = tries + 1
+LOOP UNTIL tries = 3
+PRINT "tries:"; tries
+FOR i = 10 TO 0 STEP -5: PRINT i;: NEXT: PRINT</pre>
+<pre class="terminal" data-example-output="control">fs0:\&gt; control
+1
+2 is two
+3
+5 16 8 4 2 1
+tries:3
+1050</pre>
+<ul>
+  <li><code>EXIT FOR</code>, <code>EXIT WHILE</code>, <code>EXIT DO</code> leave a loop; <code>CONTINUE FOR</code> (<code>WHILE</code>, <code>DO</code>)
+      skips to the next round.</li>
+  <li><code>WHILE … END WHILE</code> is accepted as well as <code>WEND</code>. <code>NEXT i</code> may repeat the variable name.</li>
+  <li>A loop checks for <kbd>Ctrl</kbd>+<kbd>C</kbd>, so an endless loop can always be stopped.</li>
+</ul>
+<p><strong>SELECT CASE</strong> compares one value against lists, ranges (<code>TO</code>) and conditions (<code>IS</code>):</p>
+<pre class="code" data-lang="basic" data-example="select" data-title="select.nsb">FOR code = 0 TO 4
+  SELECT CASE code
+    CASE 0
+      msg$ = "success"
+    CASE 1, 2
+      msg$ = "failed"
+    CASE 3 TO 9
+      msg$ = "unusual"
+  END SELECT
+  PRINT code; ": "; msg$
+NEXT
+SELECT CASE "fs1:"
+  CASE IS &lt; "fs1:"
+    PRINT "before"
+  CASE ELSE
+    PRINT "fs1: or later"
+END SELECT</pre>
+<pre class="terminal" data-example-output="select">fs0:\&gt; select
+0: success
+1: failed
+2: failed
+3: unusual
+4: unusual
+fs1: or later</pre>
+<p><strong>GOTO</strong> jumps to a label, a name followed by <code>:</code> <em>alone on its line</em>. It can jump within the
+same block or out of loops, not into them. Structured statements are usually clearer.</p>
+<pre class="code" data-lang="basic" data-example="gotolabels" data-title="gotolabels.nsb">i = 0
+again:
+i = i + 1
+IF i &lt; 3 THEN GOTO again
+PRINT "i ="; i</pre>
+<pre class="terminal" data-example-output="gotolabels">fs0:\&gt; gotolabels
+i =3</pre>
+
+<h3 id="arrays">Arrays</h3>
+<p><code>DIM name(N)</code> creates an array with the elements <code>0</code> to <code>N</code> (so N+1 elements); string arrays
+end with <code>$</code>. Arrays have one dimension. <code>REDIM</code> changes the size and keeps the values;
+<code>UBOUND</code> gives the last index. Functions that take a whole array use the name with empty parentheses,
+like <code>disk$()</code>.</p>
+<pre class="code" data-lang="basic" data-example="arrays" data-title="arrays.nsb">DIM disk$(2)                  ' three elements: 0, 1 and 2
+disk$(0) = "fs0:"
+disk$(1) = "fs1:"
+disk$(2) = "fs2:"
+PRINT UBOUND(disk$()); " is the last index"
+PRINT JOIN$(disk$(), ", ")
+n = SPLIT("ata;nvme;usb", ";", bus$())
+FOR i = 0 TO n - 1
+  PRINT i; "="; bus$(i)
+NEXT
+REDIM disk$(3)                ' grow, keeping the values
+disk$(3) = "fs3:"
+PRINT JOIN$(disk$(), " ")</pre>
+<pre class="terminal" data-example-output="arrays">fs0:\&gt; arrays
+2 is the last index
+fs0:, fs1:, fs2:
+0=ata
+1=nvme
+2=usb
+fs0: fs1: fs2: fs3:</pre>
+<p><code>SPLIT</code> and <code>RECORDS</code> create or resize the array they fill, so it needs no <code>DIM</code>.</p>
+
+<h3 id="procedures">SUB and FUNCTION</h3>
+<p>A <code>SUB</code> is a named block of statements; a <code>FUNCTION</code> also returns a value with <code>RETURN</code>
+(a function whose name ends with <code>$</code> returns a string). They can be defined anywhere in the script at the top
+level, also after the lines that use them.</p>
+<pre class="code" data-lang="basic" data-example="procs" data-title="procs.nsb">FUNCTION human$(bytes)
+  ' 1536 -&gt; "1 KiB"
+  LOCAL i, u$(4)
+  i = SPLIT("B KiB MiB GiB TiB", " ", u$())
+  i = 0
+  WHILE bytes &gt;= 1024 AND i &lt; 4
+    bytes = bytes \ 1024
+    i = i + 1
+  WEND
+  RETURN STR$(bytes) + " " + u$(i)
+END FUNCTION
+
+SUB banner(title$)
+  PRINT STRING$(LEN(title$) + 4, "=")
+  PRINT "= "; title$; " ="
+  PRINT STRING$(LEN(title$) + 4, "=")
+END SUB
+
+banner "Disk sizes"
+PRINT human$(512)
+PRINT human$(1536)
+PRINT human$(250059350016)</pre>
+<pre class="terminal" data-example-output="procs">fs0:\&gt; procs
+==============
+= Disk sizes =
+==============
+512 B
+1 KiB
+232 GiB</pre>
+<ul>
+  <li>Call a SUB with its name followed by the arguments (<code>banner "Title"</code>) or with
+      <code>CALL banner("Title")</code>. A function is used inside an expression, with parentheses.</li>
+  <li>Parameters receive copies of the values: changing <code>bytes</code> inside <code>human$</code> does not change the
+      caller's variable. A parameter is a number or a string according to its name.</li>
+  <li><strong>Variables are global</strong> unless declared with <code>LOCAL</code> inside the SUB or FUNCTION.
+      <code>LOCAL</code> can also create local arrays (<code>LOCAL u$(4)</code>). A <code>DIM</code> inside a procedure creates a
+      global array, which a second call cannot <code>DIM</code> again.</li>
+  <li><code>RETURN</code> without a value (or <code>EXIT SUB</code>, <code>EXIT FUNCTION</code>) leaves early. A function that ends
+      without <code>RETURN</code> returns 0 or "".</li>
+  <li>Procedures may call themselves (recursion), up to 200 levels deep.</li>
+  <li>Names of built-in functions cannot be used for variables, arrays, parameters or procedures.</li>
+</ul>
+
+<h3 id="run-commands" data-index="RUN;RUN$;ERR">Running commands from a script</h3>
+<p>Scripts run shell commands with <code>RUN</code>, capture their output with <code>RUN$()</code> and check the result
+in <code>ERR</code>:</p>
+<pre class="code" data-lang="basic" data-example="runcmd" data-title="runcmd.nsb">RUN "mkdir -p backup"
+PRINT "mkdir: ERR="; ERR
+RUN "cp", "hello.nsb", "backup\hello copy.nsb"
+out$ = RUN$("ls backup")
+PRINT "backup contains: "; out$
+RUN "ls", "nothing-here"
+IF ERR &lt;&gt; 0 THEN PRINT "ls failed with code "; ERR
+RUN "echo saved by a script" TO "log.txt"
+RUN "echo second line" APPEND "log.txt"
+PRINT READFILE$("log.txt");</pre>
+<pre class="terminal" data-example-output="runcmd">fs0:\&gt; runcmd
+mkdir: ERR=0
+backup contains: hello copy.nsb
+ls: nothing-here: not found
+ls failed with code 1
+saved by a script
+second line</pre>
+<table>
+  <thead><tr><th>Form</th><th>Use</th></tr></thead>
+  <tbody>
+    <tr><td><code>RUN "cmd arg1 arg2"</code></td><td>One string: split like a command line (quotes group words, <code>&gt; file</code> works).</td></tr>
+    <tr><td><code>RUN "cmd", a$, b$</code></td><td>Separate arguments, passed exactly as they are — the safe way for
+        file names with spaces or quotes.</td></tr>
+    <tr><td><code>RUN … TO "file"</code> / <code>RUN … APPEND "file"</code></td><td>Output to a file (replace / add).</td></tr>
+    <tr><td><code>x$ = RUN$(…)</code></td><td>Same arguments as <code>RUN</code>; returns the output as a string, without the final
+        newlines. Error messages still go to the screen.</td></tr>
+    <tr><td><code>ERR</code></td><td>Exit code of the last command (0 = success).</td></tr>
+  </tbody>
+</table>
+<p>Scripts and <code>.efi</code> programs are run the same way: <code>RUN "backup fs1:"</code>. Each script has its own
+variables; values are passed with arguments, files or environment variables.</p>
+
+<h3 id="script-args" data-index="ARGC;ARG$;END">Arguments and exit code</h3>
+<p><code>ARGC</code> is the number of arguments and <code>ARG$(n)</code> the n-th one (<code>ARG$(0)</code> is the script's own path).
+<code>END code</code> stops the script and sets its exit code, which the caller sees in <code>ERR</code>.</p>
+<pre class="code" data-lang="basic" data-example="args" data-title="args.nsb">' args.nsb: prints its arguments
+PRINT "script: "; ARG$(0)
+PRINT "arguments:"; ARGC
+FOR i = 1 TO ARGC
+  PRINT i; ": "; ARG$(i)
+NEXT
+IF ARGC = 0 THEN
+  PRINT "usage: args NAME..."
+  END 2
+END IF</pre>
+<pre class="code" data-lang="basic" data-example="callargs" data-title="callargs.nsb">RUN "args one ""two words"""
+RUN "args"
+PRINT "exit code:"; ERR</pre>
+<pre class="terminal" data-example-output="callargs">fs0:\&gt; callargs
+script: fs0:\args.nsb
+arguments:2
+1: one
+2: two words
+script: fs0:\args.nsb
+arguments:0
+usage: args NAME...
+exit code:2</pre>
+<table>
+  <thead><tr><th>To stop…</th><th>Use</th></tr></thead>
+  <tbody>
+    <tr><td>this script, with an exit code</td><td><code>END 2</code> (also <code>EXIT 2</code>, or <code>RUN "exit /b 2"</code>)</td></tr>
+    <tr><td>all scripts and leave NESH</td><td><code>RUN "exit 2"</code></td></tr>
+  </tbody>
+</table>
+
+<h3 id="script-files" data-index="WRITEFILE;READFILE$;DIR$">Reading and writing files</h3>
+<pre class="code" data-lang="basic" data-example="files" data-title="files.nsb">WRITEFILE "notes.txt", "first line" + CHR$(10)
+APPENDFILE "notes.txt", "second line" + CHR$(10)
+PRINT "size:"; FILESIZE("notes.txt")
+text$ = READFILE$("notes.txt")
+n = SPLIT(TRIM$(text$), CHR$(10), line$())
+PRINT n; " lines, the second is: "; line$(1)
+IF FILEEXISTS("notes.txt") THEN PRINT "notes.txt exists"
+x$ = READFILE$("missing.txt")
+PRINT "reading a missing file: ERR="; ERR
+f$ = DIR$("*.txt")
+WHILE f$ &lt;&gt; ""
+  PRINT "found "; f$
+  f$ = DIR$
+WEND</pre>
+<pre class="terminal" data-example-output="files">fs0:\&gt; files
+size:23
+2 lines, the second is: second line
+notes.txt exists
+reading a missing file: ERR=1
+found log.txt
+found notes.txt</pre>
+<p>File functions never stop the script: they set <code>ERR</code> (0 success, 1 failure), so the script can react.
+<code>READFILE$</code> reads UTF-8 and UCS-2 text and removes carriage returns; <code>WRITEFILE</code> and
+<code>APPENDFILE</code> write UTF-8. <code>DIR$(pattern$)</code> returns the first matching name and each following
+<code>DIR$</code> the next one, then <code>""</code>.</p>
+
+<h3 id="script-env">Environment variables in scripts</h3>
+<pre class="code" data-lang="basic" data-example="env" data-title="env.nsb">PRINT "search path: "; ENV$("path")
+SETENV "backupdir", "fs1:\backup"
+PRINT "backupdir = "; ENV$("backupdir")
+x$ = ENV$("nosuchvar")
+PRINT "missing variable: ERR="; ERR
+DELENV "backupdir"</pre>
+<pre class="terminal" data-example-output="env">fs0:\&gt; env
+search path: .;fs0:\efi\tools;fs0:\efi\boot;fs0:\
+backupdir = fs1:\backup
+missing variable: ERR=1</pre>
+
+<h3 id="script-errors" data-index="errors;runtime errors">Errors</h3>
+<p>A mistake in the script (a syntax error, a division by zero, an index out of range, a type mismatch) stops it with
+a message that names the file and the line; the exit code is 1. A syntax error is reported before anything runs.</p>
+<pre class="code" data-lang="basic" data-example="errors" data-title="errors.nsb">PRINT "before"
+x = 10
+y = 0
+PRINT x / y
+PRINT "never printed"</pre>
+<pre class="terminal" data-example-output="errors">fs0:\&gt; errors
+before
+fs0:\errors.nsb:4: error: division by zero</pre>
+<p>Command failures are <em>not</em> script errors: <code>RUN</code> sets <code>ERR</code> and the script continues. Check
+<code>ERR</code> after the commands that matter. <code>nesh.efi -k SCRIPT</code> checks the syntax of a script without running it.</p>
+
+<h3 id="menus" data-index="MENU;KEY$;interactive scripts">Menus and keys</h3>
+<p><code>MENU(title$, items$ [, timeout [, default]])</code> shows a menu and returns the number of the chosen item
+(counted from 1), or 0 if <kbd>Esc</kbd> was pressed. Items are separated by <code>|</code>. The user moves with the arrow
+keys and chooses with <kbd>Enter</kbd>, or presses the item number. With a timeout (in seconds), the default item is
+chosen when time runs out; any key stops the countdown.</p>
+<pre class="code" data-lang="basic" data-example="menu-small" data-platform="efi">choice = MENU("Backup", "Copy the loaders|Copy everything|Cancel", 15, 1)
+IF choice = 1 THEN RUN "cp -r fs0:\efi fs1:\backup"
+IF choice = 2 THEN RUN "cp -r fs0:\ fs1:\backup"</pre>
+<pre class="terminal">Backup
+  1. Copy the loaders
+  2. Copy everything
+  3. Cancel
+Up/Down + Enter to choose, ESC to cancel. Default in 15 s</pre>
+<p><code>KEY$</code> reads single keys: <code>KEY$</code> returns a key if one is waiting (or ""), <code>KEY$(ms)</code> waits up
+to <code>ms</code> milliseconds (−1: forever). Special keys have names: <code>"UP"</code>, <code>"DOWN"</code>,
+<code>"LEFT"</code>, <code>"RIGHT"</code>, <code>"HOME"</code>, <code>"END"</code>, <code>"PGUP"</code>, <code>"PGDN"</code>,
+<code>"INSERT"</code>, <code>"DELETE"</code>, <code>"ENTER"</code>, <code>"ESC"</code>, <code>"TAB"</code>,
+<code>"BACKSPACE"</code>, <code>"F1"</code>…<code>"F10"</code>.</p>
+
+<h3 id="boot-menu" data-index="boot menu;startup.nsb">Worked example: an interactive boot menu</h3>
+<p>This script shows a menu of the boot entries each time the computer starts, with a 10-second countdown, and
+starts the chosen system. It is the <code>examples\bootmenu.nsb</code> file shipped with NESH. It uses three things
+explained in this manual: <code>-data</code> output read with <code>RECORDS</code> and <code>FIELD$</code>, the <code>MENU</code>
+function, and the boot commands.</p>
+<figure>
+<pre class="mermaid">
+flowchart TD
+  A["bootmgr -data&lt;br/&gt;read the boot entries"] --> B{"entry in the boot order,&lt;br/&gt;active, not hidden,&lt;br/&gt;not this shell?"}
+  B -- yes --> C["add it to the menu"]
+  B -- no --> D["skip it"]
+  C --> E["MENU with a 10 s countdown"]
+  D --> E
+  E -- "a system" --> F["bootmgr next -B ID&lt;br/&gt;(BootNext: next boot only)"]
+  F --> G["reset: the firmware starts it"]
+  E -- "Firmware setup" --> H["reset setup"]
+  E -- "Power off" --> I["reset -s"]
+  E -- "Stay / Esc" --> J["NESH prompt"]
+</pre>
+<figcaption>How the boot menu works</figcaption>
+</figure>
+<pre class="code" data-lang="basic" data-example="bootmenu" data-title="bootmenu.nsb" data-platform="efi">' bootmenu.nsb - interactive boot menu built from the firmware boot entries.
+' Copy it to the root of the boot volume as startup.nsb to show it at every start.
+
+' The entries, from "bootmgr -data": one record per entry, in boot order.
+n = RECORDS(RUN$("bootmgr -data"), rec$())
+DIM id$(n), desc$(n)
+count = 0
+items$ = ""
+FOR i = 0 TO n - 1
+  r$ = rec$(i)
+  ' keep the entries that are in the boot order, active, not hidden and
+  ' not the one that started this shell
+  IF FIELD$(r$, "kind") = "entry" AND FIELD$(r$, "order") &lt;&gt; "-" AND _
+     FIELD$(r$, "active") = "yes" AND FIELD$(r$, "hidden") = "no" AND _
+     FIELD$(r$, "current") = "no" THEN
+    id$(count) = FIELD$(r$, "id")
+    desc$(count) = FIELD$(r$, "description")
+    items$ = items$ + desc$(count) + "|"
+    count = count + 1
+  END IF
+NEXT
+items$ = items$ + "Firmware setup|Power off|Stay in the shell"
+
+' 10 seconds to choose; then the first entry starts
+choice = MENU("Start which system?", items$, 10, 1)
+
+SELECT CASE choice
+  CASE 1 TO count
+    PRINT "Starting "; desc$(choice - 1); "..."
+    ' BootNext: used once at the next boot; -B: no backup for this change
+    RUN "bootmgr next -B " + id$(choice - 1)
+    IF ERR = 0 THEN RUN "reset"
+    PRINT "Cannot set the next boot entry (error "; ERR; ")"
+  CASE count + 1
+    RUN "reset setup"
+  CASE count + 2
+    RUN "reset -s"
+  CASE ELSE
+    PRINT "Staying in the shell."
+END SELECT</pre>
+<p>How it works:</p>
+<ol class="steps">
+  <li><strong>Read the entries.</strong> <code>bootmgr -data</code> prints one record for the boot settings and one per boot
+      entry, in boot order, with fields such as <code>id</code>, <code>description</code>, <code>active</code> and <code>hidden</code>.
+      <code>RECORDS</code> splits them into the array <code>rec$()</code>.</li>
+  <li><strong>Choose what to show.</strong> Entries outside the boot order, disabled, hidden (such as the firmware's own
+      setup application) and the entry that started NESH are skipped. The IDs and names are kept in two arrays, and the
+      names are joined with <code>|</code> for <code>MENU</code>.</li>
+  <li><strong>Ask.</strong> <code>MENU</code> returns the chosen number, or the first entry after 10 seconds.</li>
+  <li><strong>Start the system.</strong> <code>bootmgr next ID</code> sets <em>BootNext</em>, a firmware variable that says
+      “start this entry once, at the next boot”, and <code>reset</code> restarts the machine; the firmware then starts the
+      chosen entry and afterwards goes back to the normal boot order. The option <code>-B</code> skips the automatic backup
+      that <code>bootmgr</code> otherwise saves before every change, which would pile up at every start (and fail on a
+      read-only volume).</li>
+</ol>
+<p><strong>To install it</strong>, copy the file to the root of the volume NESH starts from with the name
+<code>startup.nsb</code>, and make NESH the first boot entry (<code>bootmgr top ID</code>). The menu then appears at every
+start; <kbd>Esc</kbd> during the three-second countdown before it (or the “Stay in the shell” item) gives you the prompt.</p>
+<pre class="terminal">fs0:\> cp fs0:\examples\bootmenu.nsb fs0:\startup.nsb</pre>
+<div class="callout tip"><span class="callout-title">Ideas to extend it</span>
+<ul>
+  <li>Show only some systems: test <code>FIELD$(r$, "description")</code> with <code>INSTR</code>.</li>
+  <li>Remember the last choice: write the ID to a file with <code>WRITEFILE</code> and pass its position as the
+      default item of <code>MENU</code>.</li>
+  <li>Add your own items, for example a tool on the disk: run it with <code>RUN "fs0:\efi\tools\memtest.efi"</code>
+      when chosen.</li>
+</ul></div>
+
+<h3 id="more-examples">More examples</h3>
+<p>The <code>examples</code> folder contains complete scripts:</p>
+<table>
+  <thead><tr><th>Script</th><th>What it shows</th></tr></thead>
+  <tbody>
+    <tr><td><code>bootmenu.nsb</code></td><td>The interactive boot menu above.</td></tr>
+    <tr><td><code>findefi.nsb</code></td><td>Looks for boot loaders in <code>\EFI\*\</code> on every volume: <code>map -data</code>,
+        <code>ls -ad -data</code>, <code>DIR$</code>, a SUB with a <code>LOCAL</code> variable.</td></tr>
+    <tr><td><code>inventory.nsb</code></td><td>Writes a text report of the machine (system, volumes, boot entries, memory)
+        with <code>RUN$</code> and <code>APPENDFILE</code>.</td></tr>
+  </tbody>
+</table>
+<pre class="code" data-lang="basic" data-example="findefi" data-title="findefi.nsb" data-platform="efi">' findefi.nsb - lists the boot loaders in \EFI\*\ of every volume.
+
+SUB scan(folder$)
+  LOCAL f$
+  f$ = DIR$(folder$ + "\*.efi")
+  WHILE f$ &lt;&gt; ""
+    PRINT "  "; folder$; "\"; f$
+    f$ = DIR$
+  WEND
+END SUB
+
+nv = RECORDS(RUN$("map -t fs -data"), vol$())
+FOR v = 0 TO nv - 1
+  name$ = FIELD$(vol$(v), "volume") + ":"
+  IF DIREXISTS(name$ + "\EFI") THEN
+    PRINT name$; "  "; FIELD$(vol$(v), "label")
+    ' the folders inside \EFI (-ad: directories only)
+    nd = RECORDS(RUN$("ls -ad -data " + name$ + "\EFI"), sub$())
+    FOR i = 0 TO nd - 1
+      scan name$ + "\EFI\" + FIELD$(sub$(i), "name")
+    NEXT
+  END IF
+NEXT</pre>
+
+<h3 id="statement-reference">Statement reference</h3>
+<table>
+  <thead><tr><th>Statement</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td><code>[LET] var = expr</code>, <code>arr(i) = expr</code></td><td>Assignment (<code>LET</code> is optional).</td></tr>
+    <tr><td><code>PRINT [expr {; | ,} …]</code></td><td>Output; see <a href="#output-input">Output and input</a>.</td></tr>
+    <tr><td><code>INPUT ["prompt";] var</code></td><td>Read a line from the keyboard.</td></tr>
+    <tr><td><code>IF … THEN … [ELSEIF …] [ELSE …] END IF</code></td><td>Decision (block or one-line form).</td></tr>
+    <tr><td><code>FOR v = a TO b [STEP s] … NEXT [v]</code></td><td>Counting loop.</td></tr>
+    <tr><td><code>WHILE cond … WEND</code> (or <code>END WHILE</code>)</td><td>Loop while true.</td></tr>
+    <tr><td><code>DO [WHILE|UNTIL cond] … LOOP [WHILE|UNTIL cond]</code></td><td>General loop.</td></tr>
+    <tr><td><code>SELECT CASE expr … CASE list … CASE ELSE … END SELECT</code></td><td>Multiple choice; a list item is a value,
+        <code>a TO b</code> or <code>IS op value</code>.</td></tr>
+    <tr><td><code>EXIT FOR|WHILE|DO|SUB|FUNCTION</code></td><td>Leave a loop or a procedure.</td></tr>
+    <tr><td><code>CONTINUE FOR|WHILE|DO</code></td><td>Next round of a loop.</td></tr>
+    <tr><td><code>GOTO label</code></td><td>Jump to <code>label:</code> (alone on its line).</td></tr>
+    <tr><td><code>SUB name[(params)] … END SUB</code></td><td>Define a procedure.</td></tr>
+    <tr><td><code>FUNCTION name[(params)] … END FUNCTION</code></td><td>Define a function.</td></tr>
+    <tr><td><code>CALL name(args)</code>, <code>name args</code></td><td>Call a SUB.</td></tr>
+    <tr><td><code>RETURN [expr]</code></td><td>Leave a SUB/FUNCTION, with the function's value.</td></tr>
+    <tr><td><code>LOCAL v, a$(n), …</code></td><td>Local variables and arrays of a SUB/FUNCTION.</td></tr>
+    <tr><td><code>DIM a(n), b$(m), …</code></td><td>Create arrays (indexes 0 to n).</td></tr>
+    <tr><td><code>REDIM a(n)</code></td><td>Resize an array, keeping its values.</td></tr>
+    <tr><td><code>RUN args [TO|APPEND file]</code></td><td>Run a shell command; see <a href="#run-commands">Running commands</a>.</td></tr>
+    <tr><td><code>END [code]</code>, <code>EXIT [code]</code></td><td>End the script with an exit code.</td></tr>
+    <tr><td><code>CLS</code>, <code>COLOR [fg[, bg]]</code>, <code>LOCATE row, col</code></td><td>Screen control.</td></tr>
+    <tr><td><code>SLEEP ms</code>, <code>PAUSE ["msg"]</code></td><td>Wait.</td></tr>
+    <tr><td><code>' text</code>, <code>REM text</code></td><td>Comment.</td></tr>
+  </tbody>
+</table>
+<p>Functions that do something rather than compute a value — <code>SETENV</code>, <code>DELENV</code>, <code>WRITEFILE</code>,
+<code>APPENDFILE</code>, <code>SETVAR</code>, <code>SETVARSTR</code>, <code>DELVAR</code> — can also be written as statements,
+without parentheses: <code>WRITEFILE "a.txt", text$</code>.</p>
+
+<h3 id="function-reference">Function reference</h3>
+<p>Arguments ending in <code>$</code> are strings, the others numbers. Functions without arguments are written without
+parentheses (<code>ERR</code>, <code>TICKS</code>). Positions in strings start at 1.</p>
+
+<h4 id="functions-strings">Strings</h4>
+<dl class="defs">
+  <dt id="fn-len">LEN(s$)</dt><dd>Number of characters.</dd>
+  <dt id="fn-left">LEFT$(s$, n)</dt><dd>The first <code>n</code> characters.</dd>
+  <dt id="fn-right">RIGHT$(s$, n)</dt><dd>The last <code>n</code> characters.</dd>
+  <dt id="fn-mid">MID$(s$, start [, n])</dt><dd><code>n</code> characters from position <code>start</code> (all the rest without <code>n</code>).</dd>
+  <dt id="fn-instr">INSTR([start,] s$, find$)</dt><dd>Position of <code>find$</code> in <code>s$</code> (from <code>start</code>), 0 if absent. Case-sensitive.</dd>
+  <dt id="fn-ucase">UCASE$(s$) · LCASE$(s$)</dt><dd>Upper / lower case (letters A–Z only).</dd>
+  <dt id="fn-trim">TRIM$(s$) · LTRIM$(s$) · RTRIM$(s$)</dt><dd>Remove spaces (and tabs, newlines) at both ends / the start / the end.</dd>
+  <dt id="fn-replace">REPLACE$(s$, find$, new$)</dt><dd>Replace every <code>find$</code> with <code>new$</code>.</dd>
+  <dt id="fn-string">STRING$(n, c$ | code)</dt><dd><code>n</code> copies of a character: <code>STRING$(3, "*")</code> = <code>"***"</code>.</dd>
+  <dt id="fn-space">SPACE$(n)</dt><dd><code>n</code> spaces.</dd>
+  <dt id="fn-lpad">LPAD$(s$, width [, c$]) · RPAD$(s$, width [, c$])</dt><dd>Pad on the left / right to <code>width</code>
+      characters with spaces (or <code>c$</code>); longer strings are not cut.</dd>
+  <dt id="fn-chr">CHR$(code)</dt><dd>The character with a Unicode code: <code>CHR$(10)</code> is a newline.</dd>
+  <dt id="fn-asc">ASC(s$)</dt><dd>Unicode code of the first character.</dd>
+  <dt id="fn-split">SPLIT(s$, sep$, arr$())</dt><dd>Split <code>s$</code> at every <code>sep$</code> into <code>arr$()</code>; returns the
+      number of parts. With <code>sep$ = ""</code> it splits at runs of spaces.</dd>
+  <dt id="fn-join">JOIN$(arr(), sep$)</dt><dd>Join the elements of an array with <code>sep$</code> between them.</dd>
+</dl>
+
+<h4 id="functions-numbers">Numbers and conversions</h4>
+<dl class="defs">
+  <dt id="fn-val">VAL(s$)</dt><dd>Number in a string: decimal, <code>0x</code>/<code>&amp;H</code> hex, <code>0b</code>/<code>&amp;B</code> binary, with an
+      optional sign; leading spaces are skipped and reading stops at the first invalid character. 0 if none.</dd>
+  <dt id="fn-str">STR$(n)</dt><dd>Number as a decimal string.</dd>
+  <dt id="fn-hex">HEX$(n [, digits]) · BIN$(n [, digits]) · OCT$(n [, digits])</dt><dd>Number in hexadecimal (upper case),
+      binary or octal, padded with zeros to <code>digits</code>. Negative numbers show their 64-bit two's complement.</dd>
+  <dt id="fn-abs">ABS(n) · SGN(n)</dt><dd>Absolute value; sign (−1, 0, 1).</dd>
+  <dt id="fn-min">MIN(a, b, …) · MAX(a, b, …)</dt><dd>Smallest / largest of up to 16 numbers.</dd>
+  <dt id="fn-rnd">RND · RND(n)</dt><dd>A random number; with <code>n</code>, a random number from 0 to n−1.</dd>
+  <dt id="fn-ubound">UBOUND(arr())</dt><dd>Last index of an array (−1 for an empty one).</dd>
+</dl>
+
+<h4 id="functions-program">Program, time and keyboard</h4>
+<dl class="defs">
+  <dt id="fn-err">ERR</dt><dd>Result of the last command or of the last function that reports one (0 = success).</dd>
+  <dt id="fn-argc">ARGC · ARG$(n)</dt><dd>Number of arguments of the script; the n-th argument (<code>ARG$(0)</code>: the script path).</dd>
+  <dt id="fn-run">RUN$(cmd$ [, arg$, …])</dt><dd>Run a command and return its output (final newlines removed); sets <code>ERR</code>.</dd>
+  <dt id="fn-ticks">TICKS</dt><dd>Milliseconds counter, for measuring time.</dd>
+  <dt id="fn-date">DATE$ · TIME$</dt><dd>Current date <code>YYYY-MM-DD</code> and time <code>HH:MM:SS</code>.</dd>
+  <dt id="fn-key">KEY$ · KEY$(ms)</dt><dd>A key press: immediately (<code>""</code> if none), or waiting up to <code>ms</code>
+      milliseconds (−1 = no limit). Special keys return names such as <code>"UP"</code>, <code>"ENTER"</code>, <code>"ESC"</code>, <code>"F1"</code>.</dd>
+  <dt id="fn-menu">MENU(title$, items$ [, timeout [, default]])</dt><dd>Interactive menu; items separated by <code>|</code>.
+      Returns the item number (from 1) or 0 for <kbd>Esc</kbd>. See <a href="#menus">Menus and keys</a>.</dd>
+  <dt id="fn-platform">PLATFORM$ · VERSION$</dt><dd>The platform (<code>"UEFI x86_64"</code>) and the NESH version.</dd>
+</dl>
+
+<h4 id="functions-files">Files and folders</h4>
+<dl class="defs">
+  <dt id="fn-cwd">CWD$</dt><dd>Current directory, e.g. <code>fs0:\efi</code>.</dd>
+  <dt id="fn-fileexists">FILEEXISTS(p$) · DIREXISTS(p$)</dt><dd>True (−1) if the file / directory exists.</dd>
+  <dt id="fn-filesize">FILESIZE(p$)</dt><dd>Size in bytes; −1 and <code>ERR</code> = 1 if the file does not exist.</dd>
+  <dt id="fn-readfile">READFILE$(p$)</dt><dd>Contents of a text file (UTF-8 or UCS-2); <code>""</code> and <code>ERR</code> = 1 on error.</dd>
+  <dt id="fn-writefile">WRITEFILE p$, s$ · APPENDFILE p$, s$</dt><dd>Write / add text (UTF-8) to a file; <code>ERR</code> = 0 on success.</dd>
+  <dt id="fn-dir">DIR$(pattern$) · DIR$</dt><dd>First file name matching a pattern (or in a directory), then the next ones; <code>""</code> at the end.</dd>
+</dl>
+
+<h4 id="functions-env">Environment and command output</h4>
+<dl class="defs">
+  <dt id="fn-env">ENV$(name$)</dt><dd>Value of an environment variable; <code>""</code> and <code>ERR</code> = 1 if it does not exist.</dd>
+  <dt id="fn-setenv">SETENV name$, value$ [, permanent]</dt><dd>Set a variable, temporary unless <code>permanent</code> is true.</dd>
+  <dt id="fn-delenv">DELENV name$</dt><dd>Delete a variable (<code>ERR</code> = 1 if it did not exist).</dd>
+  <dt id="fn-records">RECORDS(text$, arr$())</dt><dd>Split <code>-data</code> output into records; returns their number.
+      See <a href="#data-output">Script-friendly output</a>.</dd>
+  <dt id="fn-field">FIELD$(record$, key$)</dt><dd>Value of <code>key=value</code> in a record; <code>""</code> and <code>ERR</code> = 1 if missing.</dd>
+</dl>
+
+<h4 id="functions-firmware">Firmware: UEFI variables and Secure Boot</h4>
+<p><code>guid$</code> is a GUID (<code>xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx</code>) or one of the names <code>global</code> (the default),
+<code>security</code>, <code>shim</code>, <code>shell</code>, <code>systemd</code>. After a firmware error <code>ERR</code> holds the low byte of
+the UEFI status code (for example 14 = not found).</p>
+<dl class="defs">
+  <dt id="fn-varexists">VAREXISTS(name$ [, guid$])</dt><dd>True if the variable exists.</dd>
+  <dt id="fn-var">VAR$(name$ [, guid$])</dt><dd>Value as text: UCS-2 strings are converted; other data is returned as it is, up to the first
+      zero byte (use <code>VARHEX$</code> for binary data).</dd>
+  <dt id="fn-varhex">VARHEX$(name$ [, guid$])</dt><dd>Value as hex bytes, e.g. <code>"0100"</code>.</dd>
+  <dt id="fn-varnum">VARNUM(name$ [, guid$])</dt><dd>Value as a little-endian number (e.g. <code>Timeout</code>).</dd>
+  <dt id="fn-setvar">SETVAR name$, hex$ [, guid$ [, attr]]</dt><dd>Write bytes given in hex. Without <code>attr</code> an existing
+      variable keeps its attributes and a new one is non-volatile with boot and runtime access (7).</dd>
+  <dt id="fn-setvarstr">SETVARSTR name$, text$ [, guid$ [, attr]]</dt><dd>Write a UCS-2 string (with terminator).</dd>
+  <dt id="fn-delvar">DELVAR name$ [, guid$]</dt><dd>Delete a variable.</dd>
+  <dt id="fn-fwvendor">FWVENDOR$</dt><dd>Firmware vendor, e.g. <code>"American Megatrends"</code>.</dd>
+  <dt id="fn-secureboot">SECUREBOOT</dt><dd>True if Secure Boot is active.</dd>
+</dl>
+
+<h4 id="functions-boot">Firmware: boot entries</h4>
+<p>Entries are identified by their number (the <code>####</code> of <code>Boot####</code>, e.g. <code>&amp;H0003</code>).</p>
+<dl class="defs">
+  <dt id="fn-bootcount">BOOTCOUNT</dt><dd>Number of entries in the boot order.</dd>
+  <dt id="fn-bootid">BOOTID(i)</dt><dd>Number of the i-th entry of the boot order (i from 0).</dd>
+  <dt id="fn-bootdesc">BOOTDESC$(id)</dt><dd>Description; <code>ERR</code> = 127 if the entry does not exist.</dd>
+  <dt id="fn-bootpath">BOOTPATH$(id)</dt><dd>Device path, as text.</dd>
+  <dt id="fn-bootargs">BOOTARGS$(id)</dt><dd>Optional data (arguments), as text.</dd>
+  <dt id="fn-bootenabled">BOOTENABLED(id)</dt><dd>True if the entry is active.</dd>
+  <dt id="fn-bootcurrent">BOOTCURRENT</dt><dd>Number of the entry used for this boot, −1 if unknown.</dd>
+</dl>
+<pre class="code" data-lang="basic" data-example="bootlist" data-platform="efi">' list the boot order with the descriptions
+FOR i = 0 TO BOOTCOUNT - 1
+  id = BOOTID(i)
+  PRINT HEX$(id, 4); "  "; BOOTDESC$(id)
+NEXT
+PRINT "Timeout: "; VARNUM("Timeout"); " s, Secure Boot: "; SECUREBOOT</pre>
+
+<!-- ===================================================================== -->
+<h2 id="data-output">Script-friendly output (-data)</h2>
+
+<p class="chapter-intro">Command output is designed for people: aligned columns, headings, units. Scripts need
+something simpler. With the option <code>-data</code>, many commands print their information as records of
+<code>key=value</code> lines that a script reads with two functions.</p>
+
+<h3 id="data-format">The format</h3>
+<ul>
+  <li>One field per line: <code>key=value</code>. Keys are lower case; the value is the rest of the line.</li>
+  <li>An empty line separates two records (for example two files, or two volumes).</li>
+  <li>Yes/no values are <code>yes</code> and <code>no</code>; sizes and counts are decimal numbers; handles and IDs are hexadecimal,
+      as elsewhere in the shell.</li>
+  <li>A missing value is an empty field (<code>label=</code>), so the set of keys is the same in every record.</li>
+</ul>
+<pre class="terminal">fs0:\> map -data
+kind=volume
+volume=fs0
+label=QEMU VVFAT
+size=528171008
+free=527351808
+readonly=yes
+removable=no
+boot=yes
+aliases=
+devpath=PciRoot(0x0)/Pci(0x2,0x0)/HD(1,MBR,0xBE1AFDFA,0x3F,0xFBFC1)
+
+kind=volume
+volume=fs1
+label=NESHWORK
+…</pre>
+
+<h3 id="records-field">Reading records: RECORDS and FIELD$</h3>
+<p><code>RECORDS(text$, arr$())</code> splits the output into an array with one record per element and returns the number of
+records. <code>FIELD$(record$, key$)</code> returns the value of one field, or <code>""</code> with <code>ERR</code> = 1 when the
+record has no such key.</p>
+<pre class="code" data-lang="basic" data-example="data" data-title="data.nsb">RUN "mkdir d"
+WRITEFILE "d\a.txt", "hello"
+WRITEFILE "d\big.bin", STRING$(3000, "x")
+n = RECORDS(RUN$("ls -data d"), f$())
+FOR i = 0 TO n - 1
+  PRINT RPAD$(FIELD$(f$(i), "name"), 10); LPAD$(FIELD$(f$(i), "size"), 6); " bytes"
+NEXT</pre>
+<pre class="terminal" data-example-output="data">fs0:\&gt; data
+a.txt          5 bytes
+big.bin     3000 bytes</pre>
+<pre class="code" data-lang="basic" data-example="datafield" data-title="datafield.nsb">rec$ = "name=a.txt" + CHR$(10) + "size=5" + CHR$(10)
+PRINT FIELD$(rec$, "size")
+x$ = FIELD$(rec$, "owner")
+PRINT "[" + x$ + "] ERR="; ERR</pre>
+<pre class="terminal" data-example-output="datafield">fs0:\&gt; datafield
+5
+[] ERR=1</pre>
+<p>A typical use: find a volume by its label instead of its number, which can change.</p>
+<pre class="code" data-lang="basic" data-example="findlabel" data-platform="efi">' returns the volume with the given label, e.g. "fs1:", or "" if none
+FUNCTION volume$(label$)
+  LOCAL n, i, v$(0)
+  n = RECORDS(RUN$("map -data"), v$())
+  FOR i = 0 TO n - 1
+    IF FIELD$(v$(i), "kind") = "volume" AND UCASE$(FIELD$(v$(i), "label")) = UCASE$(label$) THEN
+      RETURN FIELD$(v$(i), "volume") + ":"
+    END IF
+  NEXT
+  RETURN ""
+END FUNCTION
+
+target$ = volume$("BACKUP")
+IF target$ = "" THEN
+  PRINT "Please insert the BACKUP disk"
+  END 1
+END IF
+RUN "cp", "-r", "fs0:\efi", target$ + "\efi"</pre>
+
+<h3 id="data-commands">Commands with -data</h3>
+<table>
+  <thead><tr><th>Command</th><th>One record per</th><th>Fields</th></tr></thead>
+  <tbody>
+    <tr><td><code>ls</code>, <code>dir</code>, <code>stat</code></td><td>file or directory</td><td>name, path, type, size, modified, readonly, hidden, system, archive</td></tr>
+    <tr><td><code>map</code></td><td>volume / block device</td><td>kind=volume: volume, label, size, free, readonly, removable, boot, aliases, devpath;
+        kind=block: device, type, media, size, blocksize, readonly, volume, devpath</td></tr>
+    <tr><td><code>vol</code></td><td>volume</td><td>volume, label, size, free, readonly</td></tr>
+    <tr><td><code>ver</code></td><td>(one record)</td><td>shell, version, platform, firmware, firmware_revision, uefi, secure_boot</td></tr>
+    <tr><td><code>sysinfo</code></td><td>(one record)</td><td>firmware, cpu, memory, console and graphics sizes, config_tables, acpi, smbios, boot_volume…</td></tr>
+    <tr><td><code>memmap</code></td><td>memory descriptor (with <code>-s</code>: type)</td><td>type, start, end, pages, attributes (<code>-s</code>: type, pages, bytes)</td></tr>
+    <tr><td><code>date</code>, <code>time</code></td><td>(one record)</td><td>date, year, month, day / time, hour, minute, second</td></tr>
+    <tr><td><code>set</code>, <code>alias</code></td><td>variable / alias</td><td>name, value, kind</td></tr>
+    <tr><td><code>var list</code></td><td>UEFI variable</td><td>name, guid, guid_name, attributes, size</td></tr>
+    <tr><td><code>bootmgr</code></td><td>settings + boot entry</td><td>kind=settings: bootcurrent, bootnext, timeout;
+        kind=entry: id, variable, order, active, hidden, current, next, description, devpath, args</td></tr>
+    <tr><td><code>drivers</code></td><td>driver</td><td>handle, version, type, config, diag, controllers, children, name, image</td></tr>
+    <tr><td><code>devices</code></td><td>device</td><td>handle, type, config, diag, parents, drivers, children, name</td></tr>
+    <tr><td><code>dh</code></td><td>handle</td><td>handle, name, protocols (and devicepath with <code>-d</code>)</td></tr>
+    <tr><td><code>pci</code></td><td>PCI function (one device: its decoded header)</td><td>segment, bus, device, function, vendor, deviceid, class, classname…</td></tr>
+    <tr><td><code>smbiosview</code></td><td>SMBIOS structure</td><td>type, typename, handle, length + decoded fields (vendor, version, serial, size…)</td></tr>
+    <tr><td><code>acpiview</code></td><td>ACPI table</td><td>signature, address, length, revision, oemid, oemtable, checksum</td></tr>
+    <tr><td><code>ifconfig -l</code>, <code>ifconfig6 -l</code></td><td>network interface</td><td>name, media, policy, mac, ip, mask (IPv4), gateway, dns (dad for IPv6)</td></tr>
+  </tbody>
+</table>
+<p>The exact fields of each command are also listed at the end of its <code>help</code>. Commands without <code>-data</code>
+reject the option with an error. The UEFI Shell's <code>-sfo</code> format is not supported: <code>-data</code> replaces it.</p>
+
+<!-- ===================================================================== -->
+<h2 id="boot">Managing boot entries</h2>
+
+<p class="chapter-intro">The firmware decides what to start from a list of <em>boot entries</em> kept in UEFI variables.
+NESH shows and changes them safely with <code>bootmgr</code>, and also offers the UEFI Shell's <code>bcfg</code>.</p>
+
+<h3 id="boot-concepts">How UEFI boots</h3>
+<figure>
+<pre class="mermaid">
+flowchart LR
+  P["Power on"] --> N{"BootNext set?"}
+  N -- yes --> X["start Boot#### = BootNext&lt;br/&gt;(BootNext is cleared)"]
+  N -- no --> O["try the entries of BootOrder&lt;br/&gt;in order"]
+  O --> E["Boot####: description,&lt;br/&gt;device path, arguments"]
+  E --> L["boot loader, OS,&lt;br/&gt;or NESH"]
+  X --> L
+</pre>
+<figcaption>What the firmware does at power-on</figcaption>
+</figure>
+<table>
+  <thead><tr><th>Variable</th><th>Content</th></tr></thead>
+  <tbody>
+    <tr><td><code>Boot####</code></td><td>One boot entry (<code>####</code> is its hexadecimal ID): description, device path of the file or device to
+        start, optional arguments, and flags <em>active</em> (used) and <em>hidden</em> (not shown in the firmware menu).</td></tr>
+    <tr><td><code>BootOrder</code></td><td>The list of IDs, in the order the firmware tries them.</td></tr>
+    <tr><td><code>BootNext</code></td><td>An ID to start once, at the next boot only.</td></tr>
+    <tr><td><code>BootCurrent</code></td><td>The ID used for the current boot (set by the firmware).</td></tr>
+    <tr><td><code>Timeout</code></td><td>Seconds the firmware boot menu waits.</td></tr>
+  </tbody>
+</table>
+
+<h3 id="bootmgr">Listing entries</h3>
+<pre class="terminal">fs0:\> bootmgr
+BootCurrent: 0001   BootNext: -   Timeout: 0 s
+Ord  Id    Flg  Description
+  1  0000  AH   UiApp
+                 Fv(7CB8BDC9-F8EB-4F34-AAEA-3EE4AF6516A1)/FvFile(462CAA21-7614-4503-836E-8AB6F4662331)
+  2  0001  A *  UEFI Misc Device
+                 PciRoot(0x0)/Pci(0x2,0x0)
+  3  0002  A    UEFI Non-Block Boot Device
+                 PciRoot(0x0)/Pci(0x3,0x0)
+  4  0003  A    EFI Internal Shell
+                 Fv(7CB8BDC9-F8EB-4F34-AAEA-3EE4AF6516A1)/FvFile(7C04A583-9E3E-4F1C-AD65-E05268D0B4D1)
+Flags: A active, H hidden, * current boot, N next boot. '-' in Ord: not in the boot order.</pre>
+<p><code>bootmgr list -v</code> also shows the arguments of each entry.</p>
+
+<h3 id="boot-add" data-index="bootmgr add;boot entry for NESH">Adding an entry</h3>
+<pre class="terminal">fs0:\> bootmgr add fs0:\efi\tools\nesh.efi "NESH shell" -t</pre>
+<p>This creates a <code>Boot####</code> entry that starts <code>nesh.efi</code> from that volume, and <code>-t</code> puts it first in the
+boot order. Words after the description become the arguments passed to the program. Words starting with
+<code>-</code> are read as options of <code>bootmgr</code> itself; to give the program such an argument, set the arguments
+afterwards with <code>bootmgr edit ID -a "-n"</code>.</p>
+
+<h3 id="boot-safety" data-index="dry run;backup;restore">Safety: dry run, confirmation, backups</h3>
+<p>Every <code>bootmgr</code> command that changes something follows the same steps:</p>
+<ol class="steps">
+  <li><strong>Plan</strong> — it prints the changes it is going to make. With <code>-n</code> (dry run) it stops here.</li>
+  <li><strong>Confirm</strong> — it asks <code>Apply these changes? [y/N]</code>, unless <code>-y</code> is given.
+      (<code>bootmgr next</code> never asks: it only affects one boot.)</li>
+  <li><strong>Back up</strong> — it saves all boot variables to <code>\nesh\backup</code> on the boot volume, unless <code>-B</code>
+      is given. If the backup cannot be written the change is not made.</li>
+  <li><strong>Apply</strong> the changes.</li>
+</ol>
+<p><code>bootmgr restore FILE</code> puts back a saved state; <code>bootmgr backup FILE</code> saves one on demand.</p>
+
+<h3 id="boot-tasks">Common tasks</h3>
+<table>
+  <thead><tr><th>Task</th><th>Command</th></tr></thead>
+  <tbody>
+    <tr><td>Start an entry once, at the next boot</td><td><code>bootmgr next 0003</code>, then <code>reset</code></td></tr>
+    <tr><td>Make an entry the default</td><td><code>bootmgr top 0003</code></td></tr>
+    <tr><td>Set the whole order</td><td><code>bootmgr order 0003,0001,0002</code></td></tr>
+    <tr><td>Disable / enable an entry without deleting it</td><td><code>bootmgr disable 0002</code> / <code>bootmgr enable 0002</code></td></tr>
+    <tr><td>Rename an entry, change its file or arguments</td><td><code>bootmgr edit 0003 -D "Ubuntu"</code></td></tr>
+    <tr><td>Delete an entry</td><td><code>bootmgr del 0004</code></td></tr>
+    <tr><td>Find entries whose file no longer exists</td><td><code>bootmgr check</code></td></tr>
+    <tr><td>Change the firmware menu timeout</td><td><code>bootmgr timeout 5</code></td></tr>
+    <tr><td>Work on driver entries (<code>Driver####</code>)</td><td>add <code>-driver</code> to the command</td></tr>
+    <tr><td>Reboot into the firmware setup</td><td><code>reset setup</code></td></tr>
+  </tbody>
+</table>
+<p>The same information is available to scripts through <code>bootmgr -data</code> and the <a href="#functions-boot">boot
+functions</a>; the <a href="#boot-menu">boot menu example</a> puts them together.</p>
+
+<h3 id="bcfg">bcfg (UEFI Shell syntax)</h3>
+<p><code>bcfg</code> works like in the UEFI Shell, using <em>positions</em> in the boot order rather than IDs:
+<code>bcfg boot dump</code>, <code>bcfg boot add 0 fs0:\efi\tools\nesh.efi "NESH"</code>, <code>bcfg boot mv 3 0</code>,
+<code>bcfg boot rm 2</code>. It asks nothing (as in the UEFI Shell) but still saves a backup when it can. Existing UEFI
+Shell scripts and instructions that use <code>bcfg</code> work as they are.</p>
+
+<!-- ===================================================================== -->
+<h2 id="uefi-variables">UEFI variables</h2>
+
+<p class="chapter-intro">UEFI variables are small named values stored by the firmware — most of them in non-volatile
+memory (NVRAM). The boot entries, the Secure Boot keys, the language and the shell's own settings live there.</p>
+
+<h3 id="var-concepts">Names, GUIDs and attributes</h3>
+<p>A variable is identified by a <strong>name</strong> and a <strong>GUID</strong> (the “namespace” of its owner). Standard UEFI
+variables use the <em>global</em> GUID. NESH knows a few GUIDs by name: <code>global</code>, <code>security</code> (Secure Boot
+databases), <code>shim</code>, <code>shell</code> (UEFI Shell and NESH settings), <code>systemd</code>.</p>
+<table>
+  <thead><tr><th>Attribute</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td><code>NV</code></td><td>Non-volatile: kept across reboots.</td></tr>
+    <tr><td><code>BS</code></td><td>Boot services: visible before the OS starts.</td></tr>
+    <tr><td><code>RT</code></td><td>Runtime: also visible to the operating system.</td></tr>
+    <tr><td><code>A</code></td><td>Authenticated: can only be changed with a signed update (Secure Boot keys).</td></tr>
+  </tbody>
+</table>
+
+<h3 id="var-command">The var command</h3>
+<pre class="terminal">fs0:\> var list Boot*
+global                                 BSRT       4  BootOptionSupport
+global                                 BSRT       2  BootCurrent
+global                               NVBSRT      62  Boot0000
+global                               NVBSRT      78  Boot0001
+global                               NVBSRT       8  BootOrder
+fs0:\> var get BootOrder
+0000,0001,0002,0003
+fs0:\> var set MyTool.Mode fast -g shell -t ascii
+fs0:\> var save fs1:\vars.txt
+fs0:\> var del MyTool.Mode -g shell</pre>
+<p><code>var get</code> decodes the value when it can (numbers, strings, lists such as <code>BootOrder</code>); <code>-x</code> shows a hex
+dump. <code>var save</code> writes variables to a readable text file and <code>var load</code> restores them.</p>
+<p>The UEFI Shell commands <code>dmpstore</code> (dump, save, load and delete variables, with the same binary file format as
+the UEFI Shell) and <code>setvar</code> are available too. Scripts use <code>VAR$</code>, <code>VARNUM</code>, <code>SETVAR</code> and the
+other <a href="#functions-firmware">firmware functions</a>.</p>
+<div class="callout danger"><span class="callout-title">Careful</span>
+<p>Deleting or corrupting firmware variables can make a machine unbootable or reset its setup. Save them first
+(<code>var save</code> or <code>dmpstore -all -s FILE</code>) and change only variables you understand.</p></div>
+
+<!-- ===================================================================== -->
+<h2 id="drivers">Drivers and devices</h2>
+
+<p class="chapter-intro">UEFI firmware is built from drivers that find devices and offer services to programs.
+These commands show how the pieces fit together, and let you load, connect and remove drivers.</p>
+
+<h3 id="driver-model">The UEFI driver model in brief</h3>
+<figure>
+<pre class="mermaid">
+flowchart TD
+  PCI["PCI bus driver"] -- "creates" --> C1["controller handle&lt;br/&gt;(a disk controller)"]
+  D1["disk driver"] -- "manages" --> C1
+  D1 -- "installs BlockIo on" --> C1
+  PART["partition driver"] -- "creates" --> C2["partition handles"]
+  FAT["FAT driver"] -- "installs SimpleFileSystem" --> C2
+  C2 --> V["NESH volume fs0:"]
+</pre>
+<figcaption>Drivers, handles and protocols: from a PCI device to a volume</figcaption>
+</figure>
+<ul>
+  <li>A <strong>handle</strong> represents a thing: a device, a driver, a loaded image. NESH numbers them in hexadecimal; the
+      numbers stay the same for the whole session.</li>
+  <li>A <strong>protocol</strong> is a service attached to a handle: <code>BlockIo</code> reads disk blocks,
+      <code>SimpleFileSystem</code> reads files, <code>DevicePath</code> says where the device is.</li>
+  <li>A <strong>driver</strong> <em>manages</em> a controller when it is <em>connected</em> to it; a <em>bus driver</em> also
+      creates child devices (one per partition, per USB device…).</li>
+</ul>
+
+<h3 id="driver-commands">Inspecting</h3>
+<table>
+  <thead><tr><th>Command</th><th>Shows</th></tr></thead>
+  <tbody>
+    <tr><td><code>drivers</code></td><td>Every driver: version, type, how many devices it manages and creates, name, file.</td></tr>
+    <tr><td><code>devices</code></td><td>Every device: type, parents, drivers, children, name.</td></tr>
+    <tr><td><code>devtree</code></td><td>The devices as a tree, from the root bridges down.</td></tr>
+    <tr><td><code>dh</code></td><td>Handles and their protocols; <code>dh 8F</code> details of one, <code>dh -p BlockIo</code> only those with a protocol.</td></tr>
+    <tr><td><code>openinfo HANDLE</code></td><td>Which drivers and programs have opened the protocols of a handle.</td></tr>
+  </tbody>
+</table>
+<pre class="terminal">fs0:\> devtree
+Ctrl[33] PciRoot(0x0)
+  Ctrl[8C] PciRoot(0x0)/Pci(0x0,0x0)
+  Ctrl[8D] QEMU Video PCI Adapter
+  Ctrl[8E] PciRoot(0x0)/Pci(0x2,0x0)
+    Ctrl[9C] FAT File System
+  Ctrl[91] ATA Controller
+    Ctrl[9D] QEMU QEMU DVD-ROM
+fs0:\> dh -p BlockIo
+ 8E: DiskIo BlockIo fa920010-6785-4941-b6ec-498c579f160a PciIo DevicePath
+ 9C: SimpleFileSystem DiskIo PartitionInfo BlockIo DevicePath</pre>
+
+<h3 id="driver-actions">Loading and connecting</h3>
+<table>
+  <thead><tr><th>Command</th><th>Effect</th></tr></thead>
+  <tbody>
+    <tr><td><code>load FILE.efi</code></td><td>Loads and starts a driver, then connects all devices so it can find its hardware
+        (<code>-nc</code>: do not connect).</td></tr>
+    <tr><td><code>connect [-r]</code></td><td>Connects drivers to all devices (or to one handle; <code>-r</code> also to the new children).</td></tr>
+    <tr><td><code>disconnect HANDLE</code> / <code>reconnect HANDLE</code></td><td>Stops / restarts the drivers of a device.</td></tr>
+    <tr><td><code>unload HANDLE</code></td><td>Removes a driver from memory (if the driver allows it).</td></tr>
+    <tr><td><code>loadpcirom FILE.rom</code></td><td>Loads the UEFI drivers contained in a PCI option ROM image.</td></tr>
+    <tr><td><code>drvdiag</code> / <code>drvcfg</code></td><td>Runs driver diagnostics / driver configuration, for drivers that offer them.</td></tr>
+  </tbody>
+</table>
+<p>A new USB stick or disk that does not appear in <code>map</code> usually needs <code>connect -r</code> followed by <code>map -r</code>.</p>
+
+<!-- ===================================================================== -->
+<h2 id="hardware">Hardware and firmware information</h2>
+
+<p class="chapter-intro">Reading what the firmware knows about the machine: memory, PCI devices, SMBIOS and ACPI
+tables, the processor, the screen.</p>
+
+<h3 id="hw-overview">Overview</h3>
+<pre class="terminal">fs0:\> sysinfo
+Firmware: Debian distribution of EDK II (revision 0x00010000)
+UEFI:     2.7
+Secure Boot: inactive
+CPU:      QEMU Virtual CPU version 2.5+ / GenuineIntel
+Memory:   511 MiB
+Console:  100 x 31
+Graphics: 1280 x 800 (mode 0 of 30), frame buffer at 0x80000000
+Tables:   10 configuration tables, ACPI, SMBIOS
+Started from: fs0: PciRoot(0x0)/Pci(0x2,0x0)/HD(1,MBR,0xBE1AFDFA,0x3F,0xFBFC1)</pre>
+
+<table>
+  <thead><tr><th>Command</th><th>Shows</th></tr></thead>
+  <tbody>
+    <tr><td><code>memmap</code></td><td>The UEFI memory map; <code>-s</code> totals per memory type.</td></tr>
+    <tr><td><code>pci</code></td><td>PCI devices; <code>pci BUS DEV FUNC -i</code> decodes one device's configuration header.</td></tr>
+    <tr><td><code>smbiosview</code></td><td>SMBIOS tables: BIOS, system, board, processor, memory modules (<code>-t 17</code>).</td></tr>
+    <tr><td><code>acpiview</code></td><td>ACPI tables; <code>-s APIC</code> shows one, <code>-s DSDT -d</code> saves it to a file.</td></tr>
+    <tr><td><code>cpuid</code></td><td>Processor vendor, family, model and features; raw registers for a leaf.</td></tr>
+    <tr><td><code>mode</code> / <code>gop</code></td><td>Text modes / graphics modes, and switching between them.</td></tr>
+    <tr><td><code>sermode</code></td><td>Serial port settings.</td></tr>
+    <tr><td><code>dmem</code> / <code>mm</code></td><td>Memory dump / read and write memory, I/O ports and PCI registers.</td></tr>
+    <tr><td><code>getmtc</code></td><td>The firmware's monotonic counter.</td></tr>
+  </tbody>
+</table>
+<pre class="terminal">fs0:\> memmap -s
+Type                      Pages        MiB
+Reserved                  65672        256
+LoaderCode                  100          0
+LoaderData                  266          1
+BootServicesCode            698          2
+BootServicesData           9999         39
+RuntimeCode                 256          1
+RuntimeData                 581          2
+Conventional             118412        462
+ACPIReclaim                  18          0
+ACPINVS                     514          2
+Total memory: 511 MiB, available to the OS: 505 MiB
+fs0:\> smbiosview -t 1
+SMBIOS 2.8 (32-bit entry point at 0x1f988000), 9 structures
+Type 1 (System Information)  Handle 0x0100  Length 27
+    Manufacturer: QEMU
+    Product: Standard PC (Q35 + ICH9, 2009)
+    Version: pc-q35-10.0
+    Serial:
+    UUID: 00000000-0000-0000-0000-000000000000
+    SKU:
+    Family:
+fs0:\> acpiview
+RSDP at 0x1fb7e014, revision 2, OEM BOCHS
+Sig   Address           Length  Rev     OEM     Table
+XSDT  0x1fb7d0e8      84  rev 1   BOCHS   BXPC      checksum ok
+FACP  0x1fb79000     244  rev 3   BOCHS   BXPC      checksum ok
+DSDT  0x1fb7a000    8474  rev 1   BOCHS   BXPC      checksum ok
+FACS  0x1fbdd000      64  FACS
+APIC  0x1fb78000     120  rev 3   BOCHS   BXPC      checksum ok</pre>
+<div class="callout danger"><span class="callout-title">Low-level access</span>
+<p><code>mm</code> and <code>hexedit -m</code> write directly to memory, I/O ports and PCI registers. A wrong value can hang the
+machine or damage data. <code>dmem</code> only reads, but reading an unmapped address can also hang some machines.
+These writes are disabled while Secure Boot is active.</p></div>
+
+<!-- ===================================================================== -->
+<h2 id="network">Network</h2>
+
+<p class="chapter-intro">NESH uses the network stack of the firmware (the same one used for network boot) to configure
+interfaces and download files over IPv4 and IPv6.</p>
+
+<h3 id="net-stack">Making the network available</h3>
+<p>Most firmware loads its network drivers only when network boot (PXE) is enabled in the setup. If
+<code>ifconfig -l</code> says <em>no network interface</em>, either enable network boot in the firmware setup, or load the
+drivers from files with <code>load</code> (they are part of the firmware project EDK2; a copy extracted from the firmware of
+the same machine works best):</p>
+<pre class="terminal">fs0:\> load MnpDxe.efi ArpDxe.efi Ip4Dxe.efi Udp4Dxe.efi Dhcp4Dxe.efi Mtftp4Dxe.efi TcpDxe.efi DnsDxe.efi HttpUtilitiesDxe.efi HttpDxe.efi
+fs0:\> load Ip6Dxe.efi Udp6Dxe.efi Dhcp6Dxe.efi Mtftp6Dxe.efi</pre>
+<p>The network drivers need a random number generator, which modern machines provide.</p>
+
+<h3 id="net-ipv4">IPv4</h3>
+<pre class="terminal">fs0:\> ifconfig -s eth0 dhcp
+eth0: waiting for DHCP... done
+name         : eth0
+media state  : unknown
+policy       : dhcp
+mac addr     : 52-54-00-12-34-56
+ipv4 address : 10.0.2.15
+subnet mask  : 255.255.255.0
+gateway      : 10.0.2.2
+dns server   : 10.0.2.3
+route table  :
+  subnet 10.0.2.0 netmask 255.255.255.0 gateway 0.0.0.0
+  subnet 0.0.0.0 netmask 0.0.0.0 gateway 10.0.2.2</pre>
+<p>A fixed address: <code>ifconfig -s eth0 static 192.168.1.10 255.255.255.0 192.168.1.1</code>, DNS servers with
+<code>ifconfig -s eth0 dns 192.168.1.1</code>, back to DHCP with <code>ifconfig -r</code>. The settings are kept by the firmware.</p>
+
+<h3 id="net-ipv6">IPv6</h3>
+<p>Every interface has a link-local address (<code>fe80::…</code>). <code>ifconfig6 -s eth0 auto</code> enables automatic
+configuration from the routers of the network; <code>ifconfig6 -s eth0 man host 2001:db8::10/64 gw 2001:db8::1</code>
+sets an address by hand.</p>
+<pre class="terminal">fs0:\> ifconfig6 -s eth0 auto
+fs0:\> ifconfig6 -l eth0 -data
+name=eth0
+media=unknown
+policy=automatic
+mac=52-54-00-12-34-56
+ip=fe80::5054:ff:fe12:3456/64 fec0::5054:ff:fe12:3456/64
+gateway=fe80::2
+dns=
+dad=1</pre>
+
+<h3 id="net-tools">ping, TFTP and HTTP</h3>
+<pre class="terminal">fs0:\> ping -n 3 10.0.2.2
+Ping 10.0.2.2 16 data bytes.
+16 bytes from 10.0.2.2 : icmp_seq=1 ttl=255 time=0ms
+16 bytes from 10.0.2.2 : icmp_seq=2 ttl=255 time=0ms
+16 bytes from 10.0.2.2 : icmp_seq=3 ttl=255 time=0ms
+
+3 packets transmitted, 3 received, 0% packet loss
+Rtt(round trip time) min=0ms max=0ms avg=0ms
+fs0:\> tftp 10.0.2.2 hello.txt fs1:\tftp.txt
+Downloading hello.txt from 10.0.2.2 ...
+20 bytes saved to fs1:\tftp.txt
+fs0:\> http http://[fec0::2]:18080/tool.efi fs1:\tool.efi</pre>
+<p><code>ping</code>, <code>tftp</code> and <code>http</code> accept both IPv4 and IPv6 addresses; in URLs an IPv6 address goes in square
+brackets. <code>ping6</code> is also available for UEFI Shell compatibility. <code>http</code> supports <code>http://</code> only
+(<code>https</code> needs a TLS driver in the firmware).</p>
+<pre class="code" data-lang="basic" data-example="nettool" data-platform="efi">' download a diagnostic tool from a server and run it
+RUN "ifconfig -s eth0 dhcp"
+IF ERR &lt;&gt; 0 THEN PRINT "no network": END 1
+RUN "http", "http://192.168.1.5/tools/diag.efi", "fs1:\diag.efi"
+IF ERR = 0 THEN RUN "fs1:\diag.efi"</pre>
+
+<!-- ===================================================================== -->
+<h2 id="efi-apps">Running EFI applications</h2>
+
+<p class="chapter-intro">NESH starts UEFI programs — boot loaders, firmware updaters, diagnostics, other shells — and
+gives them the environment they expect.</p>
+<ul>
+  <li>Type the file name with its arguments: <code>fs1:\tools\flash.efi -update bios.bin</code>. The <code>.efi</code> extension
+      can be omitted, and names are searched along <code>path</code>.</li>
+  <li>The program's exit status becomes the exit code (<code>ERR</code> in scripts).</li>
+  <li>Its text output can be saved with <code>&gt; file</code> or captured with <code>RUN$</code>.</li>
+  <li>Programs written for the UEFI Shell (with the EDK2 ShellLib) work: NESH provides the UEFI Shell programming
+      interface (EFI_SHELL_PROTOCOL 2.2) with the same volumes, current directory, environment variables and aliases,
+      and lets them run shell commands. The EDK2 versions of <code>edit</code>, <code>pci</code> or <code>ping</code>, for example, run
+      unchanged.</li>
+  <li><code>load</code> is for drivers; applications are refused by <code>load</code>.</li>
+</ul>
+<p>Programs designed only for the old EFI 1.10 shell interface (from before 2009) are not supported.</p>
+
+<!-- ===================================================================== -->
+<h2 id="secure-boot">Secure Boot</h2>
+
+<p class="chapter-intro">With Secure Boot active, the firmware starts only programs signed with a trusted key. NESH is
+one file, so one signature covers the whole shell.</p>
+
+<h3 id="signing">Signing nesh.efi</h3>
+<p>To run NESH on a machine with Secure Boot, sign <code>nesh.efi</code> with a key the machine trusts. With your own keys
+(on Linux, with the <code>sbsigntools</code> package):</p>
+<pre class="terminal">$ sbsign --key db.key --cert db.crt --output nesh-signed.efi build/nesh.efi
+$ sbverify --cert db.crt nesh-signed.efi</pre>
+<p>The certificate must be in the firmware's <code>db</code> database (enrolled from the firmware setup or with your platform's
+key-management tools), or — on machines that boot through <em>shim</em> — in the MOK list (<code>mokutil --import db.der</code>).</p>
+
+<h3 id="sb-restrictions">What changes when Secure Boot is active</h3>
+<p>NESH shows <em>Secure Boot is active: low-level hardware writes are disabled</em> when it starts, and refuses writes that
+could be used to get around the protection:</p>
+<table>
+  <thead><tr><th>Refused</th><th>Still allowed</th></tr></thead>
+  <tbody>
+    <tr><td><code>mm ADDRESS VALUE</code> and interactive changes in <code>mm</code> (memory, MMIO, I/O ports, PCI registers)</td>
+        <td>Reading with <code>mm</code>, <code>dmem</code>, <code>pci</code></td></tr>
+    <tr><td>Saving memory in <code>hexedit -m</code></td><td>Viewing memory in <code>hexedit -m</code></td></tr>
+  </tbody>
+</table>
+<p>In addition, the firmware itself refuses to load unsigned drivers and programs (<code>load</code>, <code>loadpcirom</code>,
+starting <code>.efi</code> files) and to change authenticated variables such as the Secure Boot keys. Scripts can check the
+state with <code>SECUREBOOT</code>.</p>
+
+<!-- ===================================================================== -->
+<h2 id="differences">Differences from the UEFI Shell</h2>
+
+<p class="chapter-intro">For people who know the UEFI Shell: what is the same, what is different, and how to translate.</p>
+<table>
+  <thead><tr><th>UEFI Shell</th><th>NESH</th></tr></thead>
+  <tbody>
+    <tr><td><code>.nsh</code> scripts with <code>if</code>, <code>for</code>, <code>goto</code>, <code>shift</code>, <code>%1</code></td>
+        <td>Not supported: write <code>.nsb</code> scripts in NESH BASIC. <code>%1</code> → <code>ARG$(1)</code>; <code>if exist</code> →
+        <code>IF FILEEXISTS(…)</code>; <code>%lasterror%</code> → <code>ERR</code>.</td></tr>
+    <tr><td><code>%var%</code> in command lines</td><td>Not expanded; use <code>ENV$("var")</code> in a script.</td></tr>
+    <tr><td><code>-sfo</code> output</td><td><code>-data</code> output (see <a href="#data-output">Script-friendly output</a>).</td></tr>
+    <tr><td><code>-b</code> (pause after each page)</td><td>Accepted and ignored.</td></tr>
+    <tr><td><code>startup.nsh</code></td><td><code>startup.nsb</code> on the boot volume.</td></tr>
+    <tr><td><code>msr</code></td><td>Not included (reading a missing model-specific register can hang the machine).</td></tr>
+    <tr><td><code>exit /b</code></td><td>Same meaning: ends only the current script.</td></tr>
+    <tr><td>Separate IPv6 tools</td><td><code>ifconfig6</code> and <code>ping6</code> exist; <code>ping</code>, <code>tftp</code>, <code>http</code> also accept IPv6.</td></tr>
+  </tbody>
+</table>
+<p>Everything else — command names, their options, volume names, environment variables and aliases (stored in the same
+UEFI variables, so both shells share them), <code>dmpstore</code> files, <code>bcfg</code> — works as in the UEFI Shell. NESH adds
+commands the UEFI Shell does not have: <code>bootmgr</code>, <code>var</code>, <code>grep</code>, <code>head</code>, <code>tail</code>, <code>wc</code>,
+<code>hexdump</code>, <code>stat</code>, <code>which</code>, <code>history</code>, <code>sysinfo</code>, <code>cpuid</code>, <code>gop</code>, <code>devtree</code> and more.</p>
+
+<!-- ===================================================================== -->
+<h2 id="troubleshooting">Troubleshooting</h2>
+<table>
+  <thead><tr><th>Problem</th><th>What to try</th></tr></thead>
+  <tbody>
+    <tr><td>The firmware does not show the USB stick</td><td>The stick must be FAT-formatted and contain
+        <code>\EFI\BOOT\BOOTX64.EFI</code>. Some firmware needs “USB boot” enabled or “fast boot” disabled in the setup.</td></tr>
+    <tr><td>“Security violation” or nothing happens when starting NESH</td><td>Secure Boot is active and <code>nesh.efi</code> is not
+        signed with a trusted key: see <a href="#signing">Signing nesh.efi</a>, or disable Secure Boot in the setup.</td></tr>
+    <tr><td>A disk or stick is missing from <code>map</code></td><td><code>connect -r</code>, then <code>map -r</code>. Partitions with a file system the
+        firmware does not know (NTFS, ext4) appear only as <code>blkN</code>.</td></tr>
+    <tr><td>“command not found”</td><td>Check the spelling with <code>help</code>; for a script or program, give the path or check
+        <code>set path</code> and <code>which NAME</code>.</td></tr>
+    <tr><td>Function keys do not work (serial console)</td><td>Use the <kbd>Ctrl</kbd> equivalents listed for each editor.</td></tr>
+    <tr><td>History or backups are not saved</td><td>The boot volume is read-only; NESH continues without them.</td></tr>
+    <tr><td>A script stops with “error: …”</td><td>The message gives file and line. <code>nesh.efi -k SCRIPT</code> checks the syntax.</td></tr>
+    <tr><td>“no network interface”</td><td>See <a href="#net-stack">Making the network available</a>.</td></tr>
+    <tr><td>A command runs too long</td><td><kbd>Ctrl</kbd>+<kbd>C</kbd>.</td></tr>
+  </tbody>
+</table>
+
+<!-- ===================================================================== -->
+<h2 id="reference">Command reference</h2>
+
+<p class="chapter-intro">Every command, grouped by topic. These texts are the same ones that <code>help NAME</code> shows
+inside NESH (this chapter is generated from them). Commands marked <span class="badge">-data</span> support
+<a href="#data-output">script-friendly output</a>.</p>
+
+<!-- BEGIN GENERATED: command-reference (tools/gen-docs.py) -->
+
+<section class="ref-group" id="ref-shell">
+<h3>Shell and session</h3>
+<table class="ref-summary"><thead><tr><th>Command</th><th>What it does</th></tr></thead><tbody>
+<tr><td><a href="#cmd-help"><code>help</code></a></td><td>Show help</td></tr>
+<tr><td><a href="#cmd-ver"><code>ver</code></a> <span class="badge">-data</span></td><td>Show shell, firmware and UEFI versions</td></tr>
+<tr><td><a href="#cmd-cls"><code>cls</code></a></td><td>Clear the screen</td></tr>
+<tr><td><a href="#cmd-exit"><code>exit</code></a></td><td>Leave the shell and return to the firmware</td></tr>
+<tr><td><a href="#cmd-history"><code>history</code></a></td><td>Show the last N commands (-c clears the history)</td></tr>
+<tr><td><a href="#cmd-echo"><code>echo</code></a></td><td>Print text (-n: no newline)</td></tr>
+<tr><td><a href="#cmd-pause"><code>pause</code></a></td><td>Wait for a key</td></tr>
+<tr><td><a href="#cmd-sleep"><code>sleep</code></a></td><td>Wait for the given time</td></tr>
+<tr><td><a href="#cmd-which"><code>which</code></a></td><td>Show what a command name refers to</td></tr>
+<tr><td><a href="#cmd-set"><code>set</code></a> <span class="badge">-data</span></td><td>Show or change environment variables</td></tr>
+<tr><td><a href="#cmd-alias"><code>alias</code></a> <span class="badge">-data</span></td><td>Show or define command aliases</td></tr>
+<tr><td><a href="#cmd-reset"><code>reset</code></a></td><td>Restart or shut down the machine, or reboot into the firmware setup</td></tr>
+<tr><td><a href="#cmd-sysinfo"><code>sysinfo</code></a> <span class="badge">-data</span></td><td>Firmware, CPU, memory and display information</td></tr>
+</tbody></table>
+<article class="cmd" id="cmd-help" data-index="help">
+<h4><code>help</code></h4>
+<p class="cmd-summary">Show help</p>
+<pre class="usage">help [COMMAND | basic | functions]</pre>
+<pre class="cmd-help">  help                list all the commands with a one-line summary
+  help NAME           usage and details of one command
+  help basic          quick reference of the BASIC scripting language
+  help functions      list of the built-in BASIC functions
+Command names are not case-sensitive. 'help language' and 'help func' also
+work. An unknown NAME is an error.</pre>
+</article>
+<article class="cmd" id="cmd-ver" data-index="ver">
+<h4><code>ver</code> <span class="badge" title="supports -data output">-data</span></h4>
+<p class="cmd-summary">Show shell, firmware and UEFI versions</p>
+<pre class="usage">ver</pre>
+<pre class="cmd-help">  ver                 shell version and platform; on UEFI also the firmware
+                      vendor and revision, UEFI version and Secure Boot state
+With -data: shell, version, platform, firmware, firmware_revision, uefi,
+secure_boot (yes/no).</pre>
+</article>
+<article class="cmd" id="cmd-cls" data-index="cls">
+<h4><code>cls</code></h4>
+<p class="cmd-summary">Clear the screen</p>
+<pre class="usage">cls [BACKGROUND]</pre>
+<pre class="cmd-help">  cls                 clear the screen
+  cls 1               set a blue background, then clear
+BACKGROUND: 0 black, 1 blue, 2 green, 3 cyan, 4 red, 5 magenta, 6 brown,
+7 light gray. The screen is not cleared when the output is redirected.</pre>
+</article>
+<article class="cmd" id="cmd-exit" data-index="exit">
+<h4><code>exit</code></h4>
+<p class="cmd-summary">Leave the shell and return to the firmware</p>
+<pre class="usage">exit [/b] [CODE]</pre>
+<pre class="cmd-help">  exit                leave the shell with exit code 0
+  exit 3              leave the shell with exit code 3
+  exit /b 2           end only the current script, with exit code 2
+In a script (RUN "exit"), exit stops all running scripts at once, then
+leaves the shell. exit /b is like END CODE; at the prompt it only sets the
+exit code. CODE may be decimal or hex (0x10).</pre>
+</article>
+<article class="cmd" id="cmd-history" data-index="history">
+<h4><code>history</code></h4>
+<p class="cmd-summary">Show the last N commands (-c clears the history)</p>
+<pre class="usage">history [-c] [N]</pre>
+<pre class="cmd-help">Keys at the prompt: Up/Down browse the history, Ctrl-R searches it,
+Tab completes commands and paths, Ctrl-A/E start/end of line,
+Ctrl-K/U delete to end/start, Ctrl-W delete word, Ctrl-L clear screen.</pre>
+</article>
+<article class="cmd" id="cmd-echo" data-index="echo">
+<h4><code>echo</code></h4>
+<p class="cmd-summary">Print text (-n: no newline)</p>
+<pre class="usage">echo [-n] [TEXT...]</pre>
+<pre class="cmd-help">  echo TEXT...        print the words separated by one space, then a newline
+  echo -n TEXT...     the same without the final newline
+  echo "a   b"        quotes keep the spaces
+Only a first -n is an option; any other word is printed as it is.
+echo -on and echo -off (UEFI Shell script switches) do nothing.</pre>
+</article>
+<article class="cmd" id="cmd-pause" data-index="pause">
+<h4><code>pause</code></h4>
+<p class="cmd-summary">Wait for a key</p>
+<pre class="usage">pause [-q] [MESSAGE]</pre>
+<pre class="cmd-help">  pause               print "Press any key to continue..." and wait
+  pause Insert disk   print your own message and wait for a key
+  pause -q            wait without a message
+Exit code 0 for most keys, 130 for Esc or Ctrl-C. In a script, Esc can be
+tested in ERR; Ctrl-C also stops the script.</pre>
+</article>
+<article class="cmd" id="cmd-sleep" data-index="sleep">
+<h4><code>sleep</code></h4>
+<p class="cmd-summary">Wait for the given time</p>
+<pre class="usage">sleep MILLISECONDS</pre>
+<pre class="cmd-help">  sleep 500           wait half a second
+Ctrl-C stops the wait (exit code 130). For microseconds see stall.</pre>
+</article>
+<article class="cmd" id="cmd-which" data-index="which">
+<h4><code>which</code></h4>
+<p class="cmd-summary">Show what a command name refers to</p>
+<pre class="usage">which NAME...</pre>
+<pre class="cmd-help">  which NAME...       say if NAME is an alias, a built-in command, a file
+                      or a BASIC function
+  which ls            ls: built-in command
+  which ll            ll: alias for ls -l
+Files are searched like commands: NAME.nsb and NAME.efi in the directories
+of the path variable, or at the path given. Exit code 127 if a NAME is not
+found.</pre>
+</article>
+<article class="cmd" id="cmd-set" data-index="set">
+<h4><code>set</code> <span class="badge" title="supports -data output">-data</span></h4>
+<p class="cmd-summary">Show or change environment variables</p>
+<pre class="usage">set [-v] [NAME [VALUE...]] | set -d NAME</pre>
+<pre class="cmd-help">  set                 list all the variables
+  set NAME            show one variable
+  set NAME VALUE      set a variable, kept in the firmware across reboots
+  set -v NAME VALUE   set a temporary variable (lost when the shell exits)
+  set -d NAME         delete a variable
+Environment variables are shared with the EFI applications started by
+the shell and are separate from BASIC variables. In scripts: ENV$(name$),
+SETENV, DELENV. path lists the directories searched for commands (';'
+separated, '.' = current directory). Read-only: cwd, lasterror,
+uefishellsupport, uefishellversion, uefiversion, neshversion.
+With -data (set): name, value, kind (permanent, temporary, readonly).</pre>
+</article>
+<article class="cmd" id="cmd-alias" data-index="alias">
+<h4><code>alias</code> <span class="badge" title="supports -data output">-data</span></h4>
+<p class="cmd-summary">Show or define command aliases</p>
+<pre class="usage">alias [-v] [NAME [COMMAND...]] | alias -d NAME</pre>
+<pre class="cmd-help">  alias               list the aliases (V: temporary)
+  alias ll ls -l      define ll, kept in the firmware across reboots
+  alias -v ll ls -l   temporary alias
+  alias -d ll         delete an alias
+Extra arguments are appended: 'll fs0:' runs 'ls -l fs0:'.</pre>
+</article>
+<article class="cmd" id="cmd-reset" data-index="reset">
+<h4><code>reset</code></h4>
+<p class="cmd-summary">Restart or shut down the machine, or reboot into the firmware setup</p>
+<pre class="usage">reset [-w [STRING] | -s [STRING] | -c [STRING] | -fwui | setup]</pre>
+<pre class="cmd-help">  (none), -c         cold reset
+  -w                 warm reset
+  -s                 shut down (power off)
+  setup, -fwui, -f   restart into the firmware setup screen (sets the
+                     OsIndications variable; the firmware must support it)
+  STRING             reset reason passed to the firmware as ResetData
+Only one mode may be given. If the firmware does not reset, reset fails
+with an error.
+Example: reset -s "maintenance"</pre>
+</article>
+<article class="cmd" id="cmd-sysinfo" data-index="sysinfo">
+<h4><code>sysinfo</code> <span class="badge" title="supports -data output">-data</span></h4>
+<p class="cmd-summary">Firmware, CPU, memory and display information</p>
+<pre class="usage">sysinfo</pre>
+<pre class="cmd-help">Shows firmware vendor and revision, UEFI version, Secure Boot state, CPU,
+memory size, console size, graphics mode, configuration tables and the
+volume NESH was started from. Arguments are ignored.
+With -data: one record with firmware, firmware_revision, uefi,
+secure_boot, cpu, cpu_vendor, memory, console_columns, console_rows,
+graphics_width, graphics_height, framebuffer, config_tables, acpi,
+smbios, boot_volume, boot_devpath.</pre>
+</article>
+</section>
+
+<section class="ref-group" id="ref-files">
+<h3>Files and folders</h3>
+<table class="ref-summary"><thead><tr><th>Command</th><th>What it does</th></tr></thead><tbody>
+<tr><td><a href="#cmd-ls"><code>ls</code></a> <span class="badge">-data</span></td><td>List files and directories</td></tr>
+<tr><td><a href="#cmd-dir"><code>dir</code></a> <span class="badge">-data</span></td><td>List files with details (same as ls -l)</td></tr>
+<tr><td><a href="#cmd-cd"><code>cd</code></a></td><td>Change the current directory</td></tr>
+<tr><td><a href="#cmd-pwd"><code>pwd</code></a></td><td>Print the current directory</td></tr>
+<tr><td><a href="#cmd-cat"><code>cat</code></a></td><td>Print files (UTF-8 or UCS-2 text, detected automatically)</td></tr>
+<tr><td><a href="#cmd-type"><code>type</code></a></td><td>Print files (same as cat)</td></tr>
+<tr><td><a href="#cmd-cp"><code>cp</code></a></td><td>Copy files (-r directories too)</td></tr>
+<tr><td><a href="#cmd-mv"><code>mv</code></a></td><td>Move or rename files and directories</td></tr>
+<tr><td><a href="#cmd-rm"><code>rm</code></a></td><td>Delete files (-r or -q: directories too, -f ignore missing)</td></tr>
+<tr><td><a href="#cmd-del"><code>del</code></a></td><td>Delete files (same as rm)</td></tr>
+<tr><td><a href="#cmd-mkdir"><code>mkdir</code></a></td><td>Create directories (-p also the parents)</td></tr>
+<tr><td><a href="#cmd-md"><code>md</code></a></td><td>Create directories (same as mkdir)</td></tr>
+<tr><td><a href="#cmd-rmdir"><code>rmdir</code></a></td><td>Remove empty directories</td></tr>
+<tr><td><a href="#cmd-touch"><code>touch</code></a></td><td>Set the modification time to now (creates missing files; -r recursive)</td></tr>
+<tr><td><a href="#cmd-stat"><code>stat</code></a> <span class="badge">-data</span></td><td>Show file details</td></tr>
+<tr><td><a href="#cmd-attrib"><code>attrib</code></a></td><td>Show or change file attributes (archive, system, hidden, read-only)</td></tr>
+<tr><td><a href="#cmd-comp"><code>comp</code></a></td><td>Compare two files and show where they differ</td></tr>
+<tr><td><a href="#cmd-cmp"><code>cmp</code></a></td><td>Compare two files and stop at the first difference</td></tr>
+<tr><td><a href="#cmd-setsize"><code>setsize</code></a></td><td>Set the size of files (truncate or extend with zeros)</td></tr>
+</tbody></table>
+<article class="cmd" id="cmd-ls" data-index="ls">
+<h4><code>ls</code> <span class="badge" title="supports -data output">-data</span></h4>
+<p class="cmd-summary">List files and directories</p>
+<pre class="usage">ls [-l] [-r] [-a[ashrd]] [PATH | PATTERN...]</pre>
+<pre class="cmd-help">  ls                    names in the current directory
+  ls -l fs1:\efi        details: date, time, attributes, size, name
+  ls -r                 also every subdirectory
+  ls *.efi              only matching names
+  -a                    also hidden and system files
+  -aXY                  only entries with all the attributes X, Y...:
+                        d directory, r read-only, h hidden, s system,
+                        a archive (e.g. ls -ad lists directories)
+Directory names end with \ (and are blue; programs .efi/.nsb are green).
+Hidden and system files are left out unless -a is given or a pattern
+names them. -b (UEFI Shell paging) is accepted and ignored. dir is the
+same as ls -l.
+With -data: name, path, type, size, modified, readonly, hidden, system,
+archive (one record per entry).</pre>
+</article>
+<article class="cmd" id="cmd-dir" data-index="dir">
+<h4><code>dir</code> <span class="badge" title="supports -data output">-data</span></h4>
+<p class="cmd-summary">List files with details (same as ls -l)</p>
+<pre class="usage">dir [-r] [-a[ashrd]] [PATH | PATTERN...]</pre>
+<pre class="cmd-help">  dir                   current directory
+  dir -r fs0:\efi       also all subdirectories
+  dir *.efi             only matching names (hidden files included)
+Each line: date, time, attributes (d dir, r read-only, h hidden, s system,
+a archive), size and name; a total line ends each directory. Hidden and
+system files are shown only with -a. -l and -b (UEFI Shell paging) are
+accepted and have no effect. Other options as for ls.
+With -data: name, path, type, size, modified, readonly, hidden, system,
+archive.</pre>
+</article>
+<article class="cmd" id="cmd-cd" data-index="cd">
+<h4><code>cd</code></h4>
+<p class="cmd-summary">Change the current directory</p>
+<pre class="usage">cd [DIR | fsN:]</pre>
+<pre class="cmd-help">  cd                  print the current directory
+  cd DIR              go to DIR (relative, or absolute from the root)
+  cd fs1:             go to the root of volume fs1:
+  cd ..               go to the parent directory
+Both \ and / work as separators. DIR must be an existing directory.</pre>
+</article>
+<article class="cmd" id="cmd-pwd" data-index="pwd">
+<h4><code>pwd</code></h4>
+<p class="cmd-summary">Print the current directory</p>
+<pre class="usage">pwd</pre>
+<pre class="cmd-help">  Prints the full path, e.g. fs0:\efi\boot (same as cd with no arguments).</pre>
+</article>
+<article class="cmd" id="cmd-cat" data-index="cat">
+<h4><code>cat</code></h4>
+<p class="cmd-summary">Print files (UTF-8 or UCS-2 text, detected automatically)</p>
+<pre class="usage">cat [-a|-u] FILE...</pre>
+<pre class="cmd-help">  cat readme.txt            print a file
+  cat fs0:\logs\*.txt       print all matching files, one after another
+Files may be UTF-8 (with or without BOM) or UCS-2 little-endian with BOM;
+carriage returns are removed. -a and -u (UEFI Shell: force ASCII or
+UCS-2) are accepted before the files and ignored. Ctrl-C stops.</pre>
+</article>
+<article class="cmd" id="cmd-type" data-index="type">
+<h4><code>type</code></h4>
+<p class="cmd-summary">Print files (same as cat)</p>
+<pre class="usage">type [-a|-u] FILE...</pre>
+<pre class="cmd-help">  Same as cat (UEFI Shell name).</pre>
+</article>
+<article class="cmd" id="cmd-cp" data-index="cp">
+<h4><code>cp</code></h4>
+<p class="cmd-summary">Copy files (-r directories too)</p>
+<pre class="usage">cp [-r] [-q] SRC... DST</pre>
+<pre class="cmd-help">  -r        copy directories and all their contents
+  -q        accepted for UEFI Shell compatibility (cp never asks)
+  cp a.txt b.txt               copy a file
+  cp *.efi fs1:\tools          copy several files into a directory
+  cp -r fs0:\efi fs1:\backup   copy a whole folder
+If DST is an existing directory, each SRC is copied into it; with several
+sources DST must be a directory. Existing files are overwritten without
+asking; with -r, existing directories are merged. A directory cannot be
+copied into itself. After an error or Ctrl-C the partial file is deleted.</pre>
+</article>
+<article class="cmd" id="cmd-mv" data-index="mv">
+<h4><code>mv</code></h4>
+<p class="cmd-summary">Move or rename files and directories</p>
+<pre class="usage">mv SRC... DST</pre>
+<pre class="cmd-help">  mv old.txt new.txt           rename a file
+  mv *.log fs0:\logs           move files into a directory
+  mv fs0:\tools fs1:\          move a directory to another volume
+If DST is an existing directory, each SRC is moved into it; with several
+sources DST must be a directory. An existing file at the target is
+replaced without asking, but only once the move has succeeded (if not,
+it is put back); an existing directory is an error. Between volumes, mv
+copies and deletes the source only after a complete copy (a partial copy
+is removed). There are no options.</pre>
+</article>
+<article class="cmd" id="cmd-rm" data-index="rm">
+<h4><code>rm</code></h4>
+<p class="cmd-summary">Delete files (-r or -q: directories too, -f ignore missing)</p>
+<pre class="usage">rm [-r] [-f] [-q] PATH...</pre>
+<pre class="cmd-help">  -r, -q    also delete directories with all their contents
+  -f        no error for paths or patterns that match nothing
+  rm *.tmp                 delete matching files
+  rm -r fs1:\old           delete a directory tree
+Nothing is asked before deleting. Read-only files cannot be deleted:
+clear the flag with attrib -r first. The root of a volume is never
+removed. -q is the UEFI Shell form (there rm deletes directories too).</pre>
+</article>
+<article class="cmd" id="cmd-del" data-index="del">
+<h4><code>del</code></h4>
+<p class="cmd-summary">Delete files (same as rm)</p>
+<pre class="usage">del [-r] [-f] [-q] PATH...</pre>
+<pre class="cmd-help">  Same as rm (UEFI Shell name).</pre>
+</article>
+<article class="cmd" id="cmd-mkdir" data-index="mkdir">
+<h4><code>mkdir</code></h4>
+<p class="cmd-summary">Create directories (-p also the parents)</p>
+<pre class="usage">mkdir [-p] DIR...</pre>
+<pre class="cmd-help">  -p        also create missing parents; no error if a directory exists
+  mkdir -p fs0:\a\b\c       create a whole path in one step
+Without -p the parent must exist and DIR must not exist yet. A file with
+the same name as DIR or a parent is always an error.</pre>
+</article>
+<article class="cmd" id="cmd-md" data-index="md">
+<h4><code>md</code></h4>
+<p class="cmd-summary">Create directories (same as mkdir)</p>
+<pre class="usage">md [-p] DIR...</pre>
+<pre class="cmd-help">  Same as mkdir (UEFI Shell name).</pre>
+</article>
+<article class="cmd" id="cmd-rmdir" data-index="rmdir">
+<h4><code>rmdir</code></h4>
+<p class="cmd-summary">Remove empty directories</p>
+<pre class="usage">rmdir DIR...</pre>
+<pre class="cmd-help">  rmdir fs0:\old           remove an empty directory
+A directory that is not empty is an error (use rm -r to delete a whole
+tree). Wildcards are not expanded.</pre>
+</article>
+<article class="cmd" id="cmd-touch" data-index="touch">
+<h4><code>touch</code></h4>
+<p class="cmd-summary">Set the modification time to now (creates missing files; -r recursive)</p>
+<pre class="usage">touch [-r] FILE...</pre>
+<pre class="cmd-help">  -r        also every file and directory inside the given directories
+  touch log.txt            create an empty file, or update its time
+  touch -r fs0:\data       update a whole tree
+Wildcards are allowed; a pattern that matches nothing is skipped silently.</pre>
+</article>
+<article class="cmd" id="cmd-stat" data-index="stat">
+<h4><code>stat</code> <span class="badge" title="supports -data output">-data</span></h4>
+<p class="cmd-summary">Show file details</p>
+<pre class="usage">stat PATH...</pre>
+<pre class="cmd-help">  stat boot.efi            path, type, size, modified time, attributes
+Size is not shown for directories. Wildcards are not expanded.
+With -data: name, path, type, size, modified, readonly, hidden, system,
+archive.</pre>
+</article>
+<article class="cmd" id="cmd-attrib" data-index="attrib">
+<h4><code>attrib</code></h4>
+<p class="cmd-summary">Show or change file attributes (archive, system, hidden, read-only)</p>
+<pre class="usage">attrib [+a|-a] [+s|-s] [+h|-h] [+r|-r] [FILE | DIR | PATTERN...]</pre>
+<pre class="cmd-help">  attrib                   attributes of everything in the current dir
+  attrib DIR               attributes of the entries in DIR
+  attrib +r boot.efi       make a file read-only
+  attrib -h -s fs0:\*      clear hidden and system on all root entries
+Letters: a archive, s system, h hidden, r read-only (upper case works).
+Each line shows D (directory), A, S, H, R and the path. When changing, a
+directory itself is changed, not its contents. Wildcards are allowed.</pre>
+</article>
+<article class="cmd" id="cmd-comp" data-index="comp">
+<h4><code>comp</code></h4>
+<p class="cmd-summary">Compare two files and show where they differ</p>
+<pre class="usage">comp [-n COUNT|all] [-s BYTES] FILE1 FILE2</pre>
+<pre class="cmd-help">  -n COUNT  stop after COUNT differences (default 10; all: no limit)
+  -s BYTES  bytes shown for each difference (default 16)
+  comp -n all old.rom new.rom   list every difference
+A run of consecutive different bytes is one difference: its hex offset is
+printed, then the bytes of both files in hex and as text. Different sizes
+count as one more difference. ERR is nonzero if the files differ. Both
+files are read into memory.</pre>
+</article>
+<article class="cmd" id="cmd-cmp" data-index="cmp">
+<h4><code>cmp</code></h4>
+<p class="cmd-summary">Compare two files and stop at the first difference</p>
+<pre class="usage">cmp [-s BYTES] FILE1 FILE2</pre>
+<pre class="cmd-help">  Same as comp -n 1. -s BYTES sets the bytes shown (default 16).</pre>
+</article>
+<article class="cmd" id="cmd-setsize" data-index="setsize">
+<h4><code>setsize</code></h4>
+<p class="cmd-summary">Set the size of files (truncate or extend with zeros)</p>
+<pre class="usage">setsize SIZE FILE...</pre>
+<pre class="cmd-help">  setsize 1048576 disk.img    make a file of 1 MiB
+  setsize 0 log.txt           empty a file
+SIZE is in bytes (decimal, or hex with 0x). Missing files are created
+first, as in the UEFI Shell.</pre>
+</article>
+</section>
+
+<section class="ref-group" id="ref-text">
+<h3>Text and data</h3>
+<table class="ref-summary"><thead><tr><th>Command</th><th>What it does</th></tr></thead><tbody>
+<tr><td><a href="#cmd-grep"><code>grep</code></a></td><td>Print the lines of files that contain a text</td></tr>
+<tr><td><a href="#cmd-head"><code>head</code></a></td><td>First N lines of a file (default 10)</td></tr>
+<tr><td><a href="#cmd-tail"><code>tail</code></a></td><td>Last N lines of a file (default 10)</td></tr>
+<tr><td><a href="#cmd-wc"><code>wc</code></a></td><td>Count lines, words and bytes</td></tr>
+<tr><td><a href="#cmd-hexdump"><code>hexdump</code></a></td><td>Hexadecimal dump of a file</td></tr>
+<tr><td><a href="#cmd-date"><code>date</code></a> <span class="badge">-data</span></td><td>Show or set the date</td></tr>
+<tr><td><a href="#cmd-time"><code>time</code></a> <span class="badge">-data</span></td><td>Show or set the time</td></tr>
+<tr><td><a href="#cmd-timezone"><code>timezone</code></a></td><td>Show or set the time zone of the clock (-l list, -f details)</td></tr>
+<tr><td><a href="#cmd-parse"><code>parse</code></a></td><td>Extract a column from standard-format (comma separated) output</td></tr>
+<tr><td><a href="#cmd-stall"><code>stall</code></a></td><td>Wait for the given number of microseconds</td></tr>
+<tr><td><a href="#cmd-eficompress"><code>eficompress</code></a></td><td>Compress a file in the UEFI compression format</td></tr>
+<tr><td><a href="#cmd-efidecompress"><code>efidecompress</code></a></td><td>Decompress a file in the UEFI compression format</td></tr>
+</tbody></table>
+<article class="cmd" id="cmd-grep" data-index="grep">
+<h4><code>grep</code></h4>
+<p class="cmd-summary">Print the lines of files that contain a text</p>
+<pre class="usage">grep [-i] [-v] [-n] [-c] TEXT FILE...</pre>
+<pre class="cmd-help">  -i                  ignore upper/lower case
+  -v                  print the lines that do NOT contain TEXT
+  -n                  put the line number before each line
+  -c                  print only the number of matching lines
+  grep -i error log.txt      lines containing "error", any case
+  grep -c TODO *.nsb         matching lines in each script
+TEXT is plain text, not a pattern. FILE may contain wildcards; with several
+files each line starts with the file name. UTF-8 and UCS-2 files are read;
+directories are skipped. Use -- before a TEXT that starts with '-'.
+Exit code: 0 if a line matched, 1 if none, other values on errors.</pre>
+</article>
+<article class="cmd" id="cmd-head" data-index="head">
+<h4><code>head</code></h4>
+<p class="cmd-summary">First N lines of a file (default 10)</p>
+<pre class="usage">head [-n N] FILE</pre>
+<pre class="cmd-help">  -n N                print the first N lines (default 10)
+  head -n 20 log.txt  the first 20 lines
+The file is read as text (UTF-8 or UCS-2; carriage returns are removed).
+One FILE only; -n goes before it.</pre>
+</article>
+<article class="cmd" id="cmd-tail" data-index="tail">
+<h4><code>tail</code></h4>
+<p class="cmd-summary">Last N lines of a file (default 10)</p>
+<pre class="usage">tail [-n N] FILE</pre>
+<pre class="cmd-help">  -n N                print the last N lines (default 10)
+  tail -n 5 log.txt   the last 5 lines
+The file is read as text (UTF-8 or UCS-2; carriage returns are removed).
+One FILE only; -n goes before it.</pre>
+</article>
+<article class="cmd" id="cmd-wc" data-index="wc">
+<h4><code>wc</code></h4>
+<p class="cmd-summary">Count lines, words and bytes</p>
+<pre class="usage">wc FILE...</pre>
+<pre class="cmd-help">  wc a.txt b.txt      one line per file: lines, words, bytes, name
+Lines are counted as newline characters; words are separated by spaces,
+tabs or newlines; bytes is the file size. Wildcards are not expanded.</pre>
+</article>
+<article class="cmd" id="cmd-hexdump" data-index="hexdump">
+<h4><code>hexdump</code></h4>
+<p class="cmd-summary">Hexadecimal dump of a file</p>
+<pre class="usage">hexdump [-s OFFSET] [-n LENGTH] FILE</pre>
+<pre class="cmd-help">  -s OFFSET           start at byte OFFSET (default 0)
+  -n LENGTH           dump at most LENGTH bytes (default: to the end)
+  hexdump -n 0x200 disk.img      the first 512 bytes
+Each line shows the offset, 16 bytes in hex and the printable characters.
+Numbers may be decimal or hex (0x). Options go before FILE. Ctrl-C stops.</pre>
+</article>
+<article class="cmd" id="cmd-date" data-index="date">
+<h4><code>date</code> <span class="badge" title="supports -data output">-data</span></h4>
+<p class="cmd-summary">Show or set the date</p>
+<pre class="usage">date [YYYY-MM-DD | MM/DD/YYYY | MM/DD/YY]</pre>
+<pre class="cmd-help">  date                show the date as YYYY-MM-DD
+  date 2026-09-19     set the date
+  date 09/19/2026     set the date, UEFI Shell order (MM/DD/YYYY or MM/DD/YY)
+A two-digit year means 20YY. The time of day is not changed.
+With -data: date, year, month, day.</pre>
+</article>
+<article class="cmd" id="cmd-time" data-index="time">
+<h4><code>time</code> <span class="badge" title="supports -data output">-data</span></h4>
+<p class="cmd-summary">Show or set the time</p>
+<pre class="usage">time [HH:MM[:SS]]</pre>
+<pre class="cmd-help">  time                show the time as HH:MM:SS (24 hours)
+  time 14:30          set the time (seconds become 0)
+  time 14:30:15       set the time with seconds
+The date is not changed.
+With -data: time, hour, minute, second.</pre>
+</article>
+<article class="cmd" id="cmd-timezone" data-index="timezone">
+<h4><code>timezone</code></h4>
+<p class="cmd-summary">Show or set the time zone of the clock (-l list, -f details)</p>
+<pre class="usage">timezone [-s [+|-]hh:mm] [-l] [-f]</pre>
+<pre class="cmd-help">  (none)          show the time zone of the real-time clock
+  -s [+|-]hh:mm   set the offset from UTC (up to 14:00; :mm optional)
+  -l              list common offsets with example places
+  -f              also show the raw TimeZone and Daylight fields
+  -b              accepted for UEFI Shell compatibility and ignored
+-s changes only the time zone, not the date and time. -l ignores the
+other options.
+Example: timezone -s +01:00</pre>
+</article>
+<article class="cmd" id="cmd-parse" data-index="parse">
+<h4><code>parse</code></h4>
+<p class="cmd-summary">Extract a column from standard-format (comma separated) output</p>
+<pre class="usage">parse FILE TABLE COLUMN [-i INSTANCE] [-s INSTANCE]</pre>
+<pre class="cmd-help">  Lines look like: TableName,"value1","value2",...  COLUMN 1 is value1.
+  -i N: only the Nth line of TABLE.
+  -s N: only in the Nth ShellCommand section.</pre>
+</article>
+<article class="cmd" id="cmd-stall" data-index="stall">
+<h4><code>stall</code></h4>
+<p class="cmd-summary">Wait for the given number of microseconds</p>
+<pre class="usage">stall MICROSECONDS</pre>
+<pre class="cmd-help">  stall 1000          wait 1000 microseconds (1 ms)
+Uses the firmware Stall service: the wait cannot be stopped with Ctrl-C.
+For longer waits use sleep (milliseconds, can be stopped).</pre>
+</article>
+<article class="cmd" id="cmd-eficompress" data-index="eficompress">
+<h4><code>eficompress</code></h4>
+<p class="cmd-summary">Compress a file in the UEFI compression format</p>
+<pre class="usage">eficompress INFILE OUTFILE</pre>
+<pre class="cmd-help">  eficompress big.bin big.cmp    compress big.bin into big.cmp
+Writes the UEFI (EFI 1.1) compressed format, which firmware and efidecompress
+can read. OUTFILE is overwritten. Prints the sizes before and after.</pre>
+</article>
+<article class="cmd" id="cmd-efidecompress" data-index="efidecompress">
+<h4><code>efidecompress</code></h4>
+<p class="cmd-summary">Decompress a file in the UEFI compression format</p>
+<pre class="usage">efidecompress [-n] INFILE OUTFILE</pre>
+<pre class="cmd-help">  -n                  use the NESH decoder even if the firmware has one
+  efidecompress big.cmp big.bin  decompress big.cmp into big.bin
+By default the firmware decompressor is used when available. OUTFILE is
+overwritten. Prints the sizes before and after.</pre>
+</article>
+</section>
+
+<section class="ref-group" id="ref-disks">
+<h3>Volumes and disks</h3>
+<table class="ref-summary"><thead><tr><th>Command</th><th>What it does</th></tr></thead><tbody>
+<tr><td><a href="#cmd-map"><code>map</code></a> <span class="badge">-data</span></td><td>List volumes and block devices; give volumes extra names</td></tr>
+<tr><td><a href="#cmd-vol"><code>vol</code></a> <span class="badge">-data</span></td><td>Show a volume, set (-n) or delete (-d) its label</td></tr>
+<tr><td><a href="#cmd-dblk"><code>dblk</code></a></td><td>Show raw blocks of a disk, decoding MBR, GPT and FAT boot sectors</td></tr>
+<tr><td><a href="#cmd-getmtc"><code>getmtc</code></a></td><td>Show the next monotonic count of the firmware</td></tr>
+</tbody></table>
+<article class="cmd" id="cmd-map" data-index="map">
+<h4><code>map</code> <span class="badge" title="supports -data output">-data</span></h4>
+<p class="cmd-summary">List volumes and block devices; give volumes extra names</p>
+<pre class="usage">map [-r] [-v] [-t fs|blk] | map NAME TARGET | map -d NAME</pre>
+<pre class="cmd-help">  map                 volumes (fsN:) and block devices (blkN:)
+  map -r              rescan the devices (also -u)
+  map usb fs1:        fs1: can also be called usb:
+                      (TARGET: fsN:, blkN: or a handle)
+  map -d usb          remove an extra name</pre>
+</article>
+<article class="cmd" id="cmd-vol" data-index="vol">
+<h4><code>vol</code> <span class="badge" title="supports -data output">-data</span></h4>
+<p class="cmd-summary">Show a volume, set (-n) or delete (-d) its label</p>
+<pre class="usage">vol [fsN:] [-n LABEL | -d]</pre>
+<pre class="cmd-help">  vol                      current volume: label, total and free space
+  vol fs1:                 another volume (also fs1, a map name or a path)
+  vol fs1: -n BOOTDISK     set the label (at most 11 characters)
+  vol -d                   delete the label of the current volume
+A label cannot contain % ^ * + = [ ] | : ; " &lt; &gt; ? / or a dot.
+With -data: volume, label, size, free, readonly.</pre>
+</article>
+<article class="cmd" id="cmd-dblk" data-index="dblk">
+<h4><code>dblk</code></h4>
+<p class="cmd-summary">Show raw blocks of a disk, decoding MBR, GPT and FAT boot sectors</p>
+<pre class="usage">dblk DEVICE [LBA [COUNT]]</pre>
+<pre class="cmd-help">  DEVICE  blkN (see map), fsN: or a handle number (hex)
+  LBA     first block (hex, default 0)
+  COUNT   number of blocks (hex, 1 to 10, default 1)
+  -b      accepted for UEFI Shell compatibility and ignored
+Each block is shown in hex and text. An MBR (LBA 0), a GPT header (LBA 1)
+and FAT boot sectors are also decoded. COUNT stops at the end of the
+device. The disk is only read.
+Example: dblk blk0 1</pre>
+</article>
+<article class="cmd" id="cmd-getmtc" data-index="getmtc">
+<h4><code>getmtc</code></h4>
+<p class="cmd-summary">Show the next monotonic count of the firmware</p>
+<pre class="usage">getmtc</pre>
+<pre class="cmd-help">Prints the 64-bit monotonic counter of the firmware in hex. Each call
+increases it, so two runs never show the same value.</pre>
+</article>
+</section>
+
+<section class="ref-group" id="ref-boot">
+<h3>Boot options and UEFI variables</h3>
+<table class="ref-summary"><thead><tr><th>Command</th><th>What it does</th></tr></thead><tbody>
+<tr><td><a href="#cmd-bootmgr"><code>bootmgr</code></a> <span class="badge">-data</span></td><td>Manage the UEFI boot entries</td></tr>
+<tr><td><a href="#cmd-bcfg"><code>bcfg</code></a></td><td>Manage boot/driver options (UEFI Shell syntax)</td></tr>
+<tr><td><a href="#cmd-var"><code>var</code></a> <span class="badge">-data</span></td><td>Read and write UEFI variables</td></tr>
+<tr><td><a href="#cmd-dmpstore"><code>dmpstore</code></a></td><td>Dump, delete, save or load UEFI variables (UEFI Shell syntax)</td></tr>
+<tr><td><a href="#cmd-setvar"><code>setvar</code></a></td><td>Show, set or delete a UEFI variable (UEFI Shell syntax)</td></tr>
+</tbody></table>
+<article class="cmd" id="cmd-bootmgr" data-index="bootmgr">
+<h4><code>bootmgr</code> <span class="badge" title="supports -data output">-data</span></h4>
+<p class="cmd-summary">Manage the UEFI boot entries</p>
+<pre class="usage">bootmgr [SUBCOMMAND] [OPTIONS]</pre>
+<pre class="cmd-help">  list [-v]                  entries in boot order (default)
+  add FILE "DESC" [ARGS] [-t] new entry for FILE (-t: first in the order)
+  del ID                     delete an entry
+  enable ID | disable ID     activate / deactivate an entry
+  edit ID [-D DESC] [-a ARGS] [-F FILE]   change an entry
+  order [ID,ID,...]          show or set the boot order
+  top ID                     move an entry to the top of the order
+  next ID | next -d          entry for the next boot only / clear it
+  timeout [SECONDS]          firmware boot menu timeout
+  backup FILE | restore FILE save / restore all the boot variables
+  check                      find entries pointing to missing files
+Common options: -n dry run (show, change nothing), -y do not ask,
+-B no automatic backup, -driver work on Driver#### entries.
+IDs are the hexadecimal numbers of Boot#### (e.g. 0003).
+Before every change a backup is saved in \nesh\backup on the boot volume.
+To start an EFI file now, type its name (or RUN it in a script).
+With -data (list): one record per entry, plus one with the boot settings.</pre>
+</article>
+<article class="cmd" id="cmd-bcfg" data-index="bcfg">
+<h4><code>bcfg</code></h4>
+<p class="cmd-summary">Manage boot/driver options (UEFI Shell syntax)</p>
+<pre class="usage">bcfg boot|driver [dump [-v] | add|addp|addh # FILE|HANDLE "DESC" | rm # | mv # # | mod # "DESC" | modf|modp|modh # FILE|HANDLE | -opt # [FILE|"DATA"]]</pre>
+<pre class="cmd-help">  # is the position in BootOrder/DriverOrder (hex, as shown by dump).
+  dump [-v]             list the options in order
+  add # FILE "DESC"     new option for FILE at position # (full device path)
+  addp # FILE "DESC"    same with a short-form path (partition + file)
+  addh # HANDLE "DESC"  new option for the device path of a handle
+  rm #                  delete the option at position #
+  mv # #                move an option to another position
+  mod # "DESC"          change the description
+  modf|modp|modh # ...  change the file (full / short path) or use a handle
+  -opt # [FILE|"TEXT"]  optional data: a file's content or a text (UCS-2);
+                        without it the optional data is cleared
+No confirmation is asked; a backup is saved in \nesh\backup when possible.
+See also: bootmgr (NESH syntax, with dry run and confirmation).</pre>
+</article>
+<article class="cmd" id="cmd-var" data-index="var">
+<h4><code>var</code> <span class="badge" title="supports -data output">-data</span></h4>
+<p class="cmd-summary">Read and write UEFI variables</p>
+<pre class="usage">var list|get|set|del|save|load ...</pre>
+<pre class="cmd-help">  var list [PATTERN] [-g GUID]     list variables (e.g. var list Boot*)
+  var get NAME [-g GUID] [-x|-s|-n] [-v]
+                                   show a value (-x hex dump, -s string,
+                                   -n number)
+  var set NAME VALUE [-g GUID] [-t TYPE] [-a ATTR]
+        TYPE: str (UCS-2, default), ascii, u8, u16, u32, u64, hex, file
+        ATTR: nv,bs,rt (default for new variables; existing ones keep
+        theirs)
+  var del NAME [-g GUID]           delete a variable
+  var save FILE [PATTERN] [-g GUID] save variables to a text file
+  var load FILE                    restore variables saved with var save
+GUID: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx or a name: global (default),
+security, shim, shell, systemd.
+With -data (var list): name, guid, guid_name, attributes, size.</pre>
+</article>
+<article class="cmd" id="cmd-dmpstore" data-index="dmpstore">
+<h4><code>dmpstore</code></h4>
+<p class="cmd-summary">Dump, delete, save or load UEFI variables (UEFI Shell syntax)</p>
+<pre class="usage">dmpstore [-b] [-d] [-all | [NAME] [-guid GUID]] [-s FILE | -l FILE]</pre>
+<pre class="cmd-help">  dmpstore                  all variables with the global GUID
+  dmpstore -all             variables of every GUID
+  dmpstore Boot*            variables matching a pattern
+  dmpstore NAME -d          delete (asks when a pattern matches several)
+  dmpstore -all -s FILE     save to a file (binary format of the UEFI Shell)
+  dmpstore -l FILE          load variables from such a file
+See also: var (NESH syntax).</pre>
+</article>
+<article class="cmd" id="cmd-setvar" data-index="setvar">
+<h4><code>setvar</code></h4>
+<p class="cmd-summary">Show, set or delete a UEFI variable (UEFI Shell syntax)</p>
+<pre class="usage">setvar NAME [-guid GUID] [-bs] [-rt] [-nv] [=DATA...]</pre>
+<pre class="cmd-help">  setvar NAME                 show the value
+  setvar NAME -nv -rt =0100   set hexadecimal bytes
+  setvar NAME ="text"         ASCII text (no terminator)
+  setvar NAME =L"text"        UCS-2 text (with terminator)
+  setvar NAME =--PciRoot(0)   binary device path from its text form
+  setvar NAME =               delete the variable
+Without -bs/-rt/-nv an existing variable keeps its attributes; a new one
+is temporary (boot services only).</pre>
+</article>
+</section>
+
+<section class="ref-group" id="ref-drivers">
+<h3>Drivers and devices</h3>
+<table class="ref-summary"><thead><tr><th>Command</th><th>What it does</th></tr></thead><tbody>
+<tr><td><a href="#cmd-drivers"><code>drivers</code></a> <span class="badge">-data</span></td><td>List the UEFI drivers</td></tr>
+<tr><td><a href="#cmd-devices"><code>devices</code></a> <span class="badge">-data</span></td><td>List the devices (controllers) and their drivers</td></tr>
+<tr><td><a href="#cmd-devtree"><code>devtree</code></a></td><td>Show the device tree (-d: device paths)</td></tr>
+<tr><td><a href="#cmd-dh"><code>dh</code></a> <span class="badge">-data</span></td><td>Show handles and their protocols</td></tr>
+<tr><td><a href="#cmd-openinfo"><code>openinfo</code></a></td><td>Show who opened the protocols of a handle</td></tr>
+<tr><td><a href="#cmd-connect"><code>connect</code></a></td><td>Connect drivers to devices (no handle: all; -r recursive; -c consoles)</td></tr>
+<tr><td><a href="#cmd-disconnect"><code>disconnect</code></a></td><td>Disconnect drivers from a device (-r: all devices, consoles reconnected)</td></tr>
+<tr><td><a href="#cmd-reconnect"><code>reconnect</code></a></td><td>Disconnect and connect again (-r: all devices)</td></tr>
+<tr><td><a href="#cmd-load"><code>load</code></a></td><td>Load UEFI drivers (-nc: do not connect them to devices)</td></tr>
+<tr><td><a href="#cmd-unload"><code>unload</code></a></td><td>Unload an image (-n: no question, -v: show details)</td></tr>
+<tr><td><a href="#cmd-drvdiag"><code>drvdiag</code></a></td><td>Driver diagnostics (-s standard, -e extended, -m manufacturing; none: list)</td></tr>
+<tr><td><a href="#cmd-drvcfg"><code>drvcfg</code></a></td><td>Driver configuration (-f defaults, -v validate, -s set options; none: list)</td></tr>
+</tbody></table>
+<article class="cmd" id="cmd-drivers" data-index="drivers">
+<h4><code>drivers</code> <span class="badge" title="supports -data output">-data</span></h4>
+<p class="cmd-summary">List the UEFI drivers</p>
+<pre class="usage">drivers [-l LANG]</pre>
+<pre class="cmd-help">  drivers           one line per driver
+  drivers -l fr     driver names in another language, if the driver has it
+Columns: DRV driver handle, VERSION driver version (hex), TYPE, CFG and DIAG
+(X: supports drvcfg / drvdiag), #D devices it manages, #C child devices it
+created, driver name (default language en) and the file it was loaded from.
+TYPE B is a bus driver: it created child devices (e.g. one per USB device);
+D is a device driver (a bus driver with no children yet also shows D).
+Handle numbers are hexadecimal; -b is accepted and ignored.
+With -data: handle, version, type, config, diag, controllers, children,
+name, image.</pre>
+</article>
+<article class="cmd" id="cmd-devices" data-index="devices">
+<h4><code>devices</code> <span class="badge" title="supports -data output">-data</span></h4>
+<p class="cmd-summary">List the devices (controllers) and their drivers</p>
+<pre class="usage">devices [-l LANG]</pre>
+<pre class="cmd-help">  devices           one line per device (controller)
+Columns: CTRL device handle, TYPE (R root: no parent, B bus: has children,
+D device), CFG and DIAG (X: one of its drivers supports drvcfg / drvdiag),
+#P parents, #D drivers managing it, #C children, device name.
+A device is a handle with a device path that is not an image or a driver.
+Names come from the drivers (in English) or else from the device path;
+-l and -b are accepted and ignored.
+With -data: handle, type, config, diag, parents, drivers, children, name.</pre>
+</article>
+<article class="cmd" id="cmd-devtree" data-index="devtree">
+<h4><code>devtree</code></h4>
+<p class="cmd-summary">Show the device tree (-d: device paths)</p>
+<pre class="usage">devtree [-d] [-l LANG] [HANDLE]</pre>
+<pre class="cmd-help">  devtree           tree of all devices, from the root devices down
+  devtree HANDLE    only the device HANDLE and what is below it
+  devtree -d        show device paths instead of names
+Each line is "Ctrl[HANDLE] name"; children are indented under their parent.
+A device without a device path shows up to 4 of its protocols in &lt;...&gt;.
+-l and -b are accepted and ignored.
+Example:  devtree -d 3F    device paths of device 3F and its children</pre>
+</article>
+<article class="cmd" id="cmd-dh" data-index="dh">
+<h4><code>dh</code> <span class="badge" title="supports -data output">-data</span></h4>
+<p class="cmd-summary">Show handles and their protocols</p>
+<pre class="usage">dh [-d|-v] [-p PROTOCOL] [HANDLE]</pre>
+<pre class="cmd-help">  dh              one line per handle: number and protocol names
+  dh HANDLE       details of one handle (device path, image, driver, disk...)
+  dh -p BlockIo   only handles with a protocol (name or GUID)
+  dh -d           details of all handles
+Handle numbers are hexadecimal and stay the same during the session.
+With -data: handle, name, protocols (and devicepath with -d or HANDLE).</pre>
+</article>
+<article class="cmd" id="cmd-openinfo" data-index="openinfo">
+<h4><code>openinfo</code></h4>
+<p class="cmd-summary">Show who opened the protocols of a handle</p>
+<pre class="usage">openinfo HANDLE</pre>
+<pre class="cmd-help">  openinfo HANDLE    each protocol of HANDLE and who has it open
+For each protocol, one line per user: Drv[agent handle] Ctrl[controller
+handle] Cnt(open count), how it is open, and the agent's image name.
+How: Driver (a driver manages the device), Exclusive, Driver+Exclusive,
+Child (used by a child device), HandProt / GetProt / TestProt (simple use).
+Handles are hexadecimal (see dh); -b is accepted and ignored.</pre>
+</article>
+<article class="cmd" id="cmd-connect" data-index="connect">
+<h4><code>connect</code></h4>
+<p class="cmd-summary">Connect drivers to devices (no handle: all; -r recursive; -c consoles)</p>
+<pre class="usage">connect [-r] [-c] [[DRIVER] CONTROLLER]</pre>
+<pre class="cmd-help">  connect                    connect all drivers to all devices (recursive)
+  connect CONTROLLER         connect the best drivers to one device
+  connect DRIVER CONTROLLER  connect only DRIVER to that device
+  -r                         also connect the new child devices, recursively
+  -c                         connect the consoles (ConIn, ConOut, ErrOut)
+Connecting asks drivers to start managing a device. Bus drivers then create
+child devices (e.g. the partitions of a disk, which then get a file system).
+With -c and handles, the consoles are connected first, then the device.
+Exit code is nonzero if the firmware reports an error for the device.
+Example:  connect -r 3F    connect device 3F and everything below it</pre>
+</article>
+<article class="cmd" id="cmd-disconnect" data-index="disconnect">
+<h4><code>disconnect</code></h4>
+<p class="cmd-summary">Disconnect drivers from a device (-r: all devices, consoles reconnected)</p>
+<pre class="usage">disconnect CONTROLLER [DRIVER [CHILD]] | disconnect -r</pre>
+<pre class="cmd-help">  disconnect CONTROLLER               stop all drivers managing a device
+  disconnect CONTROLLER DRIVER        stop only DRIVER on that device
+  disconnect CONTROLLER DRIVER CHILD  make DRIVER release one child device
+  disconnect -r                       disconnect all devices, then connect
+                                      the consoles again (screen, keyboard)
+When a bus driver stops, the child devices it created disappear too.
+DRIVER is a driver handle (see drivers); -r is ignored when handles are given.
+Exit code is nonzero if the firmware reports an error.</pre>
+</article>
+<article class="cmd" id="cmd-reconnect" data-index="reconnect">
+<h4><code>reconnect</code></h4>
+<p class="cmd-summary">Disconnect and connect again (-r: all devices)</p>
+<pre class="usage">reconnect CONTROLLER [DRIVER [CHILD]] | reconnect -r</pre>
+<pre class="cmd-help">  reconnect CONTROLLER               disconnect all drivers, connect again
+  reconnect CONTROLLER DRIVER        the same, only for DRIVER
+  reconnect CONTROLLER DRIVER CHILD  release one child, then connect DRIVER
+  reconnect -r                       disconnect and connect all devices
+The connect step is recursive (child devices are connected too) and runs
+only if the disconnect succeeded; -r is ignored when handles are given.
+Exit code is nonzero if a step fails.</pre>
+</article>
+<article class="cmd" id="cmd-load" data-index="load">
+<h4><code>load</code></h4>
+<p class="cmd-summary">Load UEFI drivers (-nc: do not connect them to devices)</p>
+<pre class="usage">load [-nc] FILE...</pre>
+<pre class="cmd-help">  load FILE...      load and start drivers, then connect all devices
+  load -nc FILE...  load and start drivers, but do not connect them
+FILE may contain wildcards. Applications are refused (run them by typing
+their name), and so are drivers not allowed by Secure Boot.
+The connect step runs if at least one driver was loaded and started.
+Exit code is nonzero if any file fails.
+Example:  load fs0:\drivers\MyDxe.efi   load a driver and connect it</pre>
+</article>
+<article class="cmd" id="cmd-unload" data-index="unload">
+<h4><code>unload</code></h4>
+<p class="cmd-summary">Unload an image (-n: no question, -v: show details)</p>
+<pre class="usage">unload [-n] [-v] HANDLE</pre>
+<pre class="cmd-help">  unload HANDLE     unload an image, after asking for confirmation
+  unload -n HANDLE  do not ask
+  unload -v HANDLE  show the handle details (like dh HANDLE) first
+HANDLE must be a loaded image (see dh -p LoadedImage); for most drivers it
+is the DRV number shown by drivers. -verbose is the same as -v.
+Many drivers cannot be unloaded: the result is then "not supported".
+Exit code is nonzero on error or if you do not answer y.</pre>
+</article>
+<article class="cmd" id="cmd-drvdiag" data-index="drvdiag">
+<h4><code>drvdiag</code></h4>
+<p class="cmd-summary">Driver diagnostics (-s standard, -e extended, -m manufacturing; none: list)</p>
+<pre class="usage">drvdiag [-c] [-l LANG] [-s|-e|-m] [DRIVER [CONTROLLER [CHILD]]]</pre>
+<pre class="cmd-help">  drvdiag           list driver/device pairs that offer diagnostics
+  -s                run the standard diagnostics
+  -e                run the extended diagnostics
+  -m                run the manufacturing diagnostics
+  -c                also include the child devices of each device
+  -l LANG           language of the messages (default en)
+Handles narrow the selection: DRIVER, then CONTROLLER, then CHILD.
+Each line shows Drv[..] Ctrl[..] (Child[..]) and the driver name, or the
+result ("passed" or the error) and the driver's message.
+Only drivers with the Driver Diagnostics 2 protocol are used.
+Exit code is nonzero if a test fails.
+Example:  drvdiag -s 7A    standard tests of driver 7A on all its devices</pre>
+</article>
+<article class="cmd" id="cmd-drvcfg" data-index="drvcfg">
+<h4><code>drvcfg</code></h4>
+<p class="cmd-summary">Driver configuration (-f defaults, -v validate, -s set options; none: list)</p>
+<pre class="usage">drvcfg [-c] [-l LANG] [-f TYPE | -v | -s] [DRIVER [CONTROLLER [CHILD]]]</pre>
+<pre class="cmd-help">  drvcfg            list driver/device pairs with a configuration protocol
+  -s                set options: the driver asks for its settings
+  -v                check that the current settings are valid
+  -f TYPE           restore defaults: 0 safe, 1 manufacturing (other
+                    numbers are passed to the driver)
+  -c                also include the child devices of each device
+  -l LANG           language used by -s (default en)
+Handles narrow the selection: DRIVER, then CONTROLLER, then CHILD.
+After -s or -f the driver may ask to stop or restart the controller or the
+platform: the line says so ("action required").
+Only the Driver Configuration 2 protocol is used. If none is found, the
+handles with HII setup forms are listed (use the firmware setup menu).
+Exit code is nonzero if an operation fails.</pre>
+</article>
+</section>
+
+<section class="ref-group" id="ref-hw">
+<h3>Hardware and firmware</h3>
+<table class="ref-summary"><thead><tr><th>Command</th><th>What it does</th></tr></thead><tbody>
+<tr><td><a href="#cmd-memmap"><code>memmap</code></a> <span class="badge">-data</span></td><td>Show the UEFI memory map (-s summary only)</td></tr>
+<tr><td><a href="#cmd-dmem"><code>dmem</code></a></td><td>Show memory (hex; no address: the system table and configuration tables)</td></tr>
+<tr><td><a href="#cmd-mm"><code>mm</code></a></td><td>Read or write memory, I/O ports or PCI configuration space</td></tr>
+<tr><td><a href="#cmd-pci"><code>pci</code></a> <span class="badge">-data</span></td><td>List PCI devices, or show the configuration space of one device</td></tr>
+<tr><td><a href="#cmd-smbiosview"><code>smbiosview</code></a> <span class="badge">-data</span></td><td>Show the SMBIOS tables (BIOS, system, board, CPU, memory...)</td></tr>
+<tr><td><a href="#cmd-acpiview"><code>acpiview</code></a> <span class="badge">-data</span></td><td>List the ACPI tables, or show or save one</td></tr>
+<tr><td><a href="#cmd-cpuid"><code>cpuid</code></a></td><td>Show processor information (or raw CPUID registers)</td></tr>
+<tr><td><a href="#cmd-mode"><code>mode</code></a></td><td>List the text modes or select one</td></tr>
+<tr><td><a href="#cmd-gop"><code>gop</code></a></td><td>List the graphics modes or select one</td></tr>
+<tr><td><a href="#cmd-sermode"><code>sermode</code></a></td><td>Show or set serial port settings (parity n|e|o|m|s, stop bits 0|1|1.5|2)</td></tr>
+<tr><td><a href="#cmd-loadpcirom"><code>loadpcirom</code></a></td><td>Load the UEFI drivers contained in a PCI option ROM file</td></tr>
+</tbody></table>
+<article class="cmd" id="cmd-memmap" data-index="memmap">
+<h4><code>memmap</code> <span class="badge" title="supports -data output">-data</span></h4>
+<p class="cmd-summary">Show the UEFI memory map (-s summary only)</p>
+<pre class="usage">memmap [-s] [-b]</pre>
+<pre class="cmd-help">  (none)  every memory descriptor, then totals per type
+  -s      totals per type only
+  -b      accepted for UEFI Shell compatibility and ignored
+Start and End are physical addresses; a page is 4 KiB. Total memory
+excludes reserved and MMIO ranges; "available to the OS" counts
+conventional, loader and boot services memory.
+With -data: type, start, end, pages, attributes (one record per
+descriptor); with -s: type, pages, bytes (one record per type).</pre>
+</article>
+<article class="cmd" id="cmd-dmem" data-index="dmem">
+<h4><code>dmem</code></h4>
+<p class="cmd-summary">Show memory (hex; no address: the system table and configuration tables)</p>
+<pre class="usage">dmem [ADDRESS [SIZE]] [-MMIO]</pre>
+<pre class="cmd-help">  ADDRESS  start address (hex); without it, dmem dumps the EFI system
+           table and lists the configuration tables (GUID and address)
+  SIZE     bytes to show (hex, default 0x200, max 0x100000)
+  -MMIO    read through the PCI root bridge of segment 0
+  -b       accepted for UEFI Shell compatibility and ignored
+Read-only. Reading an unmapped address can hang the machine.
+Example: dmem 0xFED00000 40 -MMIO</pre>
+</article>
+<article class="cmd" id="cmd-mm" data-index="mm">
+<h4><code>mm</code></h4>
+<p class="cmd-summary">Read or write memory, I/O ports or PCI configuration space</p>
+<pre class="usage">mm ADDRESS [VALUE] [-w 1|2|4|8] [-MEM|-MMIO|-IO|-PCI|-PCIE] [-n]</pre>
+<pre class="cmd-help">  mm ADDRESS            show the value and let you type new ones
+                        (Enter: next address, q: quit)
+  mm ADDRESS VALUE      write VALUE
+  -n                    only show the value
+  -w 1|2|4|8            access width in bytes (default 1)
+  -MEM                  memory (default)   -MMIO  memory-mapped I/O
+  -IO                   I/O port
+  -PCI                  address 0x000000ssbbddffrr (segment, bus, device,
+                        function, register)
+  -PCIE                 address 0x0000ssbbddfffrrr (register up to 0xFFF)
+Numbers are hexadecimal. Writes are refused while Secure Boot is active.</pre>
+</article>
+<article class="cmd" id="cmd-pci" data-index="pci">
+<h4><code>pci</code> <span class="badge" title="supports -data output">-data</span></h4>
+<p class="cmd-summary">List PCI devices, or show the configuration space of one device</p>
+<pre class="usage">pci [BUS DEV [FUNC]] [-s SEG] [-i] [-ec]</pre>
+<pre class="cmd-help">  pci                 list every device: segment, bus, device, function,
+                      class, vendor and device ID
+  pci BUS DEV [FUNC]  hex dump of the configuration space (FUNC 0 by default)
+  -i                  also decode the header: IDs, class, command/status,
+                      BARs, bus numbers, interrupt, capabilities
+  -ec                 dump the 4 KiB PCI Express extended space
+  -s SEG              PCI segment (default: all segments when listing, 0 else)
+  -b                  accepted for UEFI Shell compatibility, ignored
+Numbers are hexadecimal:  pci 0 1f 3 -i   decodes device 00:1F.3.
+With -data: one record per function (segment, bus, device, function, vendor,
+deviceid, class, classname); for one device, the decoded header.</pre>
+</article>
+<article class="cmd" id="cmd-smbiosview" data-index="smbiosview">
+<h4><code>smbiosview</code> <span class="badge" title="supports -data output">-data</span></h4>
+<p class="cmd-summary">Show the SMBIOS tables (BIOS, system, board, CPU, memory...)</p>
+<pre class="usage">smbiosview [-t TYPE] [-h HANDLE] [-s]</pre>
+<pre class="cmd-help">  smbiosview          every structure, with the fields NESH decodes
+  -t TYPE             only one type (decimal): 0 BIOS, 1 system, 2 board,
+                      3 enclosure, 4 processor, 16 memory array, 17 memory
+                      device, 19 mapped address
+  -h HANDLE           only the structure with this handle (hexadecimal)
+  -s                  statistics: how many structures of each type
+  -a, -b              accepted for UEFI Shell compatibility, ignored
+  smbiosview -t 17    memory modules: slot, size, speed, part number
+With -data: one record per structure (type, typename, handle, length and the
+decoded fields, e.g. vendor, version, serial, size).</pre>
+</article>
+<article class="cmd" id="cmd-acpiview" data-index="acpiview">
+<h4><code>acpiview</code> <span class="badge" title="supports -data output">-data</span></h4>
+<p class="cmd-summary">List the ACPI tables, or show or save one</p>
+<pre class="usage">acpiview [-l] | acpiview -s SIG [-d]</pre>
+<pre class="cmd-help">  acpiview            list the tables: signature, address, length, revision,
+                      OEM, checksum (-l does the same)
+  -s SIG              show one table: summary of APIC, MCFG, HPET and FACP,
+                      then a hex dump (SIG is case-insensitive, e.g. apic)
+  -s SIG -d           save the table to SIG.bin in the current directory
+                      (SIG2.bin... when there are several)
+  -r, -q, -h          accepted for UEFI Shell compatibility, ignored
+With -data: one record per table (signature, address, length, revision,
+oemid, oemtable, checksum); -d cannot be combined with -data.</pre>
+</article>
+<article class="cmd" id="cmd-cpuid" data-index="cpuid">
+<h4><code>cpuid</code></h4>
+<p class="cmd-summary">Show processor information (or raw CPUID registers)</p>
+<pre class="usage">cpuid [LEAF [SUBLEAF]]</pre>
+<pre class="cmd-help">  (none)          vendor, family, model, stepping and main features
+  LEAF [SUBLEAF]  raw EAX, EBX, ECX, EDX of one leaf (SUBLEAF default 0)
+LEAF and SUBLEAF are hexadecimal. Family, model and stepping print in hex.
+Example: cpuid 80000001</pre>
+</article>
+<article class="cmd" id="cmd-mode" data-index="mode">
+<h4><code>mode</code></h4>
+<p class="cmd-summary">List the text modes or select one</p>
+<pre class="usage">mode [COLUMNS ROWS]</pre>
+<pre class="cmd-help">  (none)        list the text modes of the console (current one marked)
+  COLUMNS ROWS  switch to the mode with exactly this size
+Example: mode 100 31</pre>
+</article>
+<article class="cmd" id="cmd-gop" data-index="gop">
+<h4><code>gop</code></h4>
+<p class="cmd-summary">List the graphics modes or select one</p>
+<pre class="usage">gop [MODE]</pre>
+<pre class="cmd-help">  (none)  list the graphics modes (resolution, pixel format), then the
+          frame buffer address and size
+  MODE    switch to this mode number, as listed
+After a mode change the text console is reset to fit the new screen.
+Example: gop 2</pre>
+</article>
+<article class="cmd" id="cmd-sermode" data-index="sermode">
+<h4><code>sermode</code></h4>
+<p class="cmd-summary">Show or set serial port settings (parity n|e|o|m|s, stop bits 0|1|1.5|2)</p>
+<pre class="usage">sermode [HANDLE [BAUD PARITY DATABITS STOPBITS]]</pre>
+<pre class="cmd-help">  (none)                            list all serial ports and settings
+  HANDLE                            show one port (handle number, hex)
+  HANDLE BAUD PARITY DATABITS STOP  change the settings of a port
+  PARITY    d (default), n, e, o, m or s (only the first letter counts)
+  DATABITS  5 to 8; STOP 0 (default), 1, 1.5 (or 15) or 2
+The receive FIFO depth and timeout are kept. Handles are shown by dh.
+Example: sermode 5C 115200 n 8 1</pre>
+</article>
+<article class="cmd" id="cmd-loadpcirom" data-index="loadpcirom">
+<h4><code>loadpcirom</code></h4>
+<p class="cmd-summary">Load the UEFI drivers contained in a PCI option ROM file</p>
+<pre class="usage">loadpcirom [-nc] ROMFILE...</pre>
+<pre class="cmd-help">  ROMFILE  PCI option ROM image file; several files may be given
+  -nc      load and start the drivers but do not connect them
+Every x64 UEFI image in the ROM is loaded and started (compressed images
+are expanded first); legacy and other-architecture images are skipped.
+Then all controllers are connected, unless -nc is given.
+With Secure Boot active, the firmware checks the driver signatures.
+Example: loadpcirom -nc nic.rom</pre>
+</article>
+</section>
+
+<section class="ref-group" id="ref-net">
+<h3>Network</h3>
+<table class="ref-summary"><thead><tr><th>Command</th><th>What it does</th></tr></thead><tbody>
+<tr><td><a href="#cmd-ifconfig"><code>ifconfig</code></a> <span class="badge">-data</span></td><td>Show or set the IPv4 configuration of the network interfaces</td></tr>
+<tr><td><a href="#cmd-ifconfig6"><code>ifconfig6</code></a> <span class="badge">-data</span></td><td>Show or set the IPv6 configuration of the network interfaces</td></tr>
+<tr><td><a href="#cmd-ping"><code>ping</code></a></td><td>Send echo requests to an IPv4 or IPv6 address</td></tr>
+<tr><td><a href="#cmd-ping6"><code>ping6</code></a></td><td>Send echo requests to an IPv6 address (ping accepts IPv6 too)</td></tr>
+<tr><td><a href="#cmd-tftp"><code>tftp</code></a></td><td>Download a file with TFTP</td></tr>
+<tr><td><a href="#cmd-http"><code>http</code></a></td><td>Download a file with HTTP</td></tr>
+</tbody></table>
+<article class="cmd" id="cmd-ifconfig" data-index="ifconfig">
+<h4><code>ifconfig</code> <span class="badge" title="supports -data output">-data</span></h4>
+<p class="cmd-summary">Show or set the IPv4 configuration of the network interfaces</p>
+<pre class="usage">ifconfig [-l [NAME]] | -r [NAME] | -s NAME dhcp | -s NAME static IP MASK GW | -s NAME dns IP...</pre>
+<pre class="cmd-help">  ifconfig -l [NAME]          list the interfaces (eth0...) and their settings
+  ifconfig -s eth0 dhcp       get an address with DHCP (waits up to 15 s)
+  ifconfig -s eth0 static 192.168.1.10 255.255.255.0 192.168.1.1
+                              fixed address, mask and gateway
+  ifconfig -s eth0 dns 192.168.1.1   DNS servers
+  ifconfig -r [NAME]          reset to DHCP
+The firmware network drivers must be loaded (network boot enabled in the
+setup, or: load MnpDxe.efi ArpDxe.efi Ip4Dxe.efi Udp4Dxe.efi Dhcp4Dxe.efi
+Mtftp4Dxe.efi TcpDxe.efi ...). See also ifconfig6 for IPv6.
+With -data (ifconfig -l -data): name, media, policy, mac, ip, mask,
+gateway, dns.</pre>
+</article>
+<article class="cmd" id="cmd-ifconfig6" data-index="ifconfig6">
+<h4><code>ifconfig6</code> <span class="badge" title="supports -data output">-data</span></h4>
+<p class="cmd-summary">Show or set the IPv6 configuration of the network interfaces</p>
+<pre class="usage">ifconfig6 [-l [NAME]] | -r [NAME] | -s NAME auto | -s NAME man [host ADDR[/LEN]...] [gw ADDR...] [dns ADDR...] | -s NAME dad COUNT</pre>
+<pre class="cmd-help">  ifconfig6 -l [NAME]         list the interfaces and their IPv6 settings
+  ifconfig6 -s eth0 auto      automatic configuration (router advertisements)
+  ifconfig6 -s eth0 man host 2001:db8::10/64 gw 2001:db8::1 dns 2001:db8::53
+                              manual configuration (prefix length 64 if
+                              omitted)
+  ifconfig6 -s eth0 dad 1     duplicate address detection messages per address
+  ifconfig6 -r [NAME]         reset to automatic configuration
+A link-local address (fe80::...) is always present. ping, tftp and http
+accept IPv6 addresses; in URLs they go in brackets: http://[2001:db8::1]/f.
+The firmware IPv6 drivers must be loaded (IPv6 network boot enabled in the
+setup, or: load MnpDxe.efi Ip6Dxe.efi Udp6Dxe.efi Dhcp6Dxe.efi
+Mtftp6Dxe.efi TcpDxe.efi).
+With -data (ifconfig6 -l -data): name, media, policy, mac, ip (ADDR/LEN
+list), gateway, dns, dad.</pre>
+</article>
+<article class="cmd" id="cmd-ping" data-index="ping">
+<h4><code>ping</code></h4>
+<p class="cmd-summary">Send echo requests to an IPv4 or IPv6 address</p>
+<pre class="usage">ping [-n COUNT] [-l SIZE] [-i IF] ADDRESS</pre>
+<pre class="cmd-help">  ping 192.168.1.1           IPv4
+  ping -n 3 2001:db8::1      IPv6 (same as ping6)
+Ends with an error (ERR &lt;&gt; 0) when no answer arrives.</pre>
+</article>
+<article class="cmd" id="cmd-ping6" data-index="ping6">
+<h4><code>ping6</code></h4>
+<p class="cmd-summary">Send echo requests to an IPv6 address (ping accepts IPv6 too)</p>
+<pre class="usage">ping6 [-n COUNT] [-l SIZE] [-s SOURCE] [-i IF] ADDRESS</pre>
+<pre class="cmd-help">  -n COUNT    number of requests (default 10)
+  -l SIZE     data bytes per request (0-1400, default 16)
+  -s SOURCE   source address (default: one that can reach ADDRESS)
+  -i IF       interface name (default: the first one)
+  ping6 -n 3 fe80::1       link-local address: the link-local source is used
+Ends with an error (ERR &lt;&gt; 0) when no answer arrives. Without an address
+other than link-local, run 'ifconfig6 -s eth0 auto' first.</pre>
+</article>
+<article class="cmd" id="cmd-tftp" data-index="tftp">
+<h4><code>tftp</code></h4>
+<p class="cmd-summary">Download a file with TFTP</p>
+<pre class="usage">tftp [-i IF] [-l PORT] [-r PORT] [-c TRIES] [-t TIMEOUT] [-s BLKSIZE] SERVER REMOTE [LOCAL]</pre>
+<pre class="cmd-help">  tftp 192.168.1.5 boot/grubx64.efi            saved as grubx64.efi
+  tftp 2001:db8::5 boot/grubx64.efi fs1:\g.efi  IPv6 server</pre>
+</article>
+<article class="cmd" id="cmd-http" data-index="http">
+<h4><code>http</code></h4>
+<p class="cmd-summary">Download a file with HTTP</p>
+<pre class="usage">http [-i IF] [-t TIMEOUT_MS] [-s BUFSIZE] URL [LOCAL]</pre>
+<pre class="cmd-help">  http http://192.168.1.5/images/tool.efi
+  http http://[2001:db8::5]:8080/tool.efi fs1:\tool.efi
+                               IPv6 address: in brackets
+Only http:// (https needs the firmware TLS driver).</pre>
+</article>
+</section>
+
+<section class="ref-group" id="ref-editors">
+<h3>Editors</h3>
+<table class="ref-summary"><thead><tr><th>Command</th><th>What it does</th></tr></thead><tbody>
+<tr><td><a href="#cmd-edit"><code>edit</code></a></td><td>Full-screen text editor (UTF-8 or UCS-2 files; Ctrl-E for help)</td></tr>
+<tr><td><a href="#cmd-hexedit"><code>hexedit</code></a></td><td>Full-screen hex editor for files, disk blocks or memory</td></tr>
+</tbody></table>
+<article class="cmd" id="cmd-edit" data-index="edit">
+<h4><code>edit</code></h4>
+<p class="cmd-summary">Full-screen text editor (UTF-8 or UCS-2 files; Ctrl-E for help)</p>
+<pre class="usage">edit FILE</pre>
+<pre class="cmd-help">  edit FILE           open FILE; a new FILE is created when you save
+Keys (Ctrl-E shows them inside the editor):
+  F1  Ctrl-G  go to line          F6  Ctrl-K  cut the current line
+  F2  Ctrl-S  save                F7  Ctrl-U  paste the cut lines
+  F3  Ctrl-Q  exit (also Esc)     F8  Ctrl-O  open another file
+  F4  Ctrl-F  find                F9  Ctrl-T  switch UTF-8 / UCS-2
+  F5  Ctrl-R  find and replace    F10 Ctrl-N  find next
+Find is case-sensitive and wraps around; replace asks y/n/a(ll) per match.
+Cut lines in a row form one block; paste inserts the last block cut.
+The file keeps its encoding (UTF-8 with or without BOM, or UCS-2) and line
+ends (LF or CRLF). Tab characters are kept and shown up to the next multiple
+of 4 columns; the Tab key inserts 4 spaces. Needs an interactive console.</pre>
+</article>
+<article class="cmd" id="cmd-hexedit" data-index="hexedit">
+<h4><code>hexedit</code></h4>
+<p class="cmd-summary">Full-screen hex editor for files, disk blocks or memory</p>
+<pre class="usage">hexedit [-f] FILE | hexedit -d DEVICE LBA COUNT | hexedit -m ADDRESS SIZE</pre>
+<pre class="cmd-help">  -d DEVICE LBA COUNT   disk blocks (DEVICE: blkN, fsN: or a handle;
+                        numbers in hex)
+  -m ADDRESS SIZE       memory (writing is disabled while Secure Boot
+                        is active)
+  Keys: arrows, PgUp/PgDn, Tab switches hex/ASCII, F1 go to, F2 save, F3 exit.</pre>
+</article>
+</section>
+
+<!-- END GENERATED: command-reference -->
+
+<!-- ===================================================================== -->
+<h2 id="index" class="unnumbered">Index</h2>
+<p>Commands, BASIC functions and topics in alphabetical order. The number after each entry is the section.</p>
+<div id="index-list"></div>
+
+<footer class="doc-footer">
+  NESH User Manual — for NESH 0.1.0. See also the <a href="developer-manual.html">developer manual</a> and
+  the <a href="decisions-and-history.md">design decisions and project history</a>.
+</footer>
+
+</main>
+</div>
+<script src="assets/vendor/mermaid.min.js"></script>
+<script src="assets/docs.js"></script>
+</body>
+</html>

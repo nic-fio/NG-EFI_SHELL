@@ -1,0 +1,23 @@
+' Writes a small inventory of the machine to a text file.
+' usage: inventory [OUTPUT_FILE]
+
+out$ = "inventory.txt"
+IF ARGC >= 1 THEN out$ = ARG$(1)
+
+WRITEFILE out$, "Inventory " + DATE$ + " " + TIME$ + CHR$(10)
+IF ERR <> 0 THEN
+  PRINT "Cannot write "; out$
+  END 1
+END IF
+
+SUB section(title$, cmd$)
+  APPENDFILE out$, CHR$(10) + "== " + title$ + " ==" + CHR$(10)
+  APPENDFILE out$, RUN$(cmd$) + CHR$(10)
+END SUB
+
+section "System", "sysinfo"
+section "Volumes", "map -v"
+section "Boot entries", "bootmgr list -v"
+section "Memory", "memmap -s"
+
+PRINT "Inventory saved to "; out$; " ("; FILESIZE(out$); " bytes)"

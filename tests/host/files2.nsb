@@ -1,0 +1,27 @@
+' group 1: vol-independent file commands
+WRITEFILE "a.txt", "hello world"
+WRITEFILE "b.txt", "hello World"
+RUN "comp a.txt b.txt"
+PRINT "comp differs ERR="; ERR
+RUN "cp a.txt c.txt"
+RUN "comp a.txt c.txt"
+PRINT "comp same ERR="; ERR
+RUN "cmp a.txt b.txt"
+RUN "setsize 5 a.txt"
+PRINT "setsize: "; FILESIZE("a.txt"); " ["; READFILE$("a.txt"); "]"
+RUN "setsize 8 a.txt"
+PRINT "extended: "; FILESIZE("a.txt"); " zero byte: "; ASC(MID$(READFILE$("a.txt"), 7, 1))
+RUN "setsize 3 new.bin"
+PRINT "setsize creates: "; FILESIZE("new.bin")
+RUN "attrib +r c.txt"
+RUN "attrib c.txt"
+RUN "attrib -r c.txt"
+RUN "mkdir -p d\e"
+WRITEFILE "d\e\f.txt", "x"
+RUN "rm -q d"
+PRINT "rm -q dir: "; DIREXISTS("d")
+RUN "touch -r a.txt"
+PRINT "touch ERR="; ERR
+RUN "type -a b.txt"
+PRINT
+RUN "ls -ad"

@@ -1,0 +1,11 @@
+ls -l
+ll works: -1
+alias: ls: a built-in command has this name
+self alias works: -1 ERR=0
+alias: ls: no such alias
+copy alias: -1
+alias: cp: a built-in command has this name
+builtin name refused ERR=1
+alias: nosuch: no such alias
+delete missing ERR=1
+[exit 0]

@@ -1,0 +1,294 @@
+' Smoke tests executed inside QEMU/OVMF
+fails = 0
+SUB check(name$, ok)
+  IF ok THEN
+    PRINT "PASS "; name$
+  ELSE
+    PRINT "FAIL "; name$
+    fails = fails + 1
+  END IF
+END SUB
+
+RUN "ver"
+RUN "map"
+check "map lists fs0", INSTR(RUN$("map"), "fs0") > 0
+check "cwd is a volume", LEFT$(CWD$, 2) = "fs"
+check "arith", (&HFF + 1) * 2 = 512
+' fs0 is the read-only test disk, fs1 an empty writable FAT volume
+RUN "cd fs1:"
+check "cd fs1:", CWD$ = "fs1:\"
+RUN "mkdir -p tmp\a\b"
+check "mkdir -p", DIREXISTS("tmp\a\b")
+WRITEFILE "tmp\hello.txt", "Hello UEFI" + CHR$(10)
+check "writefile", ERR = 0
+check "readfile", READFILE$("tmp\hello.txt") = "Hello UEFI" + CHR$(10)
+RUN "cp tmp\hello.txt tmp\a\copy.txt"
+check "cp", FILEEXISTS("tmp\a\copy.txt")
+RUN "mv tmp\a\copy.txt tmp\a\moved.txt"
+check "mv", FILEEXISTS("tmp\a\moved.txt") AND NOT FILEEXISTS("tmp\a\copy.txt")
+out$ = RUN$("grep -c UEFI tmp\hello.txt")
+check "grep", out$ = "1"
+RUN "rm -r tmp"
+check "rm -r", NOT DIREXISTS("tmp")
+check "firmware vendor", LEN(FWVENDOR$) > 0
+check "var get", VAREXISTS("BootOrder")
+check "setvarstr", SETVARSTR("NeshTest", "abc", "shell") = 0
+check "var$", VAR$("NeshTest", "shell") = "abc"
+check "delvar", DELVAR("NeshTest", "shell") = 0 AND NOT VAREXISTS("NeshTest", "shell")
+RUN "var get BootOrder"
+RUN "bootmgr list"
+n = BOOTCOUNT
+check "bootcount", n > 0
+RUN "bootmgr add fs0:\nesh.efi ""NESH test entry"" -y -B"
+check "bootmgr add", ERR = 0 AND BOOTCOUNT = n + 1
+id = BOOTID(BOOTCOUNT - 1)
+check "bootdesc", BOOTDESC$(id) = "NESH test entry"
+RUN "bootmgr disable " + HEX$(id, 4) + " -y -B"
+check "bootmgr disable", NOT BOOTENABLED(id)
+RUN "bootmgr top " + HEX$(id, 4) + " -y -B"
+check "bootmgr top", BOOTID(0) = id
+RUN "bootmgr check"
+RUN "bootmgr del " + HEX$(id, 4) + " -y -B"
+check "bootmgr del", BOOTCOUNT = n
+RUN "sysinfo"
+RUN "memmap -s"
+RUN "fs0:\examples\findefi"
+check "findefi example", ERR = 0
+RUN "fs0:\examples\inventory.nsb", "fs1:\inv.txt"
+check "inventory example", ERR = 0 AND INSTR(READFILE$("fs1:\inv.txt"), "Boot entries") > 0
+RUN "set neshtestenv 12345"
+check "env permanent in NVRAM", VAR$("neshtestenv", "shell") = "12345"
+RUN "set -v neshvol x"
+check "env temporary not in NVRAM", ENV$("neshvol") = "x" AND NOT VAREXISTS("neshvol", "shell")
+RUN "set -d neshtestenv"
+check "env delete", NOT VAREXISTS("neshtestenv", "shell") AND ENV$("neshtestenv") = ""
+check "env uefiversion", ENV$("uefiversion") = "2.7"
+' --- UEFI Shell applications (EFI_SHELL_PROTOCOL) ---
+out$ = RUN$("fs0:\tests\apps\shelltest.efi", "alpha", "beta gamma")
+PRINT out$
+check "shell protocol test app", ERR = 0 AND INSTR(out$, "SHELLTEST DONE ok") > 0
+out$ = RUN$("fs0:\tests\apps\pci.efi")
+check "EDK2 pci.efi", ERR = 0 AND INSTR(out$, "Host/PCI bridge") > 0
+out$ = RUN$("fs0:\tests\apps\usb.efi")
+check "EDK2 usb.efi", ERR = 0 AND INSTR(out$, "USB") > 0
+out$ = RUN$("fs0:\tests\apps\tftp.efi")
+check "EDK2 tftp.efi argument check", INSTR(out$, "Too few arguments") > 0
+' --- drivers and devices ---
+out$ = RUN$("drivers")
+check "drivers", ERR = 0 AND INSTR(out$, "PCI Bus Driver") > 0 AND INSTR(out$, "PciBusDxe") > 0
+out$ = RUN$("devices")
+check "devices", ERR = 0 AND INSTR(out$, "PciRoot(0x0)") > 0
+out$ = RUN$("devtree")
+check "devtree", ERR = 0 AND INSTR(out$, "FAT File System") > 0
+' the writable disk (fs1) is the PCI device that has a file system on it
+n = SPLIT(RUN$("dh -p SimpleFileSystem"), CHR$(10), l$)
+h$ = ""
+FOR i = 0 TO n - 1
+  IF INSTR(l$(i), "PciIo") > 0 THEN h$ = TRIM$(LEFT$(l$(i), INSTR(l$(i), ":") - 1))
+NEXT
+check "dh -p", h$ <> ""
+out$ = RUN$("dh " + h$)
+check "dh handle", INSTR(out$, "BlockIo") > 0 AND INSTR(out$, "Segment") > 0
+out$ = RUN$("openinfo " + h$)
+check "openinfo", ERR = 0 AND INSTR(out$, "Driver") > 0
+RUN "disconnect " + h$
+RUN "map -r"
+check "disconnect removes fs1", ERR = 0 AND INSTR(RUN$("map"), "fs1") = 0
+RUN "connect -r " + h$
+RUN "map -r"
+check "connect brings fs1 back", INSTR(RUN$("map"), "fs1") > 0
+RUN "load fs0:\nesh.efi"
+check "load refuses applications", ERR <> 0
+RUN "drvdiag"
+check "drvdiag list", ERR = 0
+RUN "drvcfg"
+check "drvcfg list", ERR = 0
+' --- UEFI Shell style variable and boot commands ---
+g$ = "12345678-1234-1234-1234-123456789abc"
+out$ = RUN$("dmpstore BootOrder")
+check "dmpstore", INSTR(out$, "NV+BS+RT") > 0 AND INSTR(out$, ":BootOrder' DataSize") > 0
+RUN "setvar NeshHex -guid " + g$ + " -bs =0102ff"
+check "setvar hex", VARHEX$("NeshHex", g$) = "0102ff"
+RUN "setvar NeshAsc -guid " + g$ + " -bs =""abc"""
+check "setvar ascii", VARHEX$("NeshAsc", g$) = "616263"
+RUN "setvar NeshUni -guid " + g$ + " -bs =L""ab"""
+check "setvar unicode", VARHEX$("NeshUni", g$) = "610062000000"
+out$ = RUN$("setvar NeshHex -guid " + g$)
+check "setvar show", INSTR(out$, "DataSize = 0x3") > 0
+RUN "dmpstore Nesh* -guid " + g$ + " -s fs1:\vars.bin"
+check "dmpstore -s", ERR = 0 AND FILESIZE("fs1:\vars.bin") > 0
+RUN "setvar NeshHex -guid " + g$ + " ="
+check "setvar delete", NOT VAREXISTS("NeshHex", g$)
+RUN "dmpstore -d NeshAsc -guid " + g$
+check "dmpstore -d", NOT VAREXISTS("NeshAsc", g$)
+RUN "dmpstore -l fs1:\vars.bin -all"
+check "dmpstore -l", VARHEX$("NeshHex", g$) = "0102ff" AND VARHEX$("NeshAsc", g$) = "616263"
+RUN "setvar NeshHex -guid " + g$ + " ="
+RUN "setvar NeshAsc -guid " + g$ + " ="
+RUN "setvar NeshUni -guid " + g$ + " ="
+n = BOOTCOUNT
+RUN "bcfg boot add 0 fs0:\nesh.efi ""BCFG test"""
+id = BOOTID(0)
+check "bcfg add", BOOTCOUNT = n + 1 AND BOOTDESC$(id) = "BCFG test"
+RUN "bcfg boot mod 0 ""BCFG renamed"""
+check "bcfg mod", BOOTDESC$(id) = "BCFG renamed"
+RUN "bcfg boot -opt 0 ""quiet splash"""
+check "bcfg -opt", BOOTARGS$(id) = "quiet splash"
+RUN "bcfg boot modp 0 fs0:\nesh.efi"
+check "bcfg modp (short path)", LEFT$(BOOTPATH$(id), 3) = "HD("
+RUN "bcfg boot mv 0 2"
+check "bcfg mv", BOOTID(2) = id
+check "bcfg dump", INSTR(RUN$("bcfg boot dump"), "BCFG renamed") > 0
+RUN "bcfg boot rm 2"
+check "bcfg rm", BOOTCOUNT = n
+' --- group 1: disks and files ---
+out$ = RUN$("map")
+check "map lists block devices", INSTR(out$, "blk0") > 0
+RUN "map work fs1:"
+check "map alias", FILEEXISTS("work:\inv.txt")
+RUN "map -d work"
+check "map -d", NOT FILEEXISTS("work:\inv.txt")
+RUN "vol fs1: -n NESHDATA"
+RUN "map -r"
+check "vol -n", INSTR(RUN$("vol fs1:"), "NESHDATA") > 0
+out$ = RUN$("dblk fs1: 0")
+check "dblk FAT boot sector", INSTR(out$, "FAT boot sector") > 0
+n = SPLIT(RUN$("map"), CHR$(10), ml$)
+blk$ = ""
+FOR i = 0 TO n - 1
+  IF LEFT$(ml$(i), 3) = "blk" AND INSTR(ml$(i), "disk") > 0 AND blk$ = "" THEN blk$ = LEFT$(ml$(i), INSTR(ml$(i), " ") - 1)
+NEXT
+out$ = RUN$("dblk " + blk$ + " 0")
+check "dblk MBR", INSTR(out$, "MBR partition table") > 0 OR INSTR(out$, "FAT boot sector") > 0
+WRITEFILE "fs1:\sz.bin", "0123456789"
+RUN "setsize 4 fs1:\sz.bin"
+check "setsize", FILESIZE("fs1:\sz.bin") = 4
+RUN "attrib +h +r fs1:\sz.bin"
+out$ = RUN$("attrib fs1:\sz.bin")
+check "attrib", INSTR(out$, "H") > 0 AND INSTR(out$, "R") > 0
+RUN "attrib -h -r fs1:\sz.bin"
+check "attrib clear", INSTR(RUN$("attrib fs1:\sz.bin"), "R ") = 0
+WRITEFILE "fs1:\c1.txt", "abc"
+WRITEFILE "fs1:\c2.txt", "abd"
+RUN "comp fs1:\c1.txt fs1:\c2.txt"
+check "comp", ERR <> 0
+RUN "touch fs1:\c1.txt"
+check "touch", ERR = 0
+RUN "mkdir -p fs1:\q\r"
+RUN "rm -q fs1:\q"
+check "rm -q", NOT DIREXISTS("fs1:\q")
+check "ls -r", ERR = 0 AND INSTR(RUN$("ls -r fs0:\tests"), "shelltest.efi") > 0
+RUN "timezone -s +01:00"
+check "timezone", INSTR(RUN$("timezone"), "UTC+01:00") > 0
+check "getmtc", LEN(RUN$("getmtc")) > 0
+RUN "date 09/19/2026"
+check "date mm/dd/yyyy", DATE$ = "2026-09-19"
+' --- group 3: memory and hardware ---
+out$ = RUN$("pci")
+check "pci list", INSTR(out$, "Host/PCI bridge") > 0
+out$ = RUN$("pci 0 1 0 -i")
+check "pci -i", INSTR(out$, "Vendor ID 8086") > 0
+check "mm -PCI", INSTR(RUN$("mm 0 -PCI -w 2 -n"), "0x8086") > 0
+check "mm -IO", ERR = 0 AND INSTR(RUN$("mm 70 -IO -n"), "IO") > 0
+check "dmem", INSTR(RUN$("dmem"), "EFI system table") > 0
+' write test on the first pixel of the frame buffer (harmless)
+out$ = RUN$("gop")
+fb$ = MID$(out$, INSTR(out$, "at 0x") + 5)
+fb$ = LEFT$(fb$, INSTR(fb$, ",") - 1)
+RUN "mm " + fb$ + " 00ABCDEF -w 4"
+check "mm write", INSTR(RUN$("mm " + fb$ + " -w 4 -n"), "0x00ABCDEF") > 0
+out$ = RUN$("smbiosview")
+check "smbiosview", INSTR(out$, "BIOS Information") > 0 AND INSTR(out$, "QEMU") > 0
+check "smbiosview -t 1", INSTR(RUN$("smbiosview -t 1"), "System Information") > 0
+out$ = RUN$("acpiview")
+check "acpiview list", INSTR(out$, "APIC") > 0 AND INSTR(out$, "FACP") > 0 AND INSTR(out$, "BAD") = 0
+check "acpiview -s APIC", INSTR(RUN$("acpiview -s APIC"), "Local APIC address") > 0
+RUN "cd fs1:"
+RUN "acpiview -s FACP -d"
+check "acpiview -d", FILESIZE("fs1:\FACP.bin") > 36
+check "mode", INSTR(RUN$("mode"), "columns") > 0
+check "sermode", INSTR(RUN$("sermode"), "baud") > 0
+check "gop", INSTR(RUN$("gop"), "current") > 0
+check "cpuid", INSTR(RUN$("cpuid"), "Vendor") > 0
+IF FILEEXISTS("fs0:\tests\apps\efi-virtio.rom") THEN
+  out$ = RUN$("loadpcirom fs0:\tests\apps\efi-virtio.rom")
+  PRINT out$
+  check "loadpcirom (compressed driver)", ERR = 0 AND INSTR(out$, "loaded") > 0
+ELSE
+  PRINT "SKIP loadpcirom (no efi-virtio.rom: set QEMU_ROM)"
+END IF
+' --- group 5: utilities ---
+RUN "cd fs1:"
+RUN "eficompress fs0:\nesh.efi nesh.z"
+RUN "efidecompress nesh.z nesh.out"
+check "eficompress + firmware decompress", ERR = 0 AND FILESIZE("nesh.out") = FILESIZE("fs0:\nesh.efi")
+RUN "comp fs0:\nesh.efi nesh.out"
+check "firmware decompression identical", ERR = 0
+WRITEFILE "rep.txt", STRING$(5000, "x") + "tail"
+RUN "eficompress rep.txt rep.z"
+RUN "efidecompress rep.z rep.out"
+check "repetitive data", READFILE$("rep.out") = STRING$(5000, "x") + "tail"
+WRITEFILE "one.txt", "a"
+RUN "eficompress one.txt one.z"
+RUN "efidecompress one.z one.out"
+check "single byte", READFILE$("one.out") = "a"
+RUN "efidecompress -n nesh.z nesh2.out"
+RUN "comp fs0:\nesh.efi nesh2.out"
+check "NESH decoder", ERR = 0
+t = TICKS
+RUN "stall 200000"
+check "stall", TICKS - t >= 150
+WRITEFILE "sfo.txt", "ShellCommand,""map""" + CHR$(10) + "Mapping,""fs0"",""disk""" + CHR$(10) + "Mapping,""fs1"",""usb""" + CHR$(10)
+check "parse", RUN$("parse sfo.txt Mapping 2 -i 2") = "usb"
+' --- -data output ---
+FUNCTION firstwith$(cmd$, k$, val$)
+  LOCAL t$, n, i
+  t$ = RUN$(cmd$)
+  n = RECORDS(t$, rr$())
+  FOR i = 0 TO n - 1
+    IF FIELD$(rr$(i), k$) = val$ THEN RETURN rr$(i)
+  NEXT
+  RETURN ""
+END FUNCTION
+FUNCTION nrec(cmd$)
+  RETURN RECORDS(RUN$(cmd$), nr$())
+END FUNCTION
+check "map -data volume", FIELD$(firstwith$("map -data", "volume", "fs1"), "kind") = "volume"
+check "map -data block", INSTR(FIELD$(firstwith$("map -data", "kind", "block"), "device"), "blk") = 1
+check "sysinfo -data", VAL(FIELD$(RUN$("sysinfo -data"), "memory")) > 0
+check "memmap -data", nrec("memmap -data") > 5
+check "var -data", FIELD$(firstwith$("var list -data", "name", "BootOrder"), "guid_name") <> ""
+check "bootmgr -data", nrec("bootmgr -data") > 1
+r$ = firstwith$("drivers -data", "type", "bus")
+check "drivers -data", FIELD$(r$, "name") <> "" AND VAL(FIELD$(r$, "children")) > 0
+check "devices -data", FIELD$(firstwith$("devices -data", "type", "root"), "name") <> ""
+n = RECORDS(RUN$("dh -p BlockIo -data"), dr$())
+check "dh -data", n > 0 AND INSTR(UCASE$(FIELD$(dr$(0), "protocols")), "BLOCKIO") > 0
+check "pci -data list", FIELD$(firstwith$("pci -data", "bus", "00"), "vendor") <> ""
+p$ = RUN$("pci 0 0 -data")
+check "pci -data device", FIELD$(p$, "vendor") <> "" AND FIELD$(p$, "classname") <> ""
+check "smbiosview -data", FIELD$(firstwith$("smbiosview -data", "type", "0"), "vendor") <> ""
+check "smbiosview -s -data", nrec("smbiosview -s -data") > 2
+check "acpiview -data", FIELD$(firstwith$("acpiview -data", "signature", "FACP"), "checksum") = "ok"
+check "acpiview -s -data", nrec("acpiview -s APIC -data") = 1
+' --- fixes found while writing the manual ---
+RUN "memmap -s -b"
+check "memmap -b accepted", ERR = 0
+RUN "loadpcirom -nc"
+check "loadpcirom without a file", ERR = 2
+RUN "reset -w -s"
+check "reset: one mode only", ERR = 2
+RUN "reset -zz"
+check "reset: unknown option", ERR = 2
+' --- the boot menu example of the user manual (reset replaced, 1 s timeout) ---
+m$ = READFILE$("fs0:\examples\bootmenu.nsb")
+m$ = REPLACE$(m$, "IF ERR = 0 THEN RUN ""reset""", "IF ERR = 0 THEN END 0")
+m$ = REPLACE$(m$, "items$, 10, 1)", "items$, 1, 1)")
+WRITEFILE "fs1:\menutest.nsb", m$
+out$ = RUN$("fs1:\menutest.nsb")
+check "boot menu example", ERR = 0 AND INSTR(out$, "Starting ") > 0 AND INSTR(out$, "UiApp") = 0
+check "boot menu sets BootNext", LEFT$(RUN$("bootmgr next"), 9) = "BootNext:"
+RUN "bootmgr next -d -B"
+out$ = RUN$("fs0:\examples\findefi.nsb")
+check "findefi example", INSTR(out$, "BOOTX64.EFI") > 0
+PRINT "failures:"; fails

@@ -1,0 +1,31 @@
+FUNCTION fib(n)
+  IF n < 2 THEN RETURN n
+  RETURN fib(n - 1) + fib(n - 2)
+END FUNCTION
+FUNCTION greet$(name$)
+  RETURN "Hello, " + name$ + "!"
+END FUNCTION
+SUB show(label$, v)
+  LOCAL t
+  t = v * 2
+  PRINT label$; "="; v; " double="; t
+END SUB
+SUB counter
+  count = count + 1
+END SUB
+PRINT fib(20), greet$("NESH")
+show "a", 21
+CALL show("b", 1)
+counter: counter: counter
+PRINT "count"; count; " t is local:"; t
+PRINT "args"; ARGC; " ["; ARG$(1); "] ["; ARG$(2); "] "; ARG$(9) = ""
+DIM arr(4)
+FOR i = 0 TO 4: arr(i) = i * i: NEXT
+PRINT arr(4), UBOUND(arr)
+REDIM arr(6)
+PRINT arr(4), arr(6), UBOUND(arr)
+FUNCTION deep(n)
+  IF n = 0 THEN RETURN 0
+  RETURN 1 + deep(n - 1)
+END FUNCTION
+PRINT deep(150)

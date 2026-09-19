@@ -1,0 +1,9 @@
+6765          Hello, NESH!
+a=21 double=42
+b=1 double=2
+count3 t is local:0
+args2 [arg1] [arg two] -1
+16            4
+16            0             6
+150
+[exit 0]

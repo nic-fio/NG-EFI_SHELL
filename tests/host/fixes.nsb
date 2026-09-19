@@ -1,0 +1,41 @@
+' behaviors fixed while writing the manual
+' exit /b ends only the current script, with its code
+WRITEFILE "inner.nsb", "PRINT ""inner start""" + CHR$(10) + "RUN ""exit /b 5""" + CHR$(10) + "PRINT ""not printed"""
+RUN "inner"
+PRINT "after inner, ERR="; ERR
+' which: aliases, commands, scripts found through path, functions in any case
+RUN "alias -v ll ls -l"
+PRINT RUN$("which ll")
+PRINT RUN$("which cp")
+RUN "mkdir tools"
+WRITEFILE "tools\hello.nsb", "PRINT ""hi"""
+RUN "which hello"
+PRINT "not in path: ERR="; ERR
+SETENV "path", ENV$("path") + ";tools"
+PRINT INSTR(RUN$("which hello"), "hello.nsb") > 0
+PRINT RUN$("which LEN")
+' mv replaces an existing file only after the move
+WRITEFILE "a.txt", "new"
+WRITEFILE "b.txt", "old"
+RUN "mv a.txt b.txt"
+PRINT "mv: "; READFILE$("b.txt"); " a exists="; FILEEXISTS("a.txt")
+RUN "ls b.txt.mv*"
+' mkdir -p through a file is an error
+WRITEFILE "f", "x"
+RUN "mkdir -p f\sub"
+PRINT "mkdir -p through a file: ERR="; ERR
+RUN "mkdir -p d1\d2\d3"
+PRINT "mkdir -p: "; DIREXISTS("d1\d2\d3")
+' rm -f: no match is not an error; without -f it is
+RUN "rm -f *.nothing"
+PRINT "rm -f no match: ERR="; ERR
+RUN "rm *.nothing"
+PRINT "rm no match: ERR="; ERR
+' echo -on / -off are accepted and print nothing
+RUN "echo -on"
+RUN "echo -off"
+PRINT "echo switches: ERR="; ERR
+' exit CODE stops every script at once and leaves the shell with CODE
+WRITEFILE "quit.nsb", "RUN ""exit 3""" + CHR$(10) + "PRINT ""not printed"""
+RUN "quit"
+PRINT "not printed either"

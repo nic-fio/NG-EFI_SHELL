@@ -1,0 +1,23 @@
+' findefi.nsb - lists the boot loaders in \EFI\*\ of every volume.
+
+SUB scan(folder$)
+  LOCAL f$
+  f$ = DIR$(folder$ + "\*.efi")
+  WHILE f$ <> ""
+    PRINT "  "; folder$; "\"; f$
+    f$ = DIR$
+  WEND
+END SUB
+
+nv = RECORDS(RUN$("map -t fs -data"), vol$())
+FOR v = 0 TO nv - 1
+  name$ = FIELD$(vol$(v), "volume") + ":"
+  IF DIREXISTS(name$ + "\EFI") THEN
+    PRINT name$; "  "; FIELD$(vol$(v), "label")
+    ' the folders inside \EFI (-ad: directories only)
+    nd = RECORDS(RUN$("ls -ad -data " + name$ + "\EFI"), sub$())
+    FOR i = 0 TO nd - 1
+      scan name$ + "\EFI\" + FIELD$(sub$(i), "name")
+    NEXT
+  END IF
+NEXT

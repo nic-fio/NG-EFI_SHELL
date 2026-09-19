@@ -1,0 +1,21 @@
+' group 5: compression, parse, stall
+s$ = ""
+FOR i = 1 TO 300
+  s$ = s$ + "line " + STR$(i MOD 17) + " of a compressible text" + CHR$(10)
+NEXT
+WRITEFILE "a.txt", s$
+RUN "eficompress a.txt a.z"
+PRINT "compressed smaller: "; FILESIZE("a.z") < FILESIZE("a.txt")
+RUN "efidecompress a.z b.txt"
+PRINT "roundtrip: "; READFILE$("b.txt") = s$
+WRITEFILE "bad.z", "not compressed at all"
+RUN "efidecompress bad.z c.txt"
+PRINT "damaged input ERR="; ERR
+WRITEFILE "t.csv", "ShellCommand,""x""" + CHR$(10) + "Row,""a"",""b, with comma""" + CHR$(10) + "Row,""c"",""d""" + CHR$(10)
+RUN "parse t.csv Row 2"
+RUN "parse t.csv Row 1 -i 2"
+RUN "parse t.csv Nope 1"
+PRINT "parse missing ERR="; ERR
+t = TICKS
+RUN "stall 100000"
+PRINT "stall ok: "; TICKS - t >= 90

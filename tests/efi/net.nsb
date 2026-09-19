@@ -1,0 +1,75 @@
+' Network tests (run by tools/run-qemu.sh --nettest)
+PRINT "=== NESH TEST START ==="
+fails = 0
+SUB check(name$, ok)
+  IF ok THEN
+    PRINT "PASS "; name$
+  ELSE
+    PRINT "FAIL "; name$
+    fails = fails + 1
+  END IF
+END SUB
+RUN "ifconfig -l"
+check "no stack message", ERR <> 0
+' this OVMF only loads its network stack for network boot: load it from files
+RUN "load -nc fs0:\netdrv\*.efi"
+check "load network drivers", ERR = 0
+RUN "connect -r"
+out$ = RUN$("ifconfig -l")
+PRINT out$
+check "ifconfig -l", INSTR(out$, "eth0") > 0
+RUN "ifconfig -s eth0 dhcp"
+out$ = RUN$("ifconfig -l eth0")
+PRINT out$
+check "dhcp address", INSTR(out$, "10.0.2.15") > 0
+d$ = RUN$("ifconfig -l eth0 -data")
+PRINT d$
+check "ifconfig -data", FIELD$(d$, "ip") = "10.0.2.15" AND FIELD$(d$, "policy") = "dhcp" AND FIELD$(d$, "gateway") = "10.0.2.2"
+RUN "ping -n 3 10.0.2.2"
+check "ping", ERR = 0
+RUN "tftp 10.0.2.2 hello.txt fs1:\tftp.txt"
+check "tftp", READFILE$("fs1:\tftp.txt") = "hello from the host" + CHR$(10)
+RUN "tftp 10.0.2.2 big.bin fs1:\big.bin"
+check "tftp big file", FILESIZE("fs1:\big.bin") = 3000000
+RUN "http http://10.0.2.2:18080/hello.txt fs1:\http.txt"
+check "http", READFILE$("fs1:\http.txt") = "hello from the host" + CHR$(10)
+RUN "http http://10.0.2.2:18080/big.bin fs1:\hbig.bin"
+check "http big file", FILESIZE("fs1:\hbig.bin") = 3000000
+RUN "comp fs1:\big.bin fs1:\hbig.bin"
+check "tftp and http files identical", ERR = 0
+RUN "http http://10.0.2.2:18080/missing.txt fs1:\m.txt"
+check "http 404", ERR <> 0
+' --- IPv6 (router advertisements from QEMU: prefix fec0::/64, host fec0::2) ---
+out$ = RUN$("ifconfig6 -l")
+PRINT out$
+check "ifconfig6 -l", INSTR(out$, "eth0") > 0 AND INSTR(out$, "fe80::") > 0
+RUN "ifconfig6 -s eth0 auto"
+check "ifconfig6 auto", ERR = 0
+RUN "ping6 -n 3 fec0::2"
+check "ping6", ERR = 0
+d$ = RUN$("ifconfig6 -l eth0 -data")
+PRINT d$
+check "ifconfig6 -data", FIELD$(d$, "policy") = "automatic" AND INSTR(FIELD$(d$, "ip"), "fec0::") > 0
+RUN "ping -n 2 fec0::2"
+check "ping with IPv6 address", ERR = 0
+RUN "tftp fec0::2 hello.txt fs1:\tftp6.txt"
+check "tftp IPv6", READFILE$("fs1:\tftp6.txt") = "hello from the host" + CHR$(10)
+RUN "http http://[fec0::2]:18080/big.bin fs1:\hbig6.bin"
+RUN "comp fs1:\big.bin fs1:\hbig6.bin"
+check "http IPv6 big file", ERR = 0
+RUN "ping6 -n 1 fec0::99"
+check "ping6 no answer", ERR <> 0
+RUN "ping6 fec0::zz"
+check "ping6 bad address", ERR <> 0
+RUN "ifconfig6 -s eth0 man host fec0::1234/64 gw fec0::2 dns fec0::3"
+check "ifconfig6 manual", ERR = 0
+d$ = RUN$("ifconfig6 -l eth0 -data")
+PRINT d$
+check "manual settings", FIELD$(d$, "policy") = "manual" AND INSTR(FIELD$(d$, "ip"), "fec0::1234/64") > 0 AND FIELD$(d$, "dns") = "fec0::3"
+RUN "ping6 -n 2 fec0::2"
+check "ping6 from manual address", ERR = 0
+RUN "ifconfig6 -r eth0"
+check "ifconfig6 -r", FIELD$(RUN$("ifconfig6 -l eth0 -data"), "policy") = "automatic"
+PRINT "failures:"; fails
+PRINT "=== NESH TEST END ==="
+RUN "reset -s"

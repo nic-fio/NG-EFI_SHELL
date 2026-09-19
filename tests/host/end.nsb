@@ -1,0 +1,7 @@
+FUNCTION f(n)
+  IF n > 2 THEN END 7
+  RETURN n
+END FUNCTION
+PRINT f(1)
+PRINT f(5)
+PRINT "not reached"

@@ -1,0 +1,25 @@
+Compare fs0:\a.txt to fs0:\b.txt
+Difference #1 at offset 0x6 (1 bytes)
+  file1: 77 6f 72 6c 64  *world*
+  file2: 57 6f 72 6c 64  *World*
+[difference(s) encountered]
+comp differs ERR=1
+Compare fs0:\a.txt to fs0:\c.txt
+[no differences encountered]
+comp same ERR=0
+Compare fs0:\a.txt to fs0:\b.txt
+Difference #1 at offset 0x6 (1 bytes)
+  file1: 77 6f 72 6c 64  *world*
+  file2: 57 6f 72 6c 64  *World*
+[difference(s) encountered]
+setsize: 5 [hello]
+extended: 8 zero byte: 0
+setsize creates: 3
+ A  R  fs0:\c.txt
+ A  R  fs0:\c.txt
+ A     fs0:\c.txt
+rm -q dir: 0
+touch ERR=0
+hello World
+
+[exit 0]

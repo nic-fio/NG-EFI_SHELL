@@ -1,0 +1,37 @@
+RUN "mkdir -p dir\sub"
+WRITEFILE "dir\a.txt", "alpha" + CHR$(10) + "beta" + CHR$(10)
+APPENDFILE "dir\a.txt", "gamma" + CHR$(10)
+PRINT FILEEXISTS("dir\a.txt"), DIREXISTS("dir\sub"), FILEEXISTS("nope"), FILESIZE("dir\a.txt")
+RUN "cat dir\a.txt"
+out$ = RUN$("grep", "-n", "eta", "dir\a.txt")
+PRINT "[" + out$ + "] ERR="; ERR
+out$ = RUN$("grep zzz dir\a.txt")
+PRINT "no match ERR="; ERR
+RUN "cp dir\a.txt dir\sub\b.txt"
+RUN "ls dir\sub" TO "list.txt"
+PRINT "list: "; TRIM$(READFILE$("list.txt"))
+RUN "echo one" TO "log.txt"
+RUN "echo two" APPEND "log.txt"
+RUN "echo three >> log.txt"
+PRINT REPLACE$(READFILE$("log.txt"), CHR$(10), "/")
+f$ = DIR$("dir\*.txt")
+WHILE f$ <> ""
+  PRINT "found "; f$
+  f$ = DIR$
+WEND
+RUN "mv dir\sub\b.txt dir\c.txt"
+PRINT FILEEXISTS("dir\c.txt"), FILEEXISTS("dir\sub\b.txt")
+RUN "head -n 2 dir\a.txt"
+RUN "tail -n 1 dir\a.txt"
+RUN "rm dir"
+PRINT "rm without -r ERR="; ERR
+RUN "rm -r dir"
+PRINT "rm -r ERR="; ERR; DIREXISTS("dir")
+RUN "nosuchcommand"
+PRINT "not found ERR="; ERR
+x$ = READFILE$("missing.txt")
+PRINT "missing file ERR="; ERR
+RUN "cd", "dir with space"
+RUN "mkdir", "dir with space"
+RUN "cd", "dir with space"
+PRINT CWD$

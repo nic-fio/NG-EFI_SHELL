@@ -1,0 +1,13 @@
+Copyright (c) 2026 nic-fio. All rights reserved.
+
+This software and its documentation are proprietary. No license is granted to
+use, copy, modify, merge, publish, distribute, sublicense or sell copies of the
+software or of its documentation, in whole or in part, without the prior
+written permission of the copyright holder.
+
+The source code is published for viewing. The license may change in the future.
+
+Third-party components included in this repository keep their own licenses:
+- docs/assets/vendor/mermaid.min.js: MIT License, see docs/assets/vendor/mermaid.LICENSE
+- tests/fixtures/edk2 and tests/fixtures/netdrv (test binaries only):
+  BSD-2-Clause-Patent, see tests/fixtures/EDK2-License.txt and tests/fixtures/README.md

@@ -66,6 +66,12 @@ firmware boot menu, start it from another shell, or add a boot entry with
 `bootmgr add`. With Secure Boot active, sign it with a trusted key first
 (see the user manual).
 
+## License
+
+Copyright (c) 2026 nic-fio. All rights reserved (see [LICENSE](LICENSE)); the
+license may change in the future. Third-party components keep their own
+licenses, listed in the LICENSE file.
+
 ## Status
 
 Version 0.1.0. Tested in QEMU with OVMF; not yet tested on real hardware or

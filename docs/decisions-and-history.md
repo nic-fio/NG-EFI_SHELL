@@ -291,4 +291,4 @@ listing), `bootmgr scan`, and the language's `ON ERROR`.
 | `https` | Needs a TLS driver in the firmware; untested. Host names in `http` URLs (DNS) are untested. |
 | UEFI Shell options not supported | `time -tz/-d`; `-l LANG` of `devices`/`devtree` is accepted and ignored. |
 | Not implemented | See "The original plan" above. |
-| License | Not chosen yet (MIT or BSD-2-Clause were proposed at the start). |
+| License | Provisional: all rights reserved (owner: "Per il tipo di licenza non ho ancora deciso nulla di definitivo. Al momento usiamo quella restrittiva, poi la cambieremo"). MIT or BSD-2-Clause were proposed at the start. |

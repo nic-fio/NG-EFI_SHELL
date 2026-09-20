@@ -613,3 +613,9 @@ footer.doc-footer {
   tbody tr:nth-child(even) { background: #fff; }
   a { color: #000; }
 }
+
+/* the animation on the landing page */
+figure.demo { margin: 2rem 0; text-align: center; }
+figure.demo img { max-width: 100%; height: auto; border: 1px solid var(--border);
+                  border-radius: 6px; background: #000; }
+figure.demo figcaption { margin-top: .6rem; font-size: .9em; color: var(--text-soft); }

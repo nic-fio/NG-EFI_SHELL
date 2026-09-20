@@ -7,6 +7,8 @@ A modern command shell for UEFI firmware, with a real scripting language.
 One file, `nesh.efi`: nothing to install, one signature for Secure Boot, no
 EDK2 code.
 
+![A NESH session: ver, map, the example scripts, and a menu script listing the firmware boot entries](docs/assets/nesh-demo.gif)
+
 ```
 fs0:\> map
 fs0:\> ls -l \EFI\BOOT

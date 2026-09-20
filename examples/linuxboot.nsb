@@ -1,0 +1,61 @@
+' linuxboot.nsb - one kernel, several sets of options: a boot menu.
+'
+' Works with any EFI stub kernel (the usual vmlinuz of an x86-64
+' distribution) that sits on a FAT volume NESH can read, together with
+' its initrd. The kernel command line is whatever this script puts
+' after the file name, so every entry of the menu can boot the same
+' kernel in a different way.
+'
+' Change the three lines below to match your machine, then run it with
+'   fs0:\> linuxboot.nsb
+' or copy it to fs0:\startup.nsb to get the menu at every boot.
+
+kernel$ = "fs0:\vmlinuz.efi"        ' the kernel, on this volume
+initrd$ = "\initrd.img"             ' path on the kernel's volume, "" if none
+root$   = "root=PARTUUID=00000000-0000-0000-0000-000000000000 ro"
+
+IF NOT FILEEXISTS(kernel$) THEN
+  PRINT "Kernel not found: "; kernel$
+  END 1
+END IF
+
+DO
+  CLS
+  PRINT "Linux boot menu   kernel: "; kernel$
+  PRINT
+
+  ' 10 seconds without a key start the first entry, like a boot loader
+  choice = MENU("Start Linux", _
+                "Normal boot|" + _
+                "Quiet boot (splash screen)|" + _
+                "Safe graphics (nomodeset)|" + _
+                "Rescue: single user, no splash|" + _
+                "Debug: messages on the serial port|" + _
+                "Type the options myself|" + _
+                "Back to the shell", 10, 1)
+
+  SELECT CASE choice
+    CASE 1 : opt$ = root$
+    CASE 2 : opt$ = root$ + " quiet splash"
+    CASE 3 : opt$ = root$ + " nomodeset"
+    CASE 4 : opt$ = root$ + " single"
+    CASE 5 : opt$ = root$ + " console=ttyS0,115200 earlyprintk=serial,ttyS0,115200 ignore_loglevel"
+    CASE 6
+      PRINT
+      INPUT "Kernel options: "; opt$
+    CASE 0, 7
+      PRINT "Back to the shell."
+      END 0
+  END SELECT
+
+  IF initrd$ <> "" THEN opt$ = "initrd=" + initrd$ + " " + opt$
+
+  PRINT
+  PRINT "Starting: "; kernel$; " "; opt$
+  RUN kernel$ + " " + opt$
+
+  ' The kernel does not come back: we are here only if it refused to start.
+  PRINT
+  PRINT "The kernel did not start (error "; ERR; ")."
+  PAUSE "Press a key to go back to the menu..."
+LOOP

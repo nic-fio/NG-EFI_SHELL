@@ -312,7 +312,7 @@ check "reset: one mode only", ERR = 2
 RUN "reset -zz"
 check "reset: unknown option", ERR = 2
 ' every example must at least parse (nesh -k checks a script without running it)
-RUN "fs0:\nesh.efi -k fs0:\examples\bootmenu.nsb fs0:\examples\findefi.nsb fs0:\examples\inventory.nsb fs0:\examples\menu.nsb"
+RUN "fs0:\nesh.efi -k fs0:\examples\bootmenu.nsb fs0:\examples\findefi.nsb fs0:\examples\inventory.nsb fs0:\examples\menu.nsb fs0:\examples\linuxboot.nsb"
 check "examples parse", ERR = 0
 ' --- the boot menu example of the user manual (reset replaced, 1 s timeout) ---
 m$ = READFILE$("fs0:\examples\bootmenu.nsb")

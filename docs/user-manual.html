@@ -1110,6 +1110,38 @@ start; <kbd>Esc</kbd> during the three-second countdown before it (or the “Sta
       when chosen.</li>
 </ul></div>
 
+<h3 id="linux-options">Starting a Linux kernel with different options</h3>
+<p>A menu does not have to choose between different systems: it can choose between different ways of starting the
+<em>same</em> one. Almost every x86-64 distribution ships a kernel built as an EFI application (the “EFI stub”), so
+NESH can start <code>vmlinuz</code> itself and give it a command line — exactly what a boot loader does. Anything the
+script writes after the file name reaches the kernel:</p>
+<pre class="terminal">fs0:\> vmlinuz.efi initrd=\initrd.img root=/dev/sda2 ro quiet splash</pre>
+<p>In a script the line is built as a string, so one entry per set of options is all it takes:</p>
+<pre class="code" data-lang="basic">kernel$ = "fs0:\vmlinuz.efi"
+root$   = "root=/dev/sda2 ro"
+
+choice = MENU("Start Linux", "Normal|Safe graphics|Rescue", 10, 1)
+SELECT CASE choice
+  CASE 1 : opt$ = root$
+  CASE 2 : opt$ = root$ + " nomodeset"
+  CASE 3 : opt$ = root$ + " single"
+END SELECT
+RUN kernel$ + " initrd=\initrd.img " + opt$</pre>
+<p><code>examples\linuxboot.nsb</code> is the finished version, with a ten-second countdown and an entry that asks for
+the options from the keyboard. Two details are worth knowing:</p>
+<ul>
+  <li>The kernel receives the file name as the first word of its command line (<code>Command line: fs0:\vmlinuz.efi
+      root=…</code>). This is what the UEFI Shell does as well, and the kernel ignores it.</li>
+  <li><code>initrd=</code> is a path <em>on the kernel's own volume</em>, written with a leading backslash and no
+      <code>fsN:</code> prefix: the kernel's EFI stub loads the file itself.</li>
+</ul>
+<div class="callout note"><span class="callout-title">Kernel or boot entry?</span>
+<p>Starting the kernel directly, as above, keeps everything in one script and lets you change the options without
+touching the firmware. The other way is to create one firmware boot entry per set of options —
+<code>bootmgr add fs0:\vmlinuz.efi "Linux (rescue)" "initrd=\initrd.img root=/dev/sda2 ro single"</code> — and let the
+menu pick one with <code>bootmgr next ID</code> followed by <code>reset</code>. Use that when other boot menus, or the
+firmware itself, must see the entries too.</p></div>
+
 <h3 id="more-examples">More examples</h3>
 <p>The <code>examples</code> folder contains complete scripts:</p>
 <table>
@@ -1118,6 +1150,8 @@ start; <kbd>Esc</kbd> during the three-second countdown before it (or the “Sta
     <tr><td><code>bootmenu.nsb</code></td><td>The interactive boot menu above.</td></tr>
     <tr><td><code>findefi.nsb</code></td><td>Looks for boot loaders in <code>\EFI\*\</code> on every volume: <code>map -data</code>,
         <code>ls -ad -data</code>, <code>DIR$</code>, a SUB with a <code>LOCAL</code> variable.</td></tr>
+    <tr><td><code>linuxboot.nsb</code></td><td>One Linux kernel, several sets of options: a countdown menu that builds
+        the kernel command line, with an entry that asks for the options.</td></tr>
     <tr><td><code>inventory.nsb</code></td><td>Writes a text report of the machine (system, volumes, boot entries, memory)
         with <code>RUN$</code> and <code>APPENDFILE</code>.</td></tr>
     <tr><td><code>menu.nsb</code></td><td>A maintenance menu that comes back after every action, with a second menu built

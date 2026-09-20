@@ -19,9 +19,7 @@ CROP = (800, 432)         # text fills the width; the GIF keeps the used part
 
 # what the session types; (seconds to wait before it, action)
 SESSION = [
-    (0.8, None),
-    (0.0, "type:ver\n"),
-    (2.0, None),
+    (1.2, None),
     (0.0, "type:map\n"),
     (2.0, None),
     (0.0, "type:ls fs0:\\examples\n"),
@@ -121,9 +119,11 @@ def record(img, frames, ovmf):
         sys.exit("NESH did not start")
     time.sleep(1.0)
 
-    # clear the firmware logo and the boot messages before recording; the
-    # firmware also swallows the first keystroke, hence the leading newline
-    for ch in "\ncls\n":
+    # Clear the firmware logo and the boot messages, then print the version:
+    # the first frame is the still image GitHub shows before the animation
+    # plays, so it should not be an empty screen. The firmware swallows the
+    # first keystroke, hence the leading newline.
+    for ch in "\ncls\nver\n":
         mon.cmd("sendkey " + keyname(ch))
         time.sleep(0.12)
     time.sleep(1.0)

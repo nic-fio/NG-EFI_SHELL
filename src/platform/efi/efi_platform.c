@@ -563,7 +563,7 @@ static const Cmd efi_sys_cmds[] = {
     { "memmap", cmd_memmap, "memmap [-s] [-b]", "Show the UEFI memory map (-s summary only)",
       "  (none)  every memory descriptor, then totals per type\n"
       "  -s      totals per type only\n"
-      "  -b      accepted for UEFI Shell compatibility and ignored\n"
+      "  -b      page the output (UEFI Shell option, see help more)\n"
       "Start and End are physical addresses; a page is 4 KiB. Total memory\n"
       "excludes reserved and MMIO ranges; \"available to the OS\" counts\n"
       "conventional, loader and boot services memory.\n"

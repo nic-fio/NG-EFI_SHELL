@@ -25,6 +25,11 @@ void data_key(const char *label, char *out, size_t n); /* "Release date" -> "rel
 /* "Label: value" (indented, label padded to width) or "label=value" in -data mode. */
 void info_line(int indent, int width, const char *label, const char *fmt, ...) __attribute__((format(printf, 4, 5)));
 
+/* Paging of console output: on for interactive commands, off in scripts and
+ * when the output is captured or redirected (see shell_exec_argv). */
+void out_paging(bool on);
+bool out_paging_quit(void); /* the user pressed q at the "-- More --" prompt */
+
 void out_push_capture(Sbuf *b);
 int out_push_file(const char *path, bool append); /* returns PAL error */
 int out_pop(void);                                /* returns PAL error of the popped file sink */

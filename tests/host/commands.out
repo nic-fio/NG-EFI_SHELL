@@ -24,4 +24,8 @@ INPUT is a NESH BASIC statemen
 LEN is a NESH BASIC built-in function.
 help: no help for 'nosuchthing' (try 'help', 'help basic' or 'help functions')
 unknown: ERR=1
+ls -b: ERR=0
+-b keeps its text
+more: line one
+line two
 [exit 0]

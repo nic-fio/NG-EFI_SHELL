@@ -28,6 +28,7 @@ typedef struct {
 
 #define CMD_KEEP_QUOTES 1 /* arguments keep their double quotes (setvar "text" vs L"text") */
 #define CMD_DATA 2        /* supports "-data" (key=value records, see out_data_mode) */
+#define CMD_ARG_B 4       /* the command uses "-b" itself (exit -b): do not take it as paging */
 
 void shell_register(const Cmd *cmds, int n);
 const Cmd *shell_find_cmd(const char *name);

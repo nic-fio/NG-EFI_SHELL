@@ -244,6 +244,25 @@ From it came the working rules of the project:
 - **Safety.** Before switching to a smaller resolution NESH moves the console to
   a text mode that fits, so the firmware never draws outside the frame buffer.
 
+### D16c. Paging of long output
+
+- **Context.** A UEFI console cannot be scrolled back, so the beginning of a long
+  output (`help`, `dh`, `drivers`) was lost. The UEFI Shell option `-b` was
+  accepted and ignored, and there was no `more`.
+- **Decision.** Paging lives in the console layer (`out_paging` in `con.c`), so
+  every command gets it without changes: output to the console stops at every
+  screenful with `-- More --` (Space: a page, Enter: a line, q: stop).
+- **When.** Automatically for commands typed at the prompt whose output goes to
+  the screen; never inside scripts or when the output is redirected or captured,
+  so automation is unaffected. `-b` turns it on for one command anywhere (UEFI
+  Shell compatibility), `set pager off` turns the automatic paging off, and the
+  new `more` command always pages.
+- **Consequences.** `q` also stops the command (through the same flag as
+  Ctrl-C, but without reporting an interruption). `-b` is removed from the
+  arguments before the command sees it, except for commands that use it
+  themselves (`exit -b`, and `echo`, which prints its words as they are):
+  they carry the flag `CMD_ARG_B`.
+
 ### D17. English for the product, Italian for the discussion
 
 - Messages, help texts, code comments and the manuals are in English (the
@@ -291,9 +310,10 @@ All work took place in one long working session (2026-09-19), in phases.
 | **5. Script-friendly output** | `-sfo` replaced by `-data` with `RECORDS`/`FIELD$` (D14). The QEMU test runner was found to report "OK" for scripts that stopped on an error; the pass rule was tightened (D19). |
 | **6. IPv6** | `ifconfig6`, `ping6`, IPv6 in `ping`/`tftp`/`http` (D15), tested with QEMU user networking; an IPv6 address parser/formatter checked against 29 cases; `ifconfig` now shows the DHCP gateway. |
 | **7. Documentation** | Help texts written for all 84 commands by reading their code. That review found and fixed real defects: `mv` could lose the target file if the rename failed; `exit` did not stop a running script; `which` ignored `path`; `load` did not connect drivers when one file failed; `mkdir -p` accepted a file in the path; `vol fs1` without colon showed the wrong volume; missing UEFI Shell options (`reset -c/-fwui`, `pause -q`, `exit /b`, `memmap -b`, `sermode` stop bits 0); the editor lost tab characters and the UTF-8 BOM; the example boot menu failed on read-only volumes and listed hidden entries. User and developer manuals written; examples executed by the test suite. |
-| **8. Screen** | While adding `gop 1024 768` / `-max` / `-fit` (owner's suggestion) it turned out that changing the resolution had no lasting effect at all, and that the text console covers only part of a large screen (a firmware property, now explained in the manual). |
-| **9. Secure Boot** | Tested for real in QEMU with own test keys enrolled in OVMF (`make qemu-sbtest`, part of CI): unsigned images refused by the firmware, hardware writes refused, clock/serial allowed, keys unchangeable. One defect found and fixed: refusals were reported as a bare "access denied". |
-| **10. Publication** | Repository published on GitHub as `NG-EFI_SHELL`, public (owner's request); provisional all-rights-reserved license; manuals online with GitHub Pages; GitHub Actions builds and tests every push and publishes a Release with `nesh.efi` for each version tag (binaries are distributed as Releases, not committed to the repository). |
+| **8. Screen** | Screen-resolution options added on the owner's suggestion (`gop WIDTH HEIGHT`, `-max`, `-fit`): it turned out that changing the resolution had no lasting effect at all, and that the text console covers only part of a large screen (a firmware property, now explained in the manual). |
+| **9. Console** | Paging of long output (D16c), after the owner noticed that a long `help` scrolls away and cannot be read back. |
+| **10. Secure Boot** | Tested for real in QEMU with own test keys enrolled in OVMF (`make qemu-sbtest`, part of CI): unsigned images refused by the firmware, hardware writes refused, clock/serial allowed, keys unchangeable. One defect found and fixed: refusals were reported as a bare "access denied". |
+| **11. Publication** | Repository published on GitHub as `NG-EFI_SHELL`, public (owner's request); provisional all-rights-reserved license; manuals online with GitHub Pages; GitHub Actions builds and tests every push and publishes a Release with `nesh.efi` for each version tag (binaries are distributed as Releases, not committed to the repository). |
 
 ### The original plan and what came of it
 

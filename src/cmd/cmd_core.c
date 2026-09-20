@@ -337,7 +337,7 @@ static const Cmd core_cmds[] = {
       "  exit /b 2           end only the current script, with exit code 2\n"
       "In a script (RUN \"exit\"), exit stops all running scripts at once, then\n"
       "leaves the shell. exit /b is like END CODE; at the prompt it only sets the\n"
-      "exit code. CODE may be decimal or hex (0x10).\n" },
+      "exit code. CODE may be decimal or hex (0x10). -b is the same as /b.\n", CMD_ARG_B },
     { "history", cmd_history, "history [-c] [N]", "Show the last N commands (-c clears the history)",
       "Keys at the prompt: Up/Down browse the history, Ctrl-R searches it,\n"
       "Tab completes commands and paths, Ctrl-A/E start/end of line,\n"
@@ -346,8 +346,9 @@ static const Cmd core_cmds[] = {
       "  echo TEXT...        print the words separated by one space, then a newline\n"
       "  echo -n TEXT...     the same without the final newline\n"
       "  echo \"a   b\"        quotes keep the spaces\n"
-      "Only a first -n is an option; any other word is printed as it is.\n"
-      "echo -on and echo -off (UEFI Shell script switches) do nothing.\n" },
+      "Only a first -n is an option; any other word is printed as it is,\n"
+      "including -b (echo never pages).\n"
+      "echo -on and echo -off (UEFI Shell script switches) do nothing.\n", CMD_ARG_B },
     { "pause", cmd_pause, "pause [-q] [MESSAGE]", "Wait for a key",
       "  pause               print \"Press any key to continue...\" and wait\n"
       "  pause Insert disk   print your own message and wait for a key\n"

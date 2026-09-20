@@ -318,6 +318,7 @@ fs0:\> set -d target</pre>
   <li><code>set NAME VALUE</code> creates a <strong>permanent</strong> variable, kept in the firmware (NVRAM) across reboots.
       <code>set -v NAME VALUE</code> creates a <strong>temporary</strong> one, lost when NESH exits.</li>
   <li>Permanent variables are stored exactly like the UEFI Shell stores them, so both shells see the same values.</li>
+  <li><code>pager</code>: set it to <code>off</code> to stop the automatic <a href="#paging">paging</a> of long output.</li>
   <li>Some variables are computed by NESH and read-only: <code>cwd</code>, <code>lasterror</code>, <code>uefiversion</code>,
       <code>uefishellversion</code>, <code>uefishellsupport</code>, <code>neshversion</code>.</li>
   <li>Scripts read and write them with <code>ENV$</code>, <code>SETENV</code> and <code>DELENV</code>. They are separate
@@ -350,9 +351,35 @@ fs0:\> PRINT n
 until it is; <kbd>Ctrl</kbd>+<kbd>C</kbd> cancels the block. Variables and SUBs defined at the prompt stay available
 until NESH exits.</p>
 
+<h3 id="paging" data-index="paging;long output;more;pager">Long output: paging</h3>
+<p>A UEFI console cannot be scrolled back, so output that does not fit would be lost. When you type a command at the
+prompt and its output goes to the screen, NESH stops at every screenful:</p>
+<pre class="terminal">fs0:\> help
+  acpiview       List the ACPI tables, or show or save one
+  ...
+-- More -- (Enter: one line, Space: one page, q: stop)</pre>
+<table>
+  <thead><tr><th>Key</th><th>Does</th></tr></thead>
+  <tbody>
+    <tr><td><kbd>Space</kbd></td><td>Show the next screenful.</td></tr>
+    <tr><td><kbd>Enter</kbd></td><td>Show one more line.</td></tr>
+    <tr><td><kbd>q</kbd> (or <kbd>Esc</kbd>, <kbd>Ctrl</kbd>+<kbd>C</kbd>)</td><td>Stop: the command ends and the prompt comes back.</td></tr>
+  </tbody>
+</table>
+<p>Paging never gets in the way of automation: it is off inside scripts and whenever the output is redirected to a file
+or captured with <code>RUN$</code>. Two ways to control it:</p>
+<table>
+  <thead><tr><th>Command</th><th>Effect</th></tr></thead>
+  <tbody>
+    <tr><td><code>set pager off</code></td><td>No automatic paging at the prompt (<code>set -d pager</code> or <code>set pager on</code> restores it).</td></tr>
+    <tr><td><code>COMMAND -b</code></td><td>Page this command even inside a script; the option of the UEFI Shell.</td></tr>
+    <tr><td><code>more FILE...</code></td><td>Print files one screen at a time (like <code>cat</code>, always paged).</td></tr>
+  </tbody>
+</table>
+<p>To keep a long output instead, save it to a file: <code>dh &gt; fs1:\handles.txt</code>.</p>
+
 <h3 id="stopping">Stopping a command</h3>
-<p><kbd>Ctrl</kbd>+<kbd>C</kbd> stops the running command, script or listing (exit code 130). Long listings do not
-pause at the end of the screen; use <kbd>Ctrl</kbd>+<kbd>C</kbd>, or save the output to a file.</p>
+<p><kbd>Ctrl</kbd>+<kbd>C</kbd> stops the running command, script or listing (exit code 130).</p>
 
 <!-- ===================================================================== -->
 <h2 id="files">Working with files and folders</h2>
@@ -1799,6 +1826,8 @@ commands the UEFI Shell does not have: <code>bootmgr</code>, <code>var</code>, <
         firmware does not know (NTFS, ext4) appear only as <code>blkN</code>.</td></tr>
     <tr><td>“command not found”</td><td>Check the spelling with <code>help</code>; for a script or program, give the path or check
         <code>set path</code> and <code>which NAME</code>.</td></tr>
+    <tr><td>A long output scrolls away</td><td>It should stop at every screenful; if it does not, check <code>set pager</code>
+        (see <a href="#paging">Long output: paging</a>), or save it to a file with <code>&gt; file</code>.</td></tr>
     <tr><td>The shell uses only part of the screen</td><td>The text console is smaller than the screen: <code>mode -max</code> for more
         characters, <code>gop -fit</code> to make the text fill the screen (see <a href="#screen">Screen resolution and text size</a>).</td></tr>
     <tr><td>Function keys do not work (serial console)</td><td>Use the <kbd>Ctrl</kbd> equivalents listed for each editor.</td></tr>
@@ -1875,7 +1904,7 @@ BACKGROUND: 0 black, 1 blue, 2 green, 3 cyan, 4 red, 5 magenta, 6 brown,
   exit /b 2           end only the current script, with exit code 2
 In a script (RUN "exit"), exit stops all running scripts at once, then
 leaves the shell. exit /b is like END CODE; at the prompt it only sets the
-exit code. CODE may be decimal or hex (0x10).</pre>
+exit code. CODE may be decimal or hex (0x10). -b is the same as /b.</pre>
 </article>
 <article class="cmd" id="cmd-history" data-index="history">
 <h4><code>history</code></h4>
@@ -1892,7 +1921,8 @@ Ctrl-K/U delete to end/start, Ctrl-W delete word, Ctrl-L clear screen.</pre>
 <pre class="cmd-help">  echo TEXT...        print the words separated by one space, then a newline
   echo -n TEXT...     the same without the final newline
   echo "a   b"        quotes keep the spaces
-Only a first -n is an option; any other word is printed as it is.
+Only a first -n is an option; any other word is printed as it is,
+including -b (echo never pages).
 echo -on and echo -off (UEFI Shell script switches) do nothing.</pre>
 </article>
 <article class="cmd" id="cmd-pause" data-index="pause">
@@ -1936,7 +1966,8 @@ found.</pre>
 Environment variables are shared with the EFI applications started by
 the shell and are separate from BASIC variables. In scripts: ENV$(name$),
 SETENV, DELENV. path lists the directories searched for commands (';'
-separated, '.' = current directory). Read-only: cwd, lasterror,
+separated, '.' = current directory). pager=off stops the automatic
+paging of long output at the prompt. Read-only: cwd, lasterror,
 uefishellsupport, uefishellversion, uefiversion, neshversion.
 With -data (set): name, value, kind (permanent, temporary, readonly).</pre>
 </article>
@@ -1987,6 +2018,7 @@ smbios, boot_volume, boot_devpath.</pre>
 <tr><td><a href="#cmd-pwd"><code>pwd</code></a></td><td>Print the current directory</td></tr>
 <tr><td><a href="#cmd-cat"><code>cat</code></a></td><td>Print files (UTF-8 or UCS-2 text, detected automatically)</td></tr>
 <tr><td><a href="#cmd-type"><code>type</code></a></td><td>Print files (same as cat)</td></tr>
+<tr><td><a href="#cmd-more"><code>more</code></a></td><td>Print files one screen at a time</td></tr>
 <tr><td><a href="#cmd-cp"><code>cp</code></a></td><td>Copy files (-r directories too)</td></tr>
 <tr><td><a href="#cmd-mv"><code>mv</code></a></td><td>Move or rename files and directories</td></tr>
 <tr><td><a href="#cmd-rm"><code>rm</code></a></td><td>Delete files (-r or -q: directories too, -f ignore missing)</td></tr>
@@ -2015,8 +2047,8 @@ smbios, boot_volume, boot_devpath.</pre>
                         a archive (e.g. ls -ad lists directories)
 Directory names end with \ (and are blue; programs .efi/.nsb are green).
 Hidden and system files are left out unless -a is given or a pattern
-names them. -b (UEFI Shell paging) is accepted and ignored. dir is the
-same as ls -l.
+names them. -b pages the output (see help more). dir is the same as
+ls -l.
 With -data: name, path, type, size, modified, readonly, hidden, system,
 archive (one record per entry).</pre>
 </article>
@@ -2029,8 +2061,8 @@ archive (one record per entry).</pre>
   dir *.efi             only matching names (hidden files included)
 Each line: date, time, attributes (d dir, r read-only, h hidden, s system,
 a archive), size and name; a total line ends each directory. Hidden and
-system files are shown only with -a. -l and -b (UEFI Shell paging) are
-accepted and have no effect. Other options as for ls.
+system files are shown only with -a. -l is accepted and has no effect;
+-b pages the output. Other options as for ls.
 With -data: name, path, type, size, modified, readonly, hidden, system,
 archive.</pre>
 </article>
@@ -2065,6 +2097,16 @@ UCS-2) are accepted before the files and ignored. Ctrl-C stops.</pre>
 <p class="cmd-summary">Print files (same as cat)</p>
 <pre class="usage">type [-a|-u] FILE...</pre>
 <pre class="cmd-help">  Same as cat (UEFI Shell name).</pre>
+</article>
+<article class="cmd" id="cmd-more" data-index="more">
+<h4><code>more</code></h4>
+<p class="cmd-summary">Print files one screen at a time</p>
+<pre class="usage">more FILE...</pre>
+<pre class="cmd-help">  more log.txt        stop at every screenful: Enter one line,
+                      Space one page, q stops
+Same as cat, with paging always on (cat pages too when you type it at
+the prompt). Any command pages with -b; 'set pager off' turns the
+automatic paging of the prompt off.</pre>
 </article>
 <article class="cmd" id="cmd-cp" data-index="cp">
 <h4><code>cp</code></h4>
@@ -2289,7 +2331,7 @@ With -data: time, hour, minute, second.</pre>
   -s [+|-]hh:mm   set the offset from UTC (up to 14:00; :mm optional)
   -l              list common offsets with example places
   -f              also show the raw TimeZone and Daylight fields
-  -b              accepted for UEFI Shell compatibility and ignored
+  -b              page the output (UEFI Shell option, see help more)
 -s changes only the time zone, not the date and time. -l ignores the
 other options.
 Example: timezone -s +01:00</pre>
@@ -2365,7 +2407,7 @@ With -data: volume, label, size, free, readonly.</pre>
 <pre class="cmd-help">  DEVICE  blkN (see map), fsN: or a handle number (hex)
   LBA     first block (hex, default 0)
   COUNT   number of blocks (hex, 1 to 10, default 1)
-  -b      accepted for UEFI Shell compatibility and ignored
+  -b      page the output (UEFI Shell option, see help more)
 Each block is shown in hex and text. An MBR (LBA 0), a GPT header (LBA 1)
 and FAT boot sectors are also decoded. COUNT stops at the end of the
 device. The disk is only read.
@@ -2502,7 +2544,7 @@ Columns: DRV driver handle, VERSION driver version (hex), TYPE, CFG and DIAG
 created, driver name (default language en) and the file it was loaded from.
 TYPE B is a bus driver: it created child devices (e.g. one per USB device);
 D is a device driver (a bus driver with no children yet also shows D).
-Handle numbers are hexadecimal; -b is accepted and ignored.
+Handle numbers are hexadecimal; -b pages the output.
 With -data: handle, version, type, config, diag, controllers, children,
 name, image.</pre>
 </article>
@@ -2516,7 +2558,7 @@ D device), CFG and DIAG (X: one of its drivers supports drvcfg / drvdiag),
 #P parents, #D drivers managing it, #C children, device name.
 A device is a handle with a device path that is not an image or a driver.
 Names come from the drivers (in English) or else from the device path;
--l and -b are accepted and ignored.
+-l is accepted and ignored; -b pages the output.
 With -data: handle, type, config, diag, parents, drivers, children, name.</pre>
 </article>
 <article class="cmd" id="cmd-devtree" data-index="devtree">
@@ -2528,7 +2570,7 @@ With -data: handle, type, config, diag, parents, drivers, children, name.</pre>
   devtree -d        show device paths instead of names
 Each line is "Ctrl[HANDLE] name"; children are indented under their parent.
 A device without a device path shows up to 4 of its protocols in &lt;...&gt;.
--l and -b are accepted and ignored.
+-l is accepted and ignored; -b pages the output.
 Example:  devtree -d 3F    device paths of device 3F and its children</pre>
 </article>
 <article class="cmd" id="cmd-dh" data-index="dh">
@@ -2551,7 +2593,7 @@ For each protocol, one line per user: Drv[agent handle] Ctrl[controller
 handle] Cnt(open count), how it is open, and the agent's image name.
 How: Driver (a driver manages the device), Exclusive, Driver+Exclusive,
 Child (used by a child device), HandProt / GetProt / TestProt (simple use).
-Handles are hexadecimal (see dh); -b is accepted and ignored.</pre>
+Handles are hexadecimal (see dh); -b pages the output.</pre>
 </article>
 <article class="cmd" id="cmd-connect" data-index="connect">
 <h4><code>connect</code></h4>
@@ -2675,7 +2717,7 @@ Exit code is nonzero if an operation fails.</pre>
 <pre class="usage">memmap [-s] [-b]</pre>
 <pre class="cmd-help">  (none)  every memory descriptor, then totals per type
   -s      totals per type only
-  -b      accepted for UEFI Shell compatibility and ignored
+  -b      page the output (UEFI Shell option, see help more)
 Start and End are physical addresses; a page is 4 KiB. Total memory
 excludes reserved and MMIO ranges; "available to the OS" counts
 conventional, loader and boot services memory.
@@ -2690,7 +2732,7 @@ descriptor); with -s: type, pages, bytes (one record per type).</pre>
            table and lists the configuration tables (GUID and address)
   SIZE     bytes to show (hex, default 0x200, max 0x100000)
   -MMIO    read through the PCI root bridge of segment 0
-  -b       accepted for UEFI Shell compatibility and ignored
+  -b       page the output (UEFI Shell option, see help more)
 Read-only. Reading an unmapped address can hang the machine.
 Example: dmem 0xFED00000 40 -MMIO</pre>
 </article>
@@ -2721,7 +2763,7 @@ Numbers are hexadecimal. Writes are refused while Secure Boot is active.</pre>
                       BARs, bus numbers, interrupt, capabilities
   -ec                 dump the 4 KiB PCI Express extended space
   -s SEG              PCI segment (default: all segments when listing, 0 else)
-  -b                  accepted for UEFI Shell compatibility, ignored
+  -b                  page the output (UEFI Shell option, see help more)
 Numbers are hexadecimal:  pci 0 1f 3 -i   decodes device 00:1F.3.
 With -data: one record per function (segment, bus, device, function, vendor,
 deviceid, class, classname); for one device, the decoded header.</pre>
@@ -2736,7 +2778,8 @@ deviceid, class, classname); for one device, the decoded header.</pre>
                       device, 19 mapped address
   -h HANDLE           only the structure with this handle (hexadecimal)
   -s                  statistics: how many structures of each type
-  -a, -b              accepted for UEFI Shell compatibility, ignored
+  -a                  accepted for UEFI Shell compatibility, ignored
+  -b                  page the output (UEFI Shell option, see help more)
   smbiosview -t 17    memory modules: slot, size, speed, part number
 With -data: one record per structure (type, typename, handle, length and the
 decoded fields, e.g. vendor, version, serial, size).</pre>

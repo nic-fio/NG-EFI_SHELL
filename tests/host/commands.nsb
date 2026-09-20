@@ -43,3 +43,9 @@ out$ = RUN$("help len")
 PRINT LEFT$(out$, 38)
 RUN "help nosuchthing"
 PRINT "unknown: ERR="; ERR
+' paging: off in scripts and when the output is captured; -b is not passed on
+RUN "ls -b"
+PRINT "ls -b: ERR="; ERR
+RUN "echo -b keeps its text"
+WRITEFILE "pager.txt", "line one" + CHR$(10) + "line two" + CHR$(10)
+PRINT "more: "; RUN$("more pager.txt")

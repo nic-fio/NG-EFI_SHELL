@@ -18,11 +18,95 @@ static Sink *top(void)
     return nsinks ? &sinks[nsinks - 1] : NULL;
 }
 
+/* ---- Paging ----
+ * Long output would scroll away on a console that cannot be scrolled back,
+ * so the shell stops at every screenful and waits for a key. Paging is only
+ * used for output that goes to the console (see out_paging). */
+
+static void set_break(void); /* stop the running command, as Ctrl-C does */
+
+static bool paging;      /* paging wanted for the current command */
+static bool page_quit;   /* the user pressed q: drop the rest of the output */
+static int page_left;    /* lines before the next pause */
+static int page_col;     /* current column, to count wrapped lines */
+static int page_rows, page_cols;
+
+void out_paging(bool on)
+{
+    paging = on;
+    page_quit = false;
+    page_col = 0;
+    pal_con_size(&page_cols, &page_rows);
+    if (page_cols < 8)
+        page_cols = 80;
+    if (page_rows < 4)
+        page_rows = 25;
+    page_left = page_rows - 1;
+}
+
+bool out_paging_quit(void)
+{
+    return page_quit;
+}
+
+/* Waits after a full screen. Returns false if the user wants to stop. */
+static bool page_pause(void)
+{
+    static const char *msg = "-- More -- (Enter: one line, Space: one page, q: stop) ";
+    pal_con_write(msg, strlen(msg));
+    pal_con_raw(true);
+    PalKey k;
+    con_get_key(&k, -1);
+    pal_con_raw(false);
+    /* erase the message */
+    pal_con_write("\r", 1);
+    for (size_t i = 0; i < strlen(msg); i++)
+        pal_con_write(" ", 1);
+    pal_con_write("\r", 1);
+    if (k.ch == 'q' || k.ch == 'Q' || k.ch == 27 || k.ch == 3 || k.scan == KEY_ESC) {
+        page_quit = true;
+        set_break(); /* also stop the command: no point in producing more */
+        return false;
+    }
+    page_left = (k.ch == '\r' || k.ch == '\n') ? 1 : page_rows - 1;
+    return true;
+}
+
+/* Writes to the console, stopping at every screenful. */
+static void write_paged(const char *s, size_t n)
+{
+    size_t start = 0;
+    for (size_t i = 0; i < n; i++) {
+        bool eol = s[i] == '\n';
+        if (!eol) {
+            if (((uint8_t)s[i] & 0xC0) != 0x80)
+                page_col++;
+            if (page_col < page_cols)
+                continue;
+            eol = true; /* the line wraps */
+        }
+        pal_con_write(s + start, i + 1 - start);
+        start = i + 1;
+        page_col = 0;
+        if (--page_left > 0)
+            continue;
+        if (!page_pause())
+            return; /* q: the rest of this write is dropped */
+    }
+    if (start < n)
+        pal_con_write(s + start, n - start);
+}
+
 void out_write(const char *s, size_t n)
 {
     Sink *t = top();
     if (!t) {
-        pal_con_write(s, n);
+        if (page_quit)
+            return;
+        if (paging && pal_con_interactive())
+            write_paged(s, n);
+        else
+            pal_con_write(s, n);
     } else if (t->kind == 1) {
         sb_add(t->buf, s, n);
     } else if (t->kind == 2 && !t->err) {
@@ -227,6 +311,11 @@ void con_poll(void)
             kb_push(&k);
         }
     }
+}
+
+static void set_break(void)
+{
+    break_flag = true;
 }
 
 bool con_break(void)

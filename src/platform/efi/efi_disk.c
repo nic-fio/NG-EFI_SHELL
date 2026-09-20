@@ -423,7 +423,7 @@ static const Cmd disk_cmds[] = {
       "  DEVICE  blkN (see map), fsN: or a handle number (hex)\n"
       "  LBA     first block (hex, default 0)\n"
       "  COUNT   number of blocks (hex, 1 to 10, default 1)\n"
-      "  -b      accepted for UEFI Shell compatibility and ignored\n"
+      "  -b      page the output (UEFI Shell option, see help more)\n"
       "Each block is shown in hex and text. An MBR (LBA 0), a GPT header (LBA 1)\n"
       "and FAT boot sectors are also decoded. COUNT stops at the end of the\n"
       "device. The disk is only read.\n"
@@ -434,7 +434,7 @@ static const Cmd disk_cmds[] = {
       "  -s [+|-]hh:mm   set the offset from UTC (up to 14:00; :mm optional)\n"
       "  -l              list common offsets with example places\n"
       "  -f              also show the raw TimeZone and Daylight fields\n"
-      "  -b              accepted for UEFI Shell compatibility and ignored\n"
+      "  -b              page the output (UEFI Shell option, see help more)\n"
       "-s changes only the time zone, not the date and time. -l ignores the\n"
       "other options.\n"
       "Example: timezone -s +01:00\n" },

@@ -257,7 +257,8 @@ static const Cmd env_cmds[] = {
       "Environment variables are shared with the EFI applications started by\n"
       "the shell and are separate from BASIC variables. In scripts: ENV$(name$),\n"
       "SETENV, DELENV. path lists the directories searched for commands (';'\n"
-      "separated, '.' = current directory). Read-only: cwd, lasterror,\n"
+      "separated, '.' = current directory). pager=off stops the automatic\n"
+      "paging of long output at the prompt. Read-only: cwd, lasterror,\n"
       "uefishellsupport, uefishellversion, uefiversion, neshversion.\n"
       "With -data (set): name, value, kind (permanent, temporary, readonly).\n", CMD_DATA },
 };

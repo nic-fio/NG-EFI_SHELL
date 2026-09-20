@@ -632,7 +632,7 @@ int shell_exec_argv(int argc, char **argv)
     const Cmd *c = shell_find_cmd(name);
     if (c) {
         /* "-data": removed from the arguments, the command sees out_data_mode() */
-        bool want_data = false;
+        bool want_data = false, page = false;
         char **cargv = xmalloc(sizeof(char *) * (size_t)(argc + 1));
         int cargc = 0;
         for (int i = 0; i < argc; i++) {
@@ -643,6 +643,9 @@ int shell_exec_argv(int argc, char **argv)
             }
             if (i && !strcasecmp(argv[i], "-data"))
                 want_data = true;
+            /* lower case only: -B is another option for some commands (bootmgr) */
+            else if (i && !strcmp(argv[i], "-b") && !(c->flags & CMD_ARG_B))
+                page = true; /* UEFI Shell: page the output of this command */
             else
                 cargv[cargc++] = argv[i];
         }
@@ -652,11 +655,26 @@ int shell_exec_argv(int argc, char **argv)
             err_printf("%s: -data is not supported by this command\n", name);
             return last_status = RC_USAGE;
         }
+        /* Paging: at the prompt, for output that goes to the console. In a
+         * script it would stop unattended work, so it is only used there when
+         * the command line asks for it with -b (as in the UEFI Shell). */
+        if (!page && !shell_script_depth() && out_is_console() && !want_data) {
+            char *v = env_get("pager");
+            page = !v || (strcasecmp(v, "off") && strcasecmp(v, "0"));
+            free(v);
+        }
         bool saved_data = out_data_mode();
         out_set_data_mode(want_data);
         con_clear_break();
+        out_paging(page);
         rc = c->fn(cargc, cargv);
+        bool quit = out_paging_quit();
+        out_paging(false);
+        if (quit)
+            con_clear_break(); /* q at "-- More --" is not Ctrl-C */
         out_set_data_mode(saved_data);
+        if (quit && !rc)
+            rc = RC_OK; /* stopping the output is not an error */
         free(cargv); /* the strings belong to the caller's argv */
         if (con_break()) {
             con_clear_break();

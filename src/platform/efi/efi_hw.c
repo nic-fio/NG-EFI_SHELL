@@ -1476,7 +1476,7 @@ static const Cmd hw_cmds[] = {
       "           table and lists the configuration tables (GUID and address)\n"
       "  SIZE     bytes to show (hex, default 0x200, max 0x100000)\n"
       "  -MMIO    read through the PCI root bridge of segment 0\n"
-      "  -b       accepted for UEFI Shell compatibility and ignored\n"
+      "  -b       page the output (UEFI Shell option, see help more)\n"
       "Read-only. Reading an unmapped address can hang the machine.\n"
       "Example: dmem 0xFED00000 40 -MMIO\n" },
     { "mm", cmd_mm, "mm ADDRESS [VALUE] [-w 1|2|4|8] [-MEM|-MMIO|-IO|-PCI|-PCIE] [-n]",
@@ -1501,7 +1501,7 @@ static const Cmd hw_cmds[] = {
       "                      BARs, bus numbers, interrupt, capabilities\n"
       "  -ec                 dump the 4 KiB PCI Express extended space\n"
       "  -s SEG              PCI segment (default: all segments when listing, 0 else)\n"
-      "  -b                  accepted for UEFI Shell compatibility, ignored\n"
+      "  -b                  page the output (UEFI Shell option, see help more)\n"
       "Numbers are hexadecimal:  pci 0 1f 3 -i   decodes device 00:1F.3.\n"
       "With -data: one record per function (segment, bus, device, function, vendor,\n"
       "deviceid, class, classname); for one device, the decoded header.\n", CMD_DATA },
@@ -1513,7 +1513,8 @@ static const Cmd hw_cmds[] = {
       "                      device, 19 mapped address\n"
       "  -h HANDLE           only the structure with this handle (hexadecimal)\n"
       "  -s                  statistics: how many structures of each type\n"
-      "  -a, -b              accepted for UEFI Shell compatibility, ignored\n"
+      "  -a                  accepted for UEFI Shell compatibility, ignored\n"
+      "  -b                  page the output (UEFI Shell option, see help more)\n"
       "  smbiosview -t 17    memory modules: slot, size, speed, part number\n"
       "With -data: one record per structure (type, typename, handle, length and the\n"
       "decoded fields, e.g. vendor, version, serial, size).\n",

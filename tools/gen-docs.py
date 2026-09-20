@@ -24,7 +24,7 @@ CATEGORIES = [
         "help", "ver", "cls", "exit", "history", "echo", "pause", "sleep", "which",
         "set", "alias", "reset", "sysinfo"]),
     ("ref-files", "Files and folders", [
-        "ls", "dir", "cd", "pwd", "cat", "type", "cp", "mv", "rm", "del", "mkdir", "md", "rmdir",
+        "ls", "dir", "cd", "pwd", "cat", "type", "more", "cp", "mv", "rm", "del", "mkdir", "md", "rmdir",
         "touch", "stat", "attrib", "comp", "cmp", "setsize"]),
     ("ref-text", "Text and data", [
         "grep", "head", "tail", "wc", "hexdump", "date", "time", "timezone", "parse",

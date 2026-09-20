@@ -506,6 +506,9 @@ static int cmd_dir(int argc, char **argv) { return do_ls(argc, argv, true); }
 
 /* ---- cat ---- */
 
+/* more: cat with paging, even in a script or after "set pager off". */
+static int cmd_more(int argc, char **argv);
+
 static int cmd_cat(int argc, char **argv)
 {
     /* -a / -u (UEFI Shell: force ASCII / UCS-2): the encoding is detected anyway */
@@ -1216,6 +1219,12 @@ static int cmd_stat(int argc, char **argv)
     return rc;
 }
 
+static int cmd_more(int argc, char **argv)
+{
+    out_paging(true);
+    return cmd_cat(argc, argv);
+}
+
 static const Cmd fs_cmds[] = {
     { "map", cmd_map, "map [-r] [-v] [-t fs|blk] | map NAME TARGET | map -d NAME",
       "List volumes and block devices; give volumes extra names",
@@ -1244,8 +1253,8 @@ static const Cmd fs_cmds[] = {
       "                        a archive (e.g. ls -ad lists directories)\n"
       "Directory names end with \\ (and are blue; programs .efi/.nsb are green).\n"
       "Hidden and system files are left out unless -a is given or a pattern\n"
-      "names them. -b (UEFI Shell paging) is accepted and ignored. dir is the\n"
-      "same as ls -l.\n"
+      "names them. -b pages the output (see help more). dir is the same as\n"
+      "ls -l.\n"
       "With -data: name, path, type, size, modified, readonly, hidden, system,\n"
       "archive (one record per entry).\n", CMD_DATA },
     { "dir", cmd_dir, "dir [-r] [-a[ashrd]] [PATH | PATTERN...]", "List files with details (same as ls -l)",
@@ -1254,10 +1263,16 @@ static const Cmd fs_cmds[] = {
       "  dir *.efi             only matching names (hidden files included)\n"
       "Each line: date, time, attributes (d dir, r read-only, h hidden, s system,\n"
       "a archive), size and name; a total line ends each directory. Hidden and\n"
-      "system files are shown only with -a. -l and -b (UEFI Shell paging) are\n"
-      "accepted and have no effect. Other options as for ls.\n"
+      "system files are shown only with -a. -l is accepted and has no effect;\n"
+      "-b pages the output. Other options as for ls.\n"
       "With -data: name, path, type, size, modified, readonly, hidden, system,\n"
       "archive.\n", CMD_DATA },
+    { "more", cmd_more, "more FILE...", "Print files one screen at a time",
+      "  more log.txt        stop at every screenful: Enter one line,\n"
+      "                      Space one page, q stops\n"
+      "Same as cat, with paging always on (cat pages too when you type it at\n"
+      "the prompt). Any command pages with -b; 'set pager off' turns the\n"
+      "automatic paging of the prompt off.\n" },
     { "cat", cmd_cat, "cat [-a|-u] FILE...", "Print files (UTF-8 or UCS-2 text, detected automatically)",
       "  cat readme.txt            print a file\n"
       "  cat fs0:\\logs\\*.txt       print all matching files, one after another\n"

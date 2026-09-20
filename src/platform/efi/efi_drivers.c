@@ -1256,7 +1256,7 @@ static const Cmd drv_cmds[] = {
       "created, driver name (default language en) and the file it was loaded from.\n"
       "TYPE B is a bus driver: it created child devices (e.g. one per USB device);\n"
       "D is a device driver (a bus driver with no children yet also shows D).\n"
-      "Handle numbers are hexadecimal; -b is accepted and ignored.\n"
+      "Handle numbers are hexadecimal; -b pages the output.\n"
       "With -data: handle, version, type, config, diag, controllers, children,\n"
       "name, image.\n", CMD_DATA },
     { "devices", cmd_devices, "devices [-l LANG]", "List the devices (controllers) and their drivers",
@@ -1266,7 +1266,7 @@ static const Cmd drv_cmds[] = {
       "#P parents, #D drivers managing it, #C children, device name.\n"
       "A device is a handle with a device path that is not an image or a driver.\n"
       "Names come from the drivers (in English) or else from the device path;\n"
-      "-l and -b are accepted and ignored.\n"
+      "-l is accepted and ignored; -b pages the output.\n"
       "With -data: handle, type, config, diag, parents, drivers, children, name.\n", CMD_DATA },
     { "devtree", cmd_devtree, "devtree [-d] [-l LANG] [HANDLE]", "Show the device tree (-d: device paths)",
       "  devtree           tree of all devices, from the root devices down\n"
@@ -1274,7 +1274,7 @@ static const Cmd drv_cmds[] = {
       "  devtree -d        show device paths instead of names\n"
       "Each line is \"Ctrl[HANDLE] name\"; children are indented under their parent.\n"
       "A device without a device path shows up to 4 of its protocols in <...>.\n"
-      "-l and -b are accepted and ignored.\n"
+      "-l is accepted and ignored; -b pages the output.\n"
       "Example:  devtree -d 3F    device paths of device 3F and its children\n" },
     { "dh", cmd_dh, "dh [-d|-v] [-p PROTOCOL] [HANDLE]", "Show handles and their protocols",
       "  dh              one line per handle: number and protocol names\n"
@@ -1289,7 +1289,7 @@ static const Cmd drv_cmds[] = {
       "handle] Cnt(open count), how it is open, and the agent's image name.\n"
       "How: Driver (a driver manages the device), Exclusive, Driver+Exclusive,\n"
       "Child (used by a child device), HandProt / GetProt / TestProt (simple use).\n"
-      "Handles are hexadecimal (see dh); -b is accepted and ignored.\n" },
+      "Handles are hexadecimal (see dh); -b pages the output.\n" },
     { "connect", cmd_connect, "connect [-r] [-c] [[DRIVER] CONTROLLER]",
       "Connect drivers to devices (no handle: all; -r recursive; -c consoles)",
       "  connect                    connect all drivers to all devices (recursive)\n"

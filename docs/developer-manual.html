@@ -113,7 +113,7 @@ explained where they are needed, and the <a href="#glossary">glossary</a> summar
         <code>cmd_util.c</code>, <code>cmd_edit.c</code> (edit, hexedit).</td></tr>
     <tr><td><code>src/platform/efi/</code></td><td>UEFI-only modules (see <a href="#efi-modules">UEFI modules</a>).</td></tr>
     <tr><td><code>src/platform/host.c</code></td><td>Stubs of the platform hooks for the Linux build.</td></tr>
-    <tr><td><code>tools/</code></td><td><code>efi.lds</code>, <code>elf2efi.py</code>, <code>run-qemu.sh</code>, <code>gen-docs.py</code>, <code>check-doc-examples.py</code>, <code>mkusb.sh</code>, <code>record-demo.py</code>.</td></tr>
+    <tr><td><code>tools/</code></td><td><code>efi.lds</code>, <code>elf2efi.py</code>, <code>run-qemu.sh</code>, <code>gen-docs.py</code>, <code>check-doc-examples.py</code>, <code>mkusb.sh</code>, <code>record-demo.py</code>, <code>setup-dev.sh</code>.</td></tr>
     <tr><td><code>tests/</code></td><td><code>host/*.nsb</code> + <code>.out</code> (Linux tests), <code>efi/*.nsb</code> (QEMU tests), <code>apps/shelltest.c</code>,
         <code>fixtures/</code> (EDK2 test binaries).</td></tr>
     <tr><td><code>examples/</code></td><td>Example scripts shipped with NESH.</td></tr>
@@ -275,6 +275,37 @@ flowchart TD
 
 <p class="chapter-intro">NESH is built with the ordinary Linux GCC, linked as a position-independent ELF shared
 object, and converted to a PE32+ EFI application by a small Python tool.</p>
+
+<h3 id="setup">Setting up a machine</h3>
+<p>The repository is self-contained: the sources, the tests with their binary fixtures, the documentation and the
+tools that generate it are all committed, and nothing is fetched at build time. A clone plus the packages below is
+the whole development environment; <code>build/</code> holds only products and is not committed.</p>
+<pre class="terminal">$ git clone https://github.com/nic-fio/NG-EFI_SHELL.git
+$ cd NG-EFI_SHELL
+$ tools/setup-dev.sh --install</pre>
+<table>
+  <thead><tr><th>Package (Debian, Ubuntu)</th><th>Needed for</th></tr></thead>
+  <tbody>
+    <tr><td><code>build-essential</code>, <code>python3</code></td><td>The build itself: GCC, GNU ld,
+        <code>make</code>, and the Python tools (<code>elf2efi.py</code>, the documentation checks).</td></tr>
+    <tr><td><code>qemu-system-x86</code>, <code>ovmf</code></td><td><code>make qemu</code>,
+        <code>make qemu-test</code>: NESH running on real firmware inside a virtual machine.</td></tr>
+    <tr><td><code>ipxe-qemu</code></td><td><code>make qemu-nettest</code>: the network ROM of the virtual
+        card.</td></tr>
+    <tr><td><code>dosfstools</code> (&ge; 4.2), <code>mtools</code></td><td><code>make usb</code>: the FAT
+        filesystem of the disk image, and writing files into it without root.</td></tr>
+    <tr><td><code>sbsigntool</code>, <code>python3-virt-firmware</code></td><td><code>make qemu-sbtest</code>:
+        signing the image and enrolling the test keys into OVMF.</td></tr>
+    <tr><td><code>ffmpeg</code></td><td><code>tools/record-demo.py</code>, the animation of the README. Optional.</td></tr>
+  </tbody>
+</table>
+<div class="callout note"><span class="callout-title">What a clone does not carry</span>
+<p>Two things live outside the repository and have to be set again on a new machine. The first is the git identity
+used for the public history, which is kept in <code>.git/config</code>: <code>tools/setup-dev.sh</code> sets it
+(<code>NESH_GIT_NAME</code> and <code>NESH_GIT_EMAIL</code> override the default). The second is anything stored on
+GitHub rather than in the tree &mdash; releases with their <code>nesh.efi</code> and <code>nesh-usb.img</code>, the
+Pages site, the Actions settings &mdash; all of which are rebuilt by <code>make</code> or by the workflow in
+<code>.github/workflows/ci.yml</code> anyway.</p></div>
 
 <h3 id="pipeline">Pipeline</h3>
 <figure>
@@ -1066,6 +1097,7 @@ captured.</p>
     <tr><td><code>tools/gen-docs.py</code></td><td>231</td><td>Generates the command reference of the user manual from the command tables in the C sources, so that the manual and the built-in 'help' never disagree</td></tr>
     <tr><td><code>tools/mkusb.sh</code></td><td>70</td><td>Builds build/nesh-usb.img, a bootable disk image (GPT + EFI system partition) with NESH, the examples and a README on it</td></tr>
     <tr><td><code>tools/record-demo.py</code></td><td>188</td><td>Records the animation of the README: drives a QEMU session through the monitor (sendkey/screendump) and turns the frames into a GIF</td></tr>
+    <tr><td><code>tools/setup-dev.sh</code></td><td>89</td><td>Checks (or installs) the packages a clone needs and sets the git identity of the working copy, which is not cloned</td></tr>
     <tr><td><code>tools/run-qemu.sh</code></td><td>86</td><td>Boots nesh.efi in QEMU/OVMF: interactive, --test and --nettest modes</td></tr>
   </tbody>
 </table>

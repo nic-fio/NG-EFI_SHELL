@@ -6,7 +6,7 @@ and turn the frames into a GIF.
     make usb                       # build/nesh-usb.img
     tools/record-demo.py build/nesh-usb.img docs/assets/nesh-demo.gif
 
-Needs qemu-system-x86_64, an OVMF image, ffmpeg and Python's PIL. Nothing
+Needs qemu-system-x86_64, an OVMF image and ffmpeg. Nothing
 in the build or the test suite depends on it: it is run by hand when the
 animation has to be made again.
 """

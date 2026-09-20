@@ -51,8 +51,21 @@ NESH, `help` and `help NAME` show the same command reference.
 
 ## Build and test
 
-Requirements: `gcc`, GNU `ld`, `make`, `python3`; for the UEFI tests
-`qemu-system-x86_64`, OVMF firmware and `mkfs.fat`.
+Everything needed to rebuild NESH, its documentation, its tests and its disk
+image is in this repository: a clone plus a handful of Debian packages is the
+whole development environment.
+
+```
+git clone https://github.com/nic-fio/NG-EFI_SHELL.git
+cd NG-EFI_SHELL
+tools/setup-dev.sh --install    # packages (asks for sudo) and the git identity
+make && make test && make qemu-test
+```
+
+Requirements, if you prefer to install them yourself: `gcc`, GNU `ld`, `make`,
+`python3`; for the UEFI tests `qemu-system-x86_64`, OVMF firmware and
+`mkfs.fat`; for `make usb` also `mtools`; for the Secure Boot tests
+`sbsigntool` and `python3-virt-firmware`.
 
 ```
 make                 # build/nesh.efi (UEFI x86-64) and build/nesh-host (Linux test build)

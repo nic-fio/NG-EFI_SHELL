@@ -61,6 +61,18 @@ boot loader of the EFI system partition (\EFI\BOOT\BOOTX64.EFI).
   - A script named startup.nsb in the root of this volume runs at every
     start; examples\bootmenu.nsb is an interactive boot menu.
 
+You are holding the one thing the project cannot test by itself: a real
+machine. NESH has only ever run in QEMU, so please say how it went, whether
+it worked or not. These four lines write a report to this stick:
+
+      fs0:\> ver > fs0:\report.txt
+      fs0:\> sysinfo >> fs0:\report.txt
+      fs0:\> map >> fs0:\report.txt
+      fs0:\> smbiosview -t 1 >> fs0:\report.txt
+
+Attach report.txt to a hardware report at
+https://github.com/nic-fio/NG-EFI_SHELL/issues/new?template=hardware-report.yml
+
 Documentation: https://nic-fio.github.io/NG-EFI_SHELL/
 Project:       https://github.com/nic-fio/NG-EFI_SHELL
 EOF

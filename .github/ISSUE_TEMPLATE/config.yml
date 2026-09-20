@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: User manual
+    url: https://nic-fio.github.io/NG-EFI_SHELL/user-manual.html
+    about: Every command and function, with examples. Worth a look before reporting a command that does not do what you expect.
+  - name: Developer manual
+    url: https://nic-fio.github.io/NG-EFI_SHELL/developer-manual.html
+    about: Architecture, build, internals and tests, for changing NESH itself.

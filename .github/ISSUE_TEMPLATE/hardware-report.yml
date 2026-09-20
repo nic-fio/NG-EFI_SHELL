@@ -1,0 +1,100 @@
+name: Hardware report
+description: How NESH behaved on a real machine — whether it worked or not, both are worth sending
+title: "[hardware] "
+labels: ["hardware report"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        NESH has only ever been tested in QEMU with OVMF. What real firmware
+        does with it is the project's main open question, and the one thing
+        that cannot be answered without you.
+
+        Four commands collect most of what is asked below, and NESH can write
+        them to the stick you booted from, to be attached here:
+
+        ```
+        ver > fs0:\report.txt
+        sysinfo >> fs0:\report.txt
+        map >> fs0:\report.txt
+        smbiosview -t 1 >> fs0:\report.txt
+        ```
+
+        If NESH never reached the prompt, skip them and say what the screen
+        showed: a photograph is worth more than a guess.
+  - type: input
+    id: machine
+    attributes:
+      label: Machine
+      description: Maker and model, as written on the case; `smbiosview -t 1` also reports it.
+      placeholder: Lenovo ThinkPad T480, or a desktop built around an ASUS PRIME B450M-A
+    validations:
+      required: true
+  - type: input
+    id: firmware
+    attributes:
+      label: Firmware and UEFI version
+      description: From `ver`, or from the firmware setup screen.
+      placeholder: American Megatrends, revision 5.19, UEFI 2.7
+    validations:
+      required: true
+  - type: dropdown
+    id: secureboot
+    attributes:
+      label: Secure Boot
+      options:
+        - "Off"
+        - "On, with NESH signed by a key I enrolled"
+        - "On, and the firmware refused to start NESH"
+        - "I do not know"
+    validations:
+      required: true
+  - type: dropdown
+    id: started
+    attributes:
+      label: How did you start NESH?
+      options:
+        - "nesh-usb.img written to a USB stick"
+        - "nesh.efi copied to a stick or ESP as \\EFI\\BOOT\\BOOTX64.EFI"
+        - "From another shell or boot manager"
+        - "From a boot entry added with bootmgr"
+        - "Some other way (described below)"
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: NESH version
+      description: The first line of `ver`.
+      placeholder: "0.2.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: outcome
+    attributes:
+      label: How far did it get?
+      options:
+        - "The prompt came up and everything I tried worked"
+        - "The prompt came up, but something misbehaved"
+        - "The banner appeared and then it stopped"
+        - "It never started: refused, or the screen stayed black"
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, what you saw instead. For a command that misbehaved, the exact line you typed.
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Output of ver, sysinfo, map and smbiosview -t 1
+      description: Paste report.txt here, or attach it. Leave empty if NESH never reached the prompt.
+      render: text
+  - type: textarea
+    id: more
+    attributes:
+      label: Anything else
+      description: Photographs of the screen are welcome — on a machine with no way to copy text out, they are often the only evidence there is.

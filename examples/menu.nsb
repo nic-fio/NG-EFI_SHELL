@@ -1,0 +1,52 @@
+' menu.nsb - a maintenance menu: choose an action, do it, come back.
+' Shows MENU(), a loop around it, and how to confirm a dangerous action.
+
+target$ = "fs1:"            ' where backups go
+
+DO
+  CLS
+  PRINT "NESH maintenance - volume for backups: "; target$
+  PRINT
+
+  choice = MENU("What do you want to do?", _
+                "Show the system|" + _
+                "List the boot entries|" + _
+                "Back up the boot loaders|" + _
+                "Choose the backup volume|" + _
+                "Leave the menu")
+
+  SELECT CASE choice
+    CASE 1
+      RUN "sysinfo"
+    CASE 2
+      RUN "bootmgr list"
+    CASE 3
+      IF NOT DIREXISTS(target$) THEN
+        PRINT "The volume "; target$; " is not there."
+      ELSE
+        PRINT "Copying fs0:\EFI to "; target$; "\backup ..."
+        RUN "mkdir", "-p", target$ + "\backup"
+        RUN "cp", "-r", "fs0:\EFI", target$ + "\backup"
+        IF ERR = 0 THEN PRINT "Done." ELSE PRINT "Failed, error "; ERR
+      END IF
+    CASE 4
+      ' a menu built at run time, from the volumes NESH can see
+      n = RECORDS(RUN$("map -t fs -data"), v$())
+      items$ = ""
+      DIM name$(n)
+      FOR i = 0 TO n - 1
+        name$(i) = FIELD$(v$(i), "volume") + ":"
+        items$ = items$ + name$(i) + "  " + FIELD$(v$(i), "label") + "|"
+      NEXT
+      items$ = items$ + "Keep " + target$
+      pick = MENU("Backup volume", items$, 0, 1)
+      IF pick >= 1 AND pick <= n THEN target$ = name$(pick - 1)
+    CASE 0, 5
+      ' 0 means Esc
+      PRINT "Bye."
+      END 0
+  END SELECT
+
+  PRINT
+  PAUSE "Press a key to go back to the menu..."
+LOOP

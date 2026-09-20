@@ -1000,6 +1000,21 @@ IF choice = 2 THEN RUN "cp -r fs0:\ fs1:\backup"</pre>
   2. Copy everything
   3. Cancel
 Up/Down + Enter to choose, ESC to cancel. Default in 15 s</pre>
+<p>A menu usually sits in a loop, so that the program comes back to it after each action; <code>examples\menu.nsb</code>
+is a complete one:</p>
+<pre class="code" data-lang="basic" data-example="menuloop" data-platform="efi">DO
+  choice = MENU("What do you want to do?", _
+                "Show the system|List the boot entries|Leave the menu")
+  SELECT CASE choice
+    CASE 1
+      RUN "sysinfo"
+    CASE 2
+      RUN "bootmgr list"
+    CASE 0, 3          ' 0 means Esc
+      END 0
+  END SELECT
+  PAUSE "Press a key to go back to the menu..."
+LOOP</pre>
 <p><code>KEY$</code> reads single keys: <code>KEY$</code> returns a key if one is waiting (or ""), <code>KEY$(ms)</code> waits up
 to <code>ms</code> milliseconds (−1: forever). Special keys have names: <code>"UP"</code>, <code>"DOWN"</code>,
 <code>"LEFT"</code>, <code>"RIGHT"</code>, <code>"HOME"</code>, <code>"END"</code>, <code>"PGUP"</code>, <code>"PGDN"</code>,
@@ -1105,6 +1120,8 @@ start; <kbd>Esc</kbd> during the three-second countdown before it (or the “Sta
         <code>ls -ad -data</code>, <code>DIR$</code>, a SUB with a <code>LOCAL</code> variable.</td></tr>
     <tr><td><code>inventory.nsb</code></td><td>Writes a text report of the machine (system, volumes, boot entries, memory)
         with <code>RUN$</code> and <code>APPENDFILE</code>.</td></tr>
+    <tr><td><code>menu.nsb</code></td><td>A maintenance menu that comes back after every action, with a second menu built
+        at run time from the volumes found by <code>map -data</code>.</td></tr>
   </tbody>
 </table>
 <pre class="code" data-lang="basic" data-example="findefi" data-title="findefi.nsb" data-platform="efi">' findefi.nsb - lists the boot loaders in \EFI\*\ of every volume.

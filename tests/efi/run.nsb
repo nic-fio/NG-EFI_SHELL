@@ -236,6 +236,9 @@ rows = VAL(FIELD$(RUN$("sysinfo -data"), "console_rows"))
 check "text mode shrinks with the screen", cols * 8 <= 640 AND rows * 19 <= 480
 RUN "mode -max"
 check "mode -max", ERR = 0
+' mode -fill is not tested here: it runs reconnect -r, which disconnects the
+' serial console these tests are read from. It is checked by hand with a
+' screendump of the emulated screen (see the decisions document).
 RUN "gop 1280 800"
 check "cpuid", INSTR(RUN$("cpuid"), "Vendor") > 0
 IF FILEEXISTS("fs0:\tests\apps\efi-virtio.rom") THEN

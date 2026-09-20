@@ -1643,16 +1643,30 @@ APIC  0x1fb78000     120  rev 3   BOCHS   BXPC      checksum ok</pre>
       when it starts its console driver.</li>
 </ul>
 <p>This is why the shell often uses only part of a large screen: a 100 x 31 text console covers 800 x 589 pixels, so on a
-1920 x 1080 screen the text sits in a corner. There are two ways to fill the screen:</p>
+1920 x 1080 screen the text sits in a block in the middle. Three ways out, from the simplest:</p>
 <pre class="terminal">fs0:\> mode -max
 Text mode 2: 100 x 31 characters
+fs0:\> mode -fill
+Restarting the firmware console driver...
+Text mode 4: 160 x 42 characters
 fs0:\> gop -fit
 Graphics mode 3: 800 x 600 (text 100 x 31)</pre>
-<ul>
-  <li><code>mode -max</code> takes the largest text size the firmware offers (more characters, same size letters).</li>
-  <li><code>gop -fit</code> lowers the resolution to the smallest one that still holds the text console, so the characters
-      become as large as possible and the text fills the screen.</li>
-</ul>
+<ol>
+  <li><code>mode -max</code> takes the largest text size the firmware already offers. Try this first: on many machines
+      the firmware started its console at the screen's own resolution and a large mode is there.</li>
+  <li><code>mode -fill</code> is for when <code>mode</code> only lists small sizes, which means the console driver
+      started at a low resolution. It restarts that driver (like <code>reconnect -r</code>), so the firmware builds a
+      text mode for the whole screen, and selects it. Two effects to know: the screen resolution goes back to the
+      firmware's own default, and the consoles are disconnected for a moment — on a serial console you may lose some
+      output.</li>
+  <li><code>gop -fit</code> keeps the text size and lowers the resolution until the text fills the screen, which makes
+      the characters larger. Useful when you want big, readable text.</li>
+</ol>
+<div class="callout"><span class="callout-title">A high resolution and a full screen of text</span>
+<p>Those two together depend on the firmware: the text modes are built when the console driver starts, so the
+resolution has to be set <em>before</em> that. Many firmware setups have a “preferred resolution” or “video mode”
+setting that is applied at the next boot; with that set, <code>mode -max</code> inside NESH is enough. Setting the
+resolution afterwards with <code>gop</code> gives a large screen with the old, smaller text block.</p></div>
 <p>To set a resolution for a program you are going to start (a graphical tool, a boot loader), use <code>gop</code>:</p>
 <table>
   <thead><tr><th>Command</th><th>Effect</th></tr></thead>
@@ -1828,8 +1842,8 @@ commands the UEFI Shell does not have: <code>bootmgr</code>, <code>var</code>, <
         <code>set path</code> and <code>which NAME</code>.</td></tr>
     <tr><td>A long output scrolls away</td><td>It should stop at every screenful; if it does not, check <code>set pager</code>
         (see <a href="#paging">Long output: paging</a>), or save it to a file with <code>&gt; file</code>.</td></tr>
-    <tr><td>The shell uses only part of the screen</td><td>The text console is smaller than the screen: <code>mode -max</code> for more
-        characters, <code>gop -fit</code> to make the text fill the screen (see <a href="#screen">Screen resolution and text size</a>).</td></tr>
+    <tr><td>The shell uses only part of the screen</td><td><code>mode -max</code>, then <code>mode -fill</code> if the text sizes offered are
+        all small; <code>gop -fit</code> makes the characters larger instead (see <a href="#screen">Screen resolution and text size</a>).</td></tr>
     <tr><td>Function keys do not work (serial console)</td><td>Use the <kbd>Ctrl</kbd> equivalents listed for each editor.</td></tr>
     <tr><td>History or backups are not saved</td><td>The boot volume is read-only; NESH continues without them.</td></tr>
     <tr><td>A script stops with “error: …”</td><td>The message gives file and line. <code>nesh.efi -k SCRIPT</code> checks the syntax.</td></tr>
@@ -2810,14 +2824,20 @@ Example: cpuid 80000001</pre>
 <article class="cmd" id="cmd-mode" data-index="mode">
 <h4><code>mode</code></h4>
 <p class="cmd-summary">List the text modes or select one</p>
-<pre class="usage">mode [COLUMNS ROWS | -max]</pre>
+<pre class="usage">mode [COLUMNS ROWS | -max | -fill]</pre>
 <pre class="cmd-help">  (none)        list the text modes of the console (current one marked)
   COLUMNS ROWS  switch to the mode with exactly this size
   -max          switch to the mode with the most characters
+  -fill         make the text use the whole screen: restarts the
+                firmware console driver (as reconnect -r does), which
+                then offers a mode for the whole screen, and selects it
 The firmware decides which text modes exist, from the screen resolution
-it had when it started its console driver. If the text uses only part of
-the screen, gop -fit lowers the resolution to match it.
-Example: mode 100 31</pre>
+it had when it started its console driver, so a large screen often shows
+a small block of text. -fill fixes that, but the screen resolution goes
+back to the firmware default and the consoles are disconnected for a
+moment (on a serial console you may lose some output). To keep a chosen
+resolution instead, gop -fit lowers it until the text fills the screen.
+Example: mode -fill</pre>
 </article>
 <article class="cmd" id="cmd-gop" data-index="gop">
 <h4><code>gop</code> <span class="badge" title="supports -data output">-data</span></h4>

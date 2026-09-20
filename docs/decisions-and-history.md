@@ -243,6 +243,15 @@ From it came the working rules of the project:
   smallest one that still holds the text console, so the text fills the screen.
 - **Safety.** Before switching to a smaller resolution NESH moves the console to
   a text mode that fits, so the firmware never draws outside the frame buffer.
+- **`mode -fill`.** Added after the owner asked how to make the text use a whole
+  1680x1050 screen. Verified by photographing the emulated screen (QEMU monitor
+  `screendump`): at 1680x1050 the text was a 100x31 block in the middle; after
+  `reconnect -r` the firmware rebuilt its list and offered 160x42, which fills
+  the screen. `mode -fill` does those two steps. It cannot keep a resolution
+  chosen with `gop`, because restarting the drivers also resets the video
+  driver: that combination has to come from the firmware setup.
+- **Not in the automatic tests**: `reconnect -r` disconnects the serial console
+  the QEMU tests read, so `mode -fill` is checked by hand with a screendump.
 
 ### D16c. Paging of long output
 

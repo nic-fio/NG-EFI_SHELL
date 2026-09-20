@@ -1042,6 +1042,16 @@ static int cmd_mode(int argc, char **argv)
         }
         return RC_OK;
     }
+    /* -fill: the firmware builds its list of text modes when its console
+     * driver starts, from the resolution it sees then, so a console started at
+     * a low resolution leaves most of a large screen empty. Reconnecting every
+     * device restarts that driver, which then offers a mode for the whole
+     * screen; the resolution goes back to the firmware default. */
+    if (argc == 2 && !strcasecmp(argv[1], "-fill")) {
+        out_puts("Restarting the firmware console driver...\n");
+        shell_exec_line("reconnect -r");
+        argv[1] = (char *)"-max"; /* then take the largest mode it offers */
+    }
     if (argc == 2 && !strcasecmp(argv[1], "-max")) {
         INT32 best = text_mode_for(0xFFFFFFFF, 0xFFFFFFFF);
         UINTN c, r;
@@ -1531,14 +1541,20 @@ static const Cmd hw_cmds[] = {
       "With -data: one record per table (signature, address, length, revision,\n"
       "oemid, oemtable, checksum); -d cannot be combined with -data.\n",
       CMD_DATA },
-    { "mode", cmd_mode, "mode [COLUMNS ROWS | -max]", "List the text modes or select one",
+    { "mode", cmd_mode, "mode [COLUMNS ROWS | -max | -fill]", "List the text modes or select one",
       "  (none)        list the text modes of the console (current one marked)\n"
       "  COLUMNS ROWS  switch to the mode with exactly this size\n"
       "  -max          switch to the mode with the most characters\n"
+      "  -fill         make the text use the whole screen: restarts the\n"
+      "                firmware console driver (as reconnect -r does), which\n"
+      "                then offers a mode for the whole screen, and selects it\n"
       "The firmware decides which text modes exist, from the screen resolution\n"
-      "it had when it started its console driver. If the text uses only part of\n"
-      "the screen, gop -fit lowers the resolution to match it.\n"
-      "Example: mode 100 31\n" },
+      "it had when it started its console driver, so a large screen often shows\n"
+      "a small block of text. -fill fixes that, but the screen resolution goes\n"
+      "back to the firmware default and the consoles are disconnected for a\n"
+      "moment (on a serial console you may lose some output). To keep a chosen\n"
+      "resolution instead, gop -fit lowers it until the text fills the screen.\n"
+      "Example: mode -fill\n" },
     { "sermode", cmd_sermode, "sermode [HANDLE [BAUD PARITY DATABITS STOPBITS]]",
       "Show or set serial port settings (parity n|e|o|m|s, stop bits 0|1|1.5|2)",
       "  (none)                            list all serial ports and settings\n"

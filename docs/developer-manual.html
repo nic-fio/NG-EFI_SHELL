@@ -88,13 +88,13 @@ explained where they are needed, and the <a href="#glossary">glossary</a> summar
     <tr><td>Portable commands</td><td><code>src/cmd</code></td><td>3,336</td><td>files, text, utilities, editors</td></tr>
     <tr><td>UEFI modules</td><td><code>src/platform/efi</code></td><td>10,215</td><td>shell protocol, variables, boot, drivers, disks, hardware, network</td></tr>
     <tr><td>UEFI definitions</td><td><code>include</code></td><td>724</td><td>UEFI types and protocols used by NESH</td></tr>
-    <tr><td>Tools and tests</td><td><code>tools</code>, <code>tests</code></td><td>3,033</td><td>ELF→PE converter, QEMU runner, doc generators, test scripts</td></tr>
+    <tr><td>Tools and tests</td><td><code>tools</code>, <code>tests</code></td><td>3,104</td><td>ELF→PE converter, QEMU runner, doc generators, test scripts</td></tr>
   </tbody>
 </table>
 <p>The resulting <code>nesh.efi</code> is about 360 KB. The line counts here and in the
-<a href="#file-map">source file map</a> are simply the lines of the files in those directories
-(for the last row, <code>tools</code> plus the test scripts and the test application), so they can be
-checked with <code>wc -l</code>.</p>
+<a href="#file-map">source file map</a> are not typed by hand: <code>make docs</code> counts the files and writes
+them into this page, and <code>make test</code> fails when they no longer match the tree &mdash; a new source file
+without a row in the map fails as well.</p>
 
 <!-- ===================================================================== -->
 <h2 id="getting-the-source">Source tree and tools</h2>
@@ -976,6 +976,11 @@ Secure Boot OVMF build the target prints why it is skipped and succeeds.</p>
       rewrites the part of <code>docs/user-manual.html</code> between the <code>BEGIN GENERATED</code>/<code>END GENERATED</code> markers.
       <code>--check</code> fails when the manual is out of date, when a command has no category, when a help line is longer
       than 78 columns, or when a BASIC function has no entry in the function reference.</li>
+  <li><strong>Line counts</strong>: the same tool counts the files of the <a href="#file-map">source map</a> and the
+      totals of the area table and writes them into <code>docs/developer-manual.html</code>, so the numbers cannot drift
+      away from the tree. <code>--check</code> fails when they are stale, when the map lists a file that does not exist
+      and when a source file has no row at all: adding a file to <code>src</code>, <code>include</code>,
+      <code>tools</code> or <code>tests/apps</code> therefore means adding a line to the map.</li>
   <li><strong>Examples</strong>: <code>tools/check-doc-examples.py</code> takes every <code>&lt;pre data-example="NAME"&gt;</code> of the
       user manual, writes it as <code>NAME.nsb</code>, checks the syntax of all of them (<code>nesh -k</code>), then runs the ones that
       have an output block (<code>data-example-output="NAME"</code>) in page order and compares the output. Examples marked
@@ -1102,7 +1107,7 @@ captured.</p>
     <tr><td><code>tools/check-doc-examples.py</code></td><td>69</td><td>Runs the NESH BASIC examples of the user manual with the host build and compares their output with the output printed in the manual</td></tr>
     <tr><td><code>tools/efi.lds</code></td><td>26</td><td>Linker script for NESH: ELF image at base 0, page-aligned sections</td></tr>
     <tr><td><code>tools/elf2efi.py</code></td><td>172</td><td>Convert an x86_64 ELF shared object (linked with tools/efi.lds) into a PE32+ EFI application with native base relocations</td></tr>
-    <tr><td><code>tools/gen-docs.py</code></td><td>231</td><td>Generates the command reference of the user manual from the command tables in the C sources, so that the manual and the built-in 'help' never disagree</td></tr>
+    <tr><td><code>tools/gen-docs.py</code></td><td>302</td><td>Generates the command reference of the user manual from the command tables in the C sources, and the line counts of this manual from the files themselves, so that neither can disagree with the code</td></tr>
     <tr><td><code>tools/mkusb.sh</code></td><td>102</td><td>Builds build/nesh-usb.img, a bootable disk image (GPT + EFI system partition) with NESH, the examples, the licence (LICENSE.txt and NOTICE.txt) and a README on it</td></tr>
     <tr><td><code>tools/record-demo.py</code></td><td>188</td><td>Records the animation of the README: drives a QEMU session through the monitor (sendkey/screendump) and turns the frames into a GIF</td></tr>
     <tr><td><code>tools/backup.sh</code></td><td>32</td><td>Packs the repository into one git bundle, with every branch, tag and commit, for a restore without a network</td></tr>

@@ -56,7 +56,9 @@ user brings them up. The reasoning for each is in
    every BASIC function must be documented, help lines stay within 78 columns,
    and the examples in the manual are run and compared against their printed
    output. **This fails if the manual is out of date**; `make docs` regenerates
-   the command reference from the help texts in the C sources.
+   the command reference from the help texts in the C sources, and the line
+   counts of the developer manual from the files themselves (a new source file
+   needs its row in the source map).
 2. `make qemu-test` when anything on the firmware side changed, and
    `make qemu-nettest` / `make qemu-sbtest` for network or Secure Boot work.
 3. Do not report success from a pipeline that hid a failure: check the exit

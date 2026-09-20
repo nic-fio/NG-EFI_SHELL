@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
-"""Generates the command reference of the user manual from the command tables
-in the C sources, so that the manual and the built-in 'help' never disagree.
+"""Generates from the sources the parts of the manuals that describe them: the
+command reference of the user manual (from the command tables, so that the
+manual and the built-in 'help' never disagree) and the line counts of the
+developer manual (so that its source map cannot drift away from the tree).
 
-  tools/gen-docs.py           rewrite the generated part of docs/user-manual.html
-  tools/gen-docs.py --check   fail if the manual is out of date, if a command has
-                              no chapter below, or if a BASIC function is not
+  tools/gen-docs.py           rewrite the generated parts of the two manuals
+  tools/gen-docs.py --check   fail if a manual is out of date, if a command has
+                              no chapter below, if a source file has no row in
+                              the source map, or if a BASIC function is not
                               documented in the manual (run by 'make test')
 """
 import html
@@ -14,6 +17,7 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 MANUAL = ROOT / "docs" / "user-manual.html"
+DEVMANUAL = ROOT / "docs" / "developer-manual.html"
 BEGIN = "<!-- BEGIN GENERATED: command-reference (tools/gen-docs.py) -->"
 END = "<!-- END GENERATED: command-reference -->"
 
@@ -140,6 +144,68 @@ def basic_functions():
     return sorted(names)
 
 
+def lines_of(path):
+    with open(path, "rb") as f:
+        return sum(1 for _ in f)
+
+
+def source_files():
+    """The files the source map of the developer manual lists: the headers, the
+    C sources of NESH, the tools and the two test programs."""
+    files = set((ROOT / "include").glob("*.h"))
+    files |= {p for p in (ROOT / "src").rglob("*") if p.suffix in (".c", ".h")}
+    files |= {p for p in (ROOT / "tools").iterdir() if p.is_file()}
+    files |= {ROOT / "tests" / "run-host-tests.sh"}
+    files |= set((ROOT / "tests" / "apps").glob("*.c"))
+    return {str(p.relative_to(ROOT)) for p in files}
+
+
+def dir_lines(names):
+    """Lines of a directory of the area table: the files it holds, and for the
+    'tools, tests' row everything below them except the binary fixtures."""
+    if names == ["tools", "tests"]:
+        return sum(lines_of(p) for n in names for p in sorted((ROOT / n).rglob("*"))
+                   if p.is_file() and "fixtures" not in p.relative_to(ROOT).parts)
+    return sum(lines_of(p) for n in names for p in sorted((ROOT / n).iterdir()) if p.is_file())
+
+
+# The two tables are recognised by the shape of their rows: a file in <code>
+# followed by its count, and an area whose second cell names directories. Any
+# other table with that shape would be rewritten too, so a numeric cell after a
+# <code> cell belongs to the source map and nowhere else.
+FILE_ROW = re.compile(r"(<tr><td><code>)([^<]+)(</code></td><td>)(\d+)(</td>)")
+AREA_ROW = re.compile(r"(<tr><td>[^<]*</td><td>)((?:<code>[^<]+</code>(?:, )?)+)(</td><td>)([\d,]+)(</td>)")
+
+
+def count_lines(text, problems):
+    """Rewrites the line counts of the developer manual: the source map row by
+    row, then the totals of the area table."""
+    listed = []
+
+    def file_row(m):
+        path = m.group(2)
+        listed.append(path)
+        if not (ROOT / path).is_file():
+            problems.append("%s: the source map lists '%s', which is not a file"
+                            % (DEVMANUAL.name, path))
+            return m.group(0)
+        return m.group(1) + path + m.group(3) + str(lines_of(ROOT / path)) + m.group(5)
+
+    def area_row(m):
+        names = re.findall(r"<code>([^<]+)</code>", m.group(2))
+        if not all((ROOT / n).is_dir() for n in names):
+            return m.group(0)                      # not the area table
+        return m.group(1) + m.group(2) + m.group(3) + format(dir_lines(names), ",") + m.group(5)
+
+    new = AREA_ROW.sub(area_row, FILE_ROW.sub(file_row, text))
+    for f in sorted(source_files() - set(listed)):
+        problems.append("%s: '%s' has no row in the source map" % (DEVMANUAL.name, f))
+    for f in sorted(set(listed)):
+        if listed.count(f) > 1:
+            problems.append("%s: the source map lists '%s' twice" % (DEVMANUAL.name, f))
+    return new
+
+
 def esc(s):
     return html.escape(s, quote=False)
 
@@ -210,17 +276,22 @@ def main():
     for f in basic_functions():
         if f not in documented:
             problems.append("BASIC function %s has no entry in the function reference of %s" % (f.upper(), MANUAL.name))
+    devtext = DEVMANUAL.read_text()
+    devnew = count_lines(devtext, problems)
     if check:
-        if new != text:
-            problems.append("%s is out of date: run 'make docs'" % MANUAL.relative_to(ROOT))
+        for man, before, after in ((MANUAL, text, new), (DEVMANUAL, devtext, devnew)):
+            if before != after:
+                problems.append("%s is out of date: run 'make docs'" % man.relative_to(ROOT))
         if problems:
             print("\n".join(problems), file=sys.stderr)
             return 1
-        print("docs: %d commands, %d BASIC functions documented" % (len(cmds), len(basic_functions())))
+        print("docs: %d commands, %d BASIC functions documented, %d source files counted"
+              % (len(cmds), len(basic_functions()), len(source_files())))
         return 0
-    if new != text:
-        MANUAL.write_text(new)
-        print("updated %s" % MANUAL.relative_to(ROOT))
+    for man, before, after in ((MANUAL, text, new), (DEVMANUAL, devtext, devnew)):
+        if before != after:
+            man.write_text(after)
+            print("updated %s" % man.relative_to(ROOT))
     if problems:
         print("\n".join(problems), file=sys.stderr)
         return 1

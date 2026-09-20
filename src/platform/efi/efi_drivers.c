@@ -987,7 +987,9 @@ static int cmd_load(int argc, char **argv)
                 if (img)
                     gBS->UnloadImage(img);
                 rc = cmd_err("load", "%s: %s", files[k],
-                             st == EFI_SECURITY_VIOLATION ? "not allowed by Secure Boot" : efi_strerror(st));
+                             efi_blocked_by_secure_boot(st)
+                                 ? "not allowed by Secure Boot (the driver is not signed by a trusted key)"
+                                 : efi_strerror(st));
                 free(files[k]);
                 continue;
             }

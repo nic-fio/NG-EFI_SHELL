@@ -24,6 +24,14 @@ bool hw_write_allowed(const char *cmd)
     return false;
 }
 
+/* LoadImage refuses an image that Secure Boot does not allow with
+ * EFI_SECURITY_VIOLATION (image loaded but untrusted) or, as OVMF does,
+ * EFI_ACCESS_DENIED (not loaded at all). */
+bool efi_blocked_by_secure_boot(EFI_STATUS st)
+{
+    return st == EFI_SECURITY_VIOLATION || (st == EFI_ACCESS_DENIED && secure_boot_active());
+}
+
 /* ---- Console proxy: captures the output of started images ---- */
 
 static EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL *real_conout;
@@ -170,7 +178,7 @@ int efi_start_image(const char *path, int argc, char **argv, bool driver_ok)
     free(data);
     free(dp);
     if (EFI_ERROR(st)) {
-        if (st == EFI_SECURITY_VIOLATION) {
+        if (efi_blocked_by_secure_boot(st)) {
             if (h)
                 gBS->UnloadImage(h);
             return cmd_err(path_basename(path), "not allowed by Secure Boot (the image is not signed by a trusted key)");

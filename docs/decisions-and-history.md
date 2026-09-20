@@ -117,6 +117,13 @@ From it came the working rules of the project:
   extension had not been agreed. The owner then confirmed the scope: clock and
   serial port settings stay allowed ("orologio e porta seriale non dovrebbero
   rappresentare un pericolo per la sicurezza").
+- **Verified** with Secure Boot really enabled (`make qemu-sbtest`, own test
+  keys enrolled in OVMF): the unsigned image is refused by the firmware, the
+  signed one runs with hardware reads working and low-level writes refused, and
+  unsigned applications and drivers are refused. The test also showed that OVMF
+  answers `EFI_ACCESS_DENIED` rather than `EFI_SECURITY_VIOLATION`, so NESH
+  printed a bare "access denied"; it now recognizes both
+  (`efi_blocked_by_secure_boot`) and says why the image was refused.
 
 ### D7. No EDK2 code, own toolchain
 
@@ -269,7 +276,8 @@ All work took place in one long working session (2026-09-19), in phases.
 | **5. Script-friendly output** | `-sfo` replaced by `-data` with `RECORDS`/`FIELD$` (D14). The QEMU test runner was found to report "OK" for scripts that stopped on an error; the pass rule was tightened (D19). |
 | **6. IPv6** | `ifconfig6`, `ping6`, IPv6 in `ping`/`tftp`/`http` (D15), tested with QEMU user networking; an IPv6 address parser/formatter checked against 29 cases; `ifconfig` now shows the DHCP gateway. |
 | **7. Documentation** | Help texts written for all 84 commands by reading their code. That review found and fixed real defects: `mv` could lose the target file if the rename failed; `exit` did not stop a running script; `which` ignored `path`; `load` did not connect drivers when one file failed; `mkdir -p` accepted a file in the path; `vol fs1` without colon showed the wrong volume; missing UEFI Shell options (`reset -c/-fwui`, `pause -q`, `exit /b`, `memmap -b`, `sermode` stop bits 0); the editor lost tab characters and the UTF-8 BOM; the example boot menu failed on read-only volumes and listed hidden entries. User and developer manuals written; examples executed by the test suite. |
-| **8. Publication** | Repository published on GitHub as `NG-EFI_SHELL`, public (owner's request); provisional all-rights-reserved license; manuals online with GitHub Pages; GitHub Actions builds and tests every push and publishes a Release with `nesh.efi` for each version tag (binaries are distributed as Releases, not committed to the repository). |
+| **8. Secure Boot** | Tested for real in QEMU with own test keys enrolled in OVMF (`make qemu-sbtest`, part of CI): unsigned images refused by the firmware, hardware writes refused, clock/serial allowed, keys unchangeable. One defect found and fixed: refusals were reported as a bare "access denied". |
+| **9. Publication** | Repository published on GitHub as `NG-EFI_SHELL`, public (owner's request); provisional all-rights-reserved license; manuals online with GitHub Pages; GitHub Actions builds and tests every push and publishes a Release with `nesh.efi` for each version tag (binaries are distributed as Releases, not committed to the repository). |
 
 ### The original plan and what came of it
 
@@ -285,7 +293,6 @@ listing), `bootmgr scan`, and the language's `ON ERROR`.
 
 | Topic | Status |
 |---|---|
-| Secure Boot | The read-only rule (D6) is implemented but NESH has not yet been run with Secure Boot actually enabled (signing and enrolling a test key in OVMF). |
 | Real hardware | All tests run in QEMU/OVMF. Behavior on real firmware (AMI, Insyde, Phoenix) is untested. |
 | Architectures | x86-64 only; AArch64 and IA32 builds are possible future work. |
 | `https` | Needs a TLS driver in the firmware; untested. Host names in `http` URLs (DNS) are untested. |

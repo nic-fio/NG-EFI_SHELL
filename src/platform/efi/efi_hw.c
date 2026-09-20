@@ -1210,7 +1210,9 @@ static int cmd_loadpcirom(int argc, char **argv)
                     if (!EFI_ERROR(st))
                         st = gBS->StartImage(ih, NULL, NULL);
                     out_printf("Image %d (subsystem %u%s) from %s - %s\n", images, subsys, comp ? ", compressed" : "",
-                               path_basename(path), EFI_ERROR(st) ? efi_strerror(st) : "loaded");
+                               path_basename(path),
+                               efi_blocked_by_secure_boot(st) ? "not allowed by Secure Boot (not signed)"
+                               : EFI_ERROR(st) ? efi_strerror(st) : "loaded");
                     if (EFI_ERROR(st))
                         rc = RC_FAIL;
                     else

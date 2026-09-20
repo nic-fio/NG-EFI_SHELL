@@ -1,0 +1,54 @@
+' Secure Boot tests (run by tools/run-qemu.sh --sbtest with a signed nesh.efi)
+PRINT "=== NESH TEST START ==="
+fails = 0
+SUB check(name$, ok)
+  IF ok THEN
+    PRINT "PASS "; name$
+  ELSE
+    PRINT "FAIL "; name$
+    fails = fails + 1
+  END IF
+END SUB
+' 1. the shell sees Secure Boot as active
+check "SECUREBOOT function", SECUREBOOT
+check "ver reports it", FIELD$(RUN$("ver -data"), "secure_boot") = "yes"
+check "sysinfo reports it", FIELD$(RUN$("sysinfo -data"), "secure_boot") = "yes"
+' 2. reading hardware still works
+out$ = RUN$("mm 0 -n")
+PRINT out$
+check "mm read", ERR = 0
+check "dmem read", INSTR(RUN$("dmem 0 20"), "0000000000000000") > 0
+check "pci read", INSTR(RUN$("pci"), "Vendor") > 0
+check "memmap read", INSTR(RUN$("memmap -s"), "Total memory") > 0
+' 3. low-level writes are refused
+out$ = RUN$("mm 0x1000 41 -w 1")
+PRINT out$
+check "mm write refused", ERR <> 0
+' 4. clock and serial settings stay allowed (decision D6)
+RUN "timezone -s +01:00"
+check "timezone allowed", ERR = 0
+RUN "time 12:30:00"
+check "time allowed", ERR = 0
+RUN "sermode"
+check "sermode list", ERR = 0
+' 5. unsigned images are refused by the firmware
+out$ = RUN$("fs0:\apps\nesh-unsigned.efi -c ""PRINT 1""")
+PRINT out$
+check "unsigned application refused", ERR <> 0
+out$ = RUN$("fs0:\apps\pci.efi")
+PRINT out$
+check "unsigned EDK2 app refused", ERR <> 0
+out$ = RUN$("load fs0:\apps\Ip4Dxe.efi")
+PRINT out$
+check "unsigned driver refused", ERR <> 0
+' 6. ordinary UEFI variables can still be written
+RUN "var set NeshSbTest hello -g shell"
+check "var set allowed", ERR = 0
+check "var get", INSTR(RUN$("var get NeshSbTest -g shell"), "hello") > 0
+RUN "var del NeshSbTest -g shell"
+' 7. authenticated variables (Secure Boot keys) cannot be changed
+RUN "var set PK 00 -t hex"
+check "PK write refused", ERR <> 0
+PRINT "failures:"; fails
+PRINT "=== NESH TEST END ==="
+RUN "reset -s"

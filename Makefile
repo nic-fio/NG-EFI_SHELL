@@ -5,6 +5,7 @@
 #   make docs       regenerate the command reference of docs/user-manual.html
 #   make qemu       boot build/nesh.efi in QEMU/OVMF (interactive, serial console)
 #   make qemu-test  run the automated tests inside QEMU
+#   make qemu-sbtest  run the Secure Boot tests inside QEMU (own test keys)
 
 CC      ?= gcc
 LD      ?= ld
@@ -88,9 +89,14 @@ qemu-test: $(BUILD)/nesh.efi $(BUILD)/tests/shelltest.efi
 qemu-nettest: $(BUILD)/nesh.efi
 	@tools/run-qemu.sh --nettest $(OVMF) $(BUILD)/nesh.efi
 
+# Secure Boot tests: needs sbsigntool, python3-virt-firmware and an OVMF build
+# with Secure Boot support (skipped with a message when they are missing).
+qemu-sbtest: $(BUILD)/nesh.efi
+	@tools/run-qemu.sh --sbtest $(OVMF) $(BUILD)/nesh.efi
+
 clean:
 	rm -rf $(BUILD)
 
-.PHONY: all test docs qemu qemu-test qemu-nettest clean
+.PHONY: all test docs qemu qemu-test qemu-nettest qemu-sbtest clean
 
 -include $(EFI_OBJ:.o=.d) $(HOST_OBJ:.o=.d)

@@ -1723,8 +1723,9 @@ could be used to get around the protection:</p>
   </tbody>
 </table>
 <p>In addition, the firmware itself refuses to load unsigned drivers and programs (<code>load</code>, <code>loadpcirom</code>,
-starting <code>.efi</code> files) and to change authenticated variables such as the Secure Boot keys. Scripts can check the
-state with <code>SECUREBOOT</code>.</p>
+starting <code>.efi</code> files); NESH reports this as <em>not allowed by Secure Boot (the image is not signed by a trusted
+key)</em>. Authenticated variables, such as the Secure Boot keys, cannot be changed either. Ordinary UEFI variables,
+files, the clock and the serial port settings keep working. Scripts can check the state with <code>SECUREBOOT</code>.</p>
 
 <!-- ===================================================================== -->
 <h2 id="differences">Differences from the UEFI Shell</h2>

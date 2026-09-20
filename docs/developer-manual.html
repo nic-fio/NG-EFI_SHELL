@@ -141,6 +141,7 @@ explained where they are needed, and the <a href="#glossary">glossary</a> summar
     <tr><td><code>make qemu</code></td><td>Boots NESH in QEMU with a serial console, interactively.</td></tr>
     <tr><td><code>make qemu-test</code></td><td>Runs <code>tests/efi/run.nsb</code> inside QEMU and checks the result.</td></tr>
     <tr><td><code>make qemu-nettest</code></td><td>Network tests (IPv4 and IPv6) inside QEMU with user networking.</td></tr>
+    <tr><td><code>make qemu-sbtest</code></td><td>Secure Boot tests inside QEMU with test keys (see <a href="#sbtest">Secure Boot tests</a>).</td></tr>
     <tr><td><code>make docs</code></td><td>Regenerates the command reference of the user manual from the help texts.</td></tr>
     <tr><td><code>make clean</code></td><td>Removes <code>build/</code>.</td></tr>
   </tbody>
@@ -900,6 +901,21 @@ $ git push origin v0.2.0</pre>
 <code>SHA256SUMS</code>. Update <code>NESH_VERSION</code> in <code>src/core/shell.h</code> (and the version shown in the manuals) before
 tagging.</p>
 
+<h3 id="sbtest">Secure Boot tests</h3>
+<p><code>make qemu-sbtest</code> checks the Secure Boot behavior end to end. It creates test keys (PK, KEK, db) with
+<code>openssl</code>, enrolls them into a copy of the OVMF variable store with <code>virt-fw-vars</code>, signs
+<code>nesh.efi</code> with <code>sbsign</code> and boots the OVMF build that enforces Secure Boot
+(<code>OVMF_CODE_4M.secboot.fd</code>; <code>OVMF_SECBOOT=</code> and <code>OVMF_VARS=</code> override the paths). Two runs:</p>
+<ol>
+  <li>the <strong>signed</strong> shell runs <code>tests/efi/secureboot.nsb</code>, which checks that NESH reports Secure Boot
+      as active, that reading hardware still works, that low-level writes are refused, that clock and serial settings are
+      still allowed, that unsigned applications and drivers are refused with a clear message, that ordinary UEFI
+      variables can still be written and that authenticated ones (the keys) cannot;</li>
+  <li>the <strong>unsigned</strong> image must not start at all (the firmware answers <em>Access Denied</em>).</li>
+</ol>
+<p>The keys are generated once in <code>build/secureboot/</code>. Without <code>sbsign</code>, <code>virt-fw-vars</code> or a
+Secure Boot OVMF build the target prints why it is skipped and succeeds.</p>
+
 <h3 id="fixtures">Fixtures</h3>
 <table>
   <thead><tr><th>Path</th><th>What and why</th></tr></thead>
@@ -978,6 +994,9 @@ arbitrary: there is usually a reason.</p>
         <code>tests/efi/run.nsb</code>.</td></tr>
     <tr><td>A ShellLib application misbehaves</td><td>Compare with the EDK2 UEFI Shell running the same program (the OVMF image has one:
         <code>EFI Internal Shell</code>); check memory ownership rules of the protocol function it uses.</td></tr>
+    <tr><td>An image is refused with "access denied"</td><td>With Secure Boot active the firmware refuses unsigned images;
+        <code>LoadImage</code> may return <code>EFI_ACCESS_DENIED</code> instead of <code>EFI_SECURITY_VIOLATION</code>
+        (<code>efi_blocked_by_secure_boot</code> handles both).</td></tr>
     <tr><td>Memory errors in portable code</td><td>Run the failing script with <code>build/nesh-host</code>: AddressSanitizer reports the exact
         line.</td></tr>
   </tbody>

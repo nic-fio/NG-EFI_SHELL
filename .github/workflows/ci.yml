@@ -22,7 +22,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            qemu-system-x86 ovmf ipxe-qemu dosfstools python3
+            qemu-system-x86 ovmf ipxe-qemu dosfstools python3 \
+            sbsigntool python3-virt-firmware
 
       - name: Enable KVM
         run: |
@@ -42,6 +43,9 @@ jobs:
 
       - name: Network tests (QEMU/OVMF)
         run: make qemu-nettest
+
+      - name: Secure Boot tests (QEMU/OVMF, own test keys)
+        run: make qemu-sbtest
 
       - name: Keep the test logs
         if: always()

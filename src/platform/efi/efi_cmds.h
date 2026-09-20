@@ -9,6 +9,7 @@ void platform_print_version(void);
 void efi_print_gop_summary(void);
 EFI_MEMORY_DESCRIPTOR *efi_memory_map(UINTN *count, UINTN *desc_size);
 int efi_start_image(const char *path, int argc, char **argv, bool driver_ok);
+bool efi_blocked_by_secure_boot(EFI_STATUS st); /* image refused because it is not signed */
 
 /* UEFI variables (efi_var.c) */
 bool guid_parse(const char *s, EFI_GUID *g);   /* text GUID or a known name ("global", "db"...) */

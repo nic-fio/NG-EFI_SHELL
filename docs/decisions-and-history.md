@@ -295,27 +295,38 @@ From it came the working rules of the project:
   reported as passing.
 - Every bug fixed gets a test.
 
-### D20. License: CC BY-NC 4.0
+### D20. License: Apache 2.0 with the Commons Clause
 
 - **Context.** The repository was published with a provisional "all rights
-  reserved" notice, to be decided later.
-- **Requirements** given by the owner: anyone may use the project and
-  redistribute it unchanged; anyone may modify it for their own use; a modified
-  version that is redistributed must credit the original author; no commercial
-  use of any kind.
-- **Options.** (a) CC BY-NC 4.0; (b) PolyForm Noncommercial 1.0.0, written for
-  software; (c) a permissive license (MIT, BSD-2) plus a non-commercial rider,
-  which would be a custom licence nobody knows.
-- **Decision.** (a) CC BY-NC 4.0: it matches the five requirements one by one
-  (attribution, statement of changes, non-commercial), GitHub recognizes it and
-  users know it. PolyForm Noncommercial stays the alternative if a
-  software-specific text is preferred later.
-- **Consequences.** The project is *not* open source by the OSI definition;
-  Linux distributions and some catalogues will not package it. Creative Commons
-  advises against its licenses for software, because they do not deal with
-  patents or with the source code of a program: only the copyright side is
-  covered. Third-party components in the repository keep their own, more
-  permissive, licenses (`NOTICE.md`).
+  reserved" notice. The owner then asked for a real license.
+- **First requirements.** Free use, free redistribution, modification for one's
+  own use, credit when a modified version is shared, "no commercial use".
+  That maps onto CC BY-NC 4.0, which was adopted first.
+- **What the owner actually wants.** "l'azienda di turno che sfrutta il lavoro
+  altrui per rivendere il progetto. Se vogliono acquistino il progetto" — the
+  target is **resale**, not use. CC BY-NC was too wide: it also forbids a
+  technician using NESH while repairing a computer for money, or a company
+  using it on its own machines. Asked about that boundary, the owner confirmed
+  that such use must stay free.
+- **Options.** (a) Keep CC BY-NC 4.0 (bans every commercial use);
+  (b) Business Source License 1.1, made for this, but its **Change Date** is
+  mandatory and at most four years, after which the work becomes open source —
+  which would remove exactly the value the owner wants to be able to sell;
+  (c) a permissive license plus the **Commons Clause**, a condition that removes
+  the right to *sell* the software or services substantially based on it, with
+  no expiry.
+- **Decision.** (c): Apache License 2.0 with the Commons Clause v1.0. Apache 2.0
+  already requires keeping the notices and stating changes (the attribution the
+  owner asked for) and adds a patent grant; the Commons Clause draws the line at
+  selling. A commercial license, without the condition, is asked for by opening
+  an issue in the repository.
+- **Consequences.** The project is *not* open source by the OSI definition (the
+  Commons Clause is a restriction on the Apache grant), so some distributions
+  and catalogues will not accept it. The wording "value derives, entirely or
+  substantially, from the functionality of the Software" is the usual
+  Commons Clause text: it is the boundary the owner asked for, but it is
+  interpreted case by case. Third-party components keep their own licenses
+  (`NOTICE.md`).
 
 ---
 
@@ -356,4 +367,4 @@ listing), `bootmgr scan`, and the language's `ON ERROR`.
 | `https` | Needs a TLS driver in the firmware; untested. Host names in `http` URLs (DNS) are untested. |
 | UEFI Shell options not supported | `time -tz/-d`; `-l LANG` of `devices`/`devtree` is accepted and ignored. |
 | Not implemented | See "The original plan" above. |
-| License | Settled: CC BY-NC 4.0 (see D20). A non-commercial license is not "open source" by the OSI definition, so some distributions and catalogues will not accept the project. |
+| License | Settled: Apache 2.0 with the Commons Clause (see D20). Not "open source" by the OSI definition, so some distributions and catalogues will not accept the project. Commercial licences are granted on request. |

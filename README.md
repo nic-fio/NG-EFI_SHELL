@@ -72,14 +72,18 @@ firmware boot menu, start it from another shell, or add a boot entry with
 
 ## License
 
-Copyright (c) 2026 nic-fio. NESH is released under the **Creative Commons
-Attribution-NonCommercial 4.0 International** license
-([CC BY-NC 4.0](LICENSE)): free to use, share and modify for non-commercial
-purposes; a modified version you share must credit the original project and
-say that it was changed. Commercial use needs permission.
+Copyright (c) 2026 nic-fio. NESH is released under the **Apache License 2.0
+with the [Commons Clause](LICENSE)**: use it for anything, at home or at work,
+free of charge; copy it, modify it and share it, keeping the notices and saying
+what you changed. What you may not do is **sell** it, or sell a product or
+service whose value comes substantially from it — that needs a commercial
+licence ([open an issue](https://github.com/nic-fio/NG-EFI_SHELL/issues) to ask
+for one).
 
-Note that a non-commercial license is not "open source" by the OSI definition.
-Third-party components keep their own licenses, listed in [NOTICE.md](NOTICE.md).
+Using NESH as a tool in paid work is fine; making money from NESH itself is
+not. The Commons Clause means the project is not "open source" by the OSI
+definition. Third-party components keep their own licences, listed in
+[NOTICE.md](NOTICE.md).
 
 ## Status
 

@@ -209,6 +209,34 @@ check "acpiview -d", FILESIZE("fs1:\FACP.bin") > 36
 check "mode", INSTR(RUN$("mode"), "columns") > 0
 check "sermode", INSTR(RUN$("sermode"), "baud") > 0
 check "gop", INSTR(RUN$("gop"), "current") > 0
+out$ = RUN$("gop 1024 768")
+PRINT out$
+check "gop by resolution", ERR = 0 AND INSTR(out$, "1024 x 768") > 0
+check "gop -data current", FIELD$(firstwith$("gop -data", "current", "yes"), "width") = "1024"
+RUN "gop -max"
+check "gop -max", ERR = 0
+w = VAL(FIELD$(firstwith$("gop -data", "current", "yes"), "width"))
+h = VAL(FIELD$(firstwith$("gop -data", "current", "yes"), "height"))
+check "gop -max picked the largest", w * h >= 1024 * 768
+RUN "gop 12345 999"
+check "gop unknown resolution", ERR <> 0
+RUN "gop 0"
+check "gop by number", ERR = 0
+' the resolution must stay set, and the text console must fit in it
+RUN "gop 1024 768"
+check "resolution stays set", FIELD$(RUN$("sysinfo -data"), "graphics_width") = "1024"
+RUN "gop -fit"
+w = VAL(FIELD$(RUN$("sysinfo -data"), "graphics_width"))
+cols = VAL(FIELD$(RUN$("sysinfo -data"), "console_columns"))
+rows = VAL(FIELD$(RUN$("sysinfo -data"), "console_rows"))
+check "gop -fit holds the text", w >= cols * 8 AND w < cols * 8 + 320
+RUN "gop 640 480"
+cols = VAL(FIELD$(RUN$("sysinfo -data"), "console_columns"))
+rows = VAL(FIELD$(RUN$("sysinfo -data"), "console_rows"))
+check "text mode shrinks with the screen", cols * 8 <= 640 AND rows * 19 <= 480
+RUN "mode -max"
+check "mode -max", ERR = 0
+RUN "gop 1280 800"
 check "cpuid", INSTR(RUN$("cpuid"), "Vendor") > 0
 IF FILEEXISTS("fs0:\tests\apps\efi-virtio.rom") THEN
   out$ = RUN$("loadpcirom fs0:\tests\apps\efi-virtio.rom")

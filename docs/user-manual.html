@@ -1570,7 +1570,7 @@ Started from: fs0: PciRoot(0x0)/Pci(0x2,0x0)/HD(1,MBR,0xBE1AFDFA,0x3F,0xFBFC1)</
     <tr><td><code>smbiosview</code></td><td>SMBIOS tables: BIOS, system, board, processor, memory modules (<code>-t 17</code>).</td></tr>
     <tr><td><code>acpiview</code></td><td>ACPI tables; <code>-s APIC</code> shows one, <code>-s DSDT -d</code> saves it to a file.</td></tr>
     <tr><td><code>cpuid</code></td><td>Processor vendor, family, model and features; raw registers for a leaf.</td></tr>
-    <tr><td><code>mode</code> / <code>gop</code></td><td>Text modes / graphics modes, and switching between them.</td></tr>
+    <tr><td><code>mode</code> / <code>gop</code></td><td>Text size and screen resolution; see <a href="#screen">Screen resolution and text size</a>.</td></tr>
     <tr><td><code>sermode</code></td><td>Serial port settings.</td></tr>
     <tr><td><code>dmem</code> / <code>mm</code></td><td>Memory dump / read and write memory, I/O ports and PCI registers.</td></tr>
     <tr><td><code>getmtc</code></td><td>The firmware's monotonic counter.</td></tr>
@@ -1607,6 +1607,39 @@ FACP  0x1fb79000     244  rev 3   BOCHS   BXPC      checksum ok
 DSDT  0x1fb7a000    8474  rev 1   BOCHS   BXPC      checksum ok
 FACS  0x1fbdd000      64  FACS
 APIC  0x1fb78000     120  rev 3   BOCHS   BXPC      checksum ok</pre>
+<h3 id="screen" data-index="screen resolution;text size;full screen">Screen resolution and text size</h3>
+<p>Two different things decide what you see:</p>
+<ul>
+  <li><strong>The screen resolution</strong> (<code>gop</code>): how many pixels the firmware draws on.</li>
+  <li><strong>The text console</strong> (<code>mode</code>): how many characters fit, in columns and rows. The firmware draws
+      each character in a fixed cell (8 x 19 pixels in the common EDK2 firmware), and it decides which text sizes exist
+      when it starts its console driver.</li>
+</ul>
+<p>This is why the shell often uses only part of a large screen: a 100 x 31 text console covers 800 x 589 pixels, so on a
+1920 x 1080 screen the text sits in a corner. There are two ways to fill the screen:</p>
+<pre class="terminal">fs0:\> mode -max
+Text mode 2: 100 x 31 characters
+fs0:\> gop -fit
+Graphics mode 3: 800 x 600 (text 100 x 31)</pre>
+<ul>
+  <li><code>mode -max</code> takes the largest text size the firmware offers (more characters, same size letters).</li>
+  <li><code>gop -fit</code> lowers the resolution to the smallest one that still holds the text console, so the characters
+      become as large as possible and the text fills the screen.</li>
+</ul>
+<p>To set a resolution for a program you are going to start (a graphical tool, a boot loader), use <code>gop</code>:</p>
+<table>
+  <thead><tr><th>Command</th><th>Effect</th></tr></thead>
+  <tbody>
+    <tr><td><code>gop</code></td><td>List the modes: number, resolution, pixel format, and the frame buffer.</td></tr>
+    <tr><td><code>gop 1024 768</code></td><td>Switch to that resolution.</td></tr>
+    <tr><td><code>gop 7</code></td><td>Switch to the mode with that number.</td></tr>
+    <tr><td><code>gop -max</code></td><td>The largest resolution available.</td></tr>
+    <tr><td><code>mode 100 31</code></td><td>A text size, from those <code>mode</code> lists.</td></tr>
+  </tbody>
+</table>
+<p>If the new resolution is too small for the current text size, NESH switches the console to one that fits first, so the
+text never ends up outside the screen.</p>
+
 <div class="callout danger"><span class="callout-title">Low-level access</span>
 <p><code>mm</code> and <code>hexedit -m</code> write directly to memory, I/O ports and PCI registers. A wrong value can hang the
 machine or damage data. <code>dmem</code> only reads, but reading an unmapped address can also hang some machines.
@@ -1766,6 +1799,8 @@ commands the UEFI Shell does not have: <code>bootmgr</code>, <code>var</code>, <
         firmware does not know (NTFS, ext4) appear only as <code>blkN</code>.</td></tr>
     <tr><td>“command not found”</td><td>Check the spelling with <code>help</code>; for a script or program, give the path or check
         <code>set path</code> and <code>which NAME</code>.</td></tr>
+    <tr><td>The shell uses only part of the screen</td><td>The text console is smaller than the screen: <code>mode -max</code> for more
+        characters, <code>gop -fit</code> to make the text fill the screen (see <a href="#screen">Screen resolution and text size</a>).</td></tr>
     <tr><td>Function keys do not work (serial console)</td><td>Use the <kbd>Ctrl</kbd> equivalents listed for each editor.</td></tr>
     <tr><td>History or backups are not saved</td><td>The boot volume is read-only; NESH continues without them.</td></tr>
     <tr><td>A script stops with “error: …”</td><td>The message gives file and line. <code>nesh.efi -k SCRIPT</code> checks the syntax.</td></tr>
@@ -2630,7 +2665,7 @@ Exit code is nonzero if an operation fails.</pre>
 <tr><td><a href="#cmd-acpiview"><code>acpiview</code></a> <span class="badge">-data</span></td><td>List the ACPI tables, or show or save one</td></tr>
 <tr><td><a href="#cmd-cpuid"><code>cpuid</code></a></td><td>Show processor information (or raw CPUID registers)</td></tr>
 <tr><td><a href="#cmd-mode"><code>mode</code></a></td><td>List the text modes or select one</td></tr>
-<tr><td><a href="#cmd-gop"><code>gop</code></a></td><td>List the graphics modes or select one</td></tr>
+<tr><td><a href="#cmd-gop"><code>gop</code></a> <span class="badge">-data</span></td><td>Show or change the screen resolution (graphics modes)</td></tr>
 <tr><td><a href="#cmd-sermode"><code>sermode</code></a></td><td>Show or set serial port settings (parity n|e|o|m|s, stop bits 0|1|1.5|2)</td></tr>
 <tr><td><a href="#cmd-loadpcirom"><code>loadpcirom</code></a></td><td>Load the UEFI drivers contained in a PCI option ROM file</td></tr>
 </tbody></table>
@@ -2732,20 +2767,32 @@ Example: cpuid 80000001</pre>
 <article class="cmd" id="cmd-mode" data-index="mode">
 <h4><code>mode</code></h4>
 <p class="cmd-summary">List the text modes or select one</p>
-<pre class="usage">mode [COLUMNS ROWS]</pre>
+<pre class="usage">mode [COLUMNS ROWS | -max]</pre>
 <pre class="cmd-help">  (none)        list the text modes of the console (current one marked)
   COLUMNS ROWS  switch to the mode with exactly this size
+  -max          switch to the mode with the most characters
+The firmware decides which text modes exist, from the screen resolution
+it had when it started its console driver. If the text uses only part of
+the screen, gop -fit lowers the resolution to match it.
 Example: mode 100 31</pre>
 </article>
 <article class="cmd" id="cmd-gop" data-index="gop">
-<h4><code>gop</code></h4>
-<p class="cmd-summary">List the graphics modes or select one</p>
-<pre class="usage">gop [MODE]</pre>
-<pre class="cmd-help">  (none)  list the graphics modes (resolution, pixel format), then the
-          frame buffer address and size
-  MODE    switch to this mode number, as listed
-After a mode change the text console is reset to fit the new screen.
-Example: gop 2</pre>
+<h4><code>gop</code> <span class="badge" title="supports -data output">-data</span></h4>
+<p class="cmd-summary">Show or change the screen resolution (graphics modes)</p>
+<pre class="usage">gop [MODE | WIDTH HEIGHT | -max | -fit]</pre>
+<pre class="cmd-help">  (none)         list the modes (number, resolution, pixel format), then
+                 the frame buffer address and size
+  WIDTH HEIGHT   switch to the mode with this resolution
+  MODE           switch to this mode number, as listed
+  -max           switch to the largest resolution available
+  -fit           smallest resolution that still holds the text console,
+                 so the text fills the screen
+  gop 1024 768   a common resolution
+The text console keeps its own size (see mode): the firmware draws
+characters in cells of 8 x 19 pixels, so a large screen may show the
+text in a corner. A text mode too large for the new resolution is
+changed first. With -data: mode, width, height, format, current (one
+record per mode), then framebuffer, framebuffer_size.</pre>
 </article>
 <article class="cmd" id="cmd-sermode" data-index="sermode">
 <h4><code>sermode</code></h4>

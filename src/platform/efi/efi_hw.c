@@ -1002,6 +1002,33 @@ static int cmd_acpiview(int argc, char **argv)
 
 /* ---- mode (text console) ---- */
 
+/* The firmware draws text in cells of this size (EDK2 default font). */
+#define CELL_W 8
+#define CELL_H 19
+
+/* Largest text mode that fits in w x h pixels; -1 if none does. */
+static INT32 text_mode_for(UINT32 w, UINT32 h)
+{
+    EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL *o = gST->ConOut;
+    INT32 best = -1;
+    uint64_t best_cells = 0;
+    for (INT32 m = 0; m < o->Mode->MaxMode; m++) {
+        UINTN c, r;
+        if (o->QueryMode(o, (UINTN)m, &c, &r) != EFI_SUCCESS)
+            continue;
+        if (c * CELL_W > w || r * CELL_H > h)
+            continue;
+        if ((uint64_t)c * r > best_cells)
+            best_cells = (uint64_t)c * r, best = m;
+    }
+    return best;
+}
+
+static bool text_mode_size(INT32 m, UINTN *c, UINTN *r)
+{
+    return gST->ConOut->QueryMode(gST->ConOut, (UINTN)m, c, r) == EFI_SUCCESS;
+}
+
 static int cmd_mode(int argc, char **argv)
 {
     EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL *o = gST->ConOut;
@@ -1013,6 +1040,17 @@ static int cmd_mode(int argc, char **argv)
                 out_printf("  %2d: %3llu columns x %3llu rows%s\n", m, (unsigned long long)c, (unsigned long long)r,
                            m == o->Mode->Mode ? "  (current)" : "");
         }
+        return RC_OK;
+    }
+    if (argc == 2 && !strcasecmp(argv[1], "-max")) {
+        INT32 best = text_mode_for(0xFFFFFFFF, 0xFFFFFFFF);
+        UINTN c, r;
+        if (best < 0 || !text_mode_size(best, &c, &r))
+            return cmd_err("mode", "cannot read the text modes");
+        EFI_STATUS st = o->SetMode(o, (UINTN)best);
+        if (EFI_ERROR(st))
+            return cmd_err("mode", "%s", efi_strerror(st));
+        out_printf("Text mode %d: %llu x %llu characters\n", best, (unsigned long long)c, (unsigned long long)r);
         return RC_OK;
     }
     int64_t c, r;
@@ -1264,6 +1302,48 @@ typedef struct {
     GOP_MODE_T *Mode;
 } GOP_T;
 
+static const char *gop_format(UINT32 f)
+{
+    static const char *fmts[] = { "RGB", "BGR", "bitmask", "blt only" };
+    return f < ARRAY_SIZE(fmts) ? fmts[f] : "?";
+}
+
+/* Resolution of a mode; false if the firmware cannot describe it. */
+static bool gop_mode_size(GOP_T *g, UINT32 m, UINT32 *w, UINT32 *h, UINT32 *fmt)
+{
+    GOP_INFO *info;
+    UINTN size;
+    if (g->QueryMode(g, m, &size, &info) != EFI_SUCCESS)
+        return false;
+    *w = info->HorizontalResolution;
+    *h = info->VerticalResolution;
+    if (fmt)
+        *fmt = info->PixelFormat;
+    gBS->FreePool(info);
+    return true;
+}
+
+static int gop_set(GOP_T *g, UINT32 m)
+{
+    UINT32 w = 0, h = 0;
+    bool known = gop_mode_size(g, m, &w, &h, NULL);
+    /* A text mode larger than the new screen would draw outside the frame
+     * buffer: switch the console to one that fits, before changing the mode. */
+    INT32 tm = known ? text_mode_for(w, h) : -1;
+    if (tm >= 0 && tm != gST->ConOut->Mode->Mode)
+        gST->ConOut->SetMode(gST->ConOut, (UINTN)tm);
+    EFI_STATUS st = g->SetMode(g, m);
+    if (EFI_ERROR(st))
+        return cmd_err("gop", "cannot switch to mode %u: %s", m, efi_strerror(st));
+    UINTN c = 0, r = 0;
+    if (known && text_mode_size(gST->ConOut->Mode->Mode, &c, &r))
+        out_printf("Graphics mode %u: %u x %u (text %llu x %llu)\n", m, w, h, (unsigned long long)c,
+                   (unsigned long long)r);
+    else if (known)
+        out_printf("Graphics mode %u: %u x %u\n", m, w, h);
+    return RC_OK;
+}
+
 static int cmd_gop(int argc, char **argv)
 {
     EFI_GUID guid = { 0x9042a9de, 0x23dc, 0x4a38, { 0x96, 0xfb, 0x7a, 0xde, 0xd0, 0x80, 0x51, 0x6a } };
@@ -1271,28 +1351,76 @@ static int cmd_gop(int argc, char **argv)
     if (gBS->LocateProtocol(&guid, NULL, (void **)&g) != EFI_SUCCESS)
         return cmd_err("gop", "no graphics output");
     if (argc == 1) {
-        static const char *fmts[] = { "RGB", "BGR", "bitmask", "blt only" };
         for (UINT32 m = 0; m < g->Mode->MaxMode; m++) {
-            GOP_INFO *info;
-            UINTN size;
-            if (g->QueryMode(g, m, &size, &info) != EFI_SUCCESS)
+            UINT32 w, h, f;
+            if (!gop_mode_size(g, m, &w, &h, &f))
                 continue;
-            out_printf("  %2u: %5u x %-5u %s%s\n", m, info->HorizontalResolution, info->VerticalResolution,
-                       info->PixelFormat < 4 ? fmts[info->PixelFormat] : "?", m == g->Mode->Mode ? "  (current)" : "");
-            gBS->FreePool(info);
+            if (out_data_mode()) {
+                data_record();
+                data_field("mode", "%u", m);
+                data_field("width", "%u", w);
+                data_field("height", "%u", h);
+                data_field("format", "%s", gop_format(f));
+                data_field("current", "%s", m == g->Mode->Mode ? "yes" : "no");
+                continue;
+            }
+            out_printf("  %2u: %5u x %-5u %s%s\n", m, w, h, gop_format(f),
+                       m == g->Mode->Mode ? "  (current)" : "");
+        }
+        if (out_data_mode()) {
+            data_record();
+            data_field("framebuffer", "0x%llx", (unsigned long long)g->Mode->FrameBufferBase);
+            data_field("framebuffer_size", "%llu", (unsigned long long)g->Mode->FrameBufferSize);
+            return RC_OK;
         }
         out_printf("Frame buffer at 0x%llx, %llu bytes\n", (unsigned long long)g->Mode->FrameBufferBase,
                    (unsigned long long)g->Mode->FrameBufferSize);
         return RC_OK;
     }
+    /* -fit: the smallest resolution that still holds the current text mode,
+     * so that the text fills as much of the screen as possible */
+    if (argc == 2 && !strcasecmp(argv[1], "-fit")) {
+        UINTN c, r;
+        if (!text_mode_size(gST->ConOut->Mode->Mode, &c, &r))
+            return cmd_err("gop", "cannot read the current text mode");
+        UINT32 need_w = (UINT32)(c * CELL_W), need_h = (UINT32)(r * CELL_H);
+        UINT32 best = g->Mode->Mode, bw = 0, bh = 0;
+        for (UINT32 m = 0; m < g->Mode->MaxMode; m++) {
+            UINT32 w, h;
+            if (!gop_mode_size(g, m, &w, &h, NULL) || w < need_w || h < need_h)
+                continue;
+            if (!bw || (uint64_t)w * h < (uint64_t)bw * bh)
+                best = m, bw = w, bh = h;
+        }
+        if (!bw)
+            return cmd_err("gop", "no mode holds the text console (%llu x %llu characters)",
+                           (unsigned long long)c, (unsigned long long)r);
+        return gop_set(g, best);
+    }
+    /* -max: the largest resolution the firmware offers */
+    if (argc == 2 && (!strcasecmp(argv[1], "-max") || !strcasecmp(argv[1], "max"))) {
+        UINT32 best = g->Mode->Mode, bw = 0, bh = 0;
+        for (UINT32 m = 0; m < g->Mode->MaxMode; m++) {
+            UINT32 w, h;
+            if (gop_mode_size(g, m, &w, &h, NULL) && (uint64_t)w * h > (uint64_t)bw * bh)
+                best = m, bw = w, bh = h;
+        }
+        return gop_set(g, best);
+    }
+    /* WIDTH HEIGHT: the mode with that resolution */
+    int64_t a, b;
+    if (argc == 3 && parse_int(argv[1], &a) && parse_int(argv[2], &b)) {
+        for (UINT32 m = 0; m < g->Mode->MaxMode; m++) {
+            UINT32 w, h;
+            if (gop_mode_size(g, m, &w, &h, NULL) && w == (UINT32)a && h == (UINT32)b)
+                return gop_set(g, m);
+        }
+        return cmd_err("gop", "no mode with %lld x %lld (gop lists the available ones)", (long long)a, (long long)b);
+    }
     int64_t m;
     if (argc != 2 || !parse_int(argv[1], &m) || m < 0 || m >= g->Mode->MaxMode)
         return cmd_usage("gop");
-    EFI_STATUS st = g->SetMode(g, (UINT32)m);
-    if (EFI_ERROR(st))
-        return cmd_err("gop", "%s", efi_strerror(st));
-    gST->ConOut->Reset(gST->ConOut, FALSE); /* let the text console adapt */
-    return RC_OK;
+    return gop_set(g, (UINT32)m);
 }
 
 /* ---- cpuid ---- */
@@ -1402,9 +1530,13 @@ static const Cmd hw_cmds[] = {
       "With -data: one record per table (signature, address, length, revision,\n"
       "oemid, oemtable, checksum); -d cannot be combined with -data.\n",
       CMD_DATA },
-    { "mode", cmd_mode, "mode [COLUMNS ROWS]", "List the text modes or select one",
+    { "mode", cmd_mode, "mode [COLUMNS ROWS | -max]", "List the text modes or select one",
       "  (none)        list the text modes of the console (current one marked)\n"
       "  COLUMNS ROWS  switch to the mode with exactly this size\n"
+      "  -max          switch to the mode with the most characters\n"
+      "The firmware decides which text modes exist, from the screen resolution\n"
+      "it had when it started its console driver. If the text uses only part of\n"
+      "the screen, gop -fit lowers the resolution to match it.\n"
       "Example: mode 100 31\n" },
     { "sermode", cmd_sermode, "sermode [HANDLE [BAUD PARITY DATABITS STOPBITS]]",
       "Show or set serial port settings (parity n|e|o|m|s, stop bits 0|1|1.5|2)",
@@ -1424,12 +1556,21 @@ static const Cmd hw_cmds[] = {
       "Then all controllers are connected, unless -nc is given.\n"
       "With Secure Boot active, the firmware checks the driver signatures.\n"
       "Example: loadpcirom -nc nic.rom\n" },
-    { "gop", cmd_gop, "gop [MODE]", "List the graphics modes or select one",
-      "  (none)  list the graphics modes (resolution, pixel format), then the\n"
-      "          frame buffer address and size\n"
-      "  MODE    switch to this mode number, as listed\n"
-      "After a mode change the text console is reset to fit the new screen.\n"
-      "Example: gop 2\n" },
+    { "gop", cmd_gop, "gop [MODE | WIDTH HEIGHT | -max | -fit]",
+      "Show or change the screen resolution (graphics modes)",
+      "  (none)         list the modes (number, resolution, pixel format), then\n"
+      "                 the frame buffer address and size\n"
+      "  WIDTH HEIGHT   switch to the mode with this resolution\n"
+      "  MODE           switch to this mode number, as listed\n"
+      "  -max           switch to the largest resolution available\n"
+      "  -fit           smallest resolution that still holds the text console,\n"
+      "                 so the text fills the screen\n"
+      "  gop 1024 768   a common resolution\n"
+      "The text console keeps its own size (see mode): the firmware draws\n"
+      "characters in cells of 8 x 19 pixels, so a large screen may show the\n"
+      "text in a corner. A text mode too large for the new resolution is\n"
+      "changed first. With -data: mode, width, height, format, current (one\n"
+      "record per mode), then framebuffer, framebuffer_size.\n", CMD_DATA },
     { "cpuid", cmd_cpuid, "cpuid [LEAF [SUBLEAF]]", "Show processor information (or raw CPUID registers)",
       "  (none)          vendor, family, model, stepping and main features\n"
       "  LEAF [SUBLEAF]  raw EAX, EBX, ECX, EDX of one leaf (SUBLEAF default 0)\n"

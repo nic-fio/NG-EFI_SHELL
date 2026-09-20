@@ -229,6 +229,21 @@ From it came the working rules of the project:
 - `nesh -k SCRIPT` checks the syntax without running (added for the
   documentation tests, useful to users too).
 
+### D16b. Screen resolution and text size
+
+- **Context.** `gop` could only select a graphics mode by number, and the screen
+  resolution did not stay: after `SetMode` the command called
+  `ConOut->Reset()` "to let the text console adapt", and the firmware console
+  driver put its own resolution back.
+- **Decision.** `gop` selects a mode by resolution (`gop 1024 768`), by number,
+  `-max` or `-fit`; the reset is gone. Because the firmware draws text in fixed
+  cells (8 x 19 pixels) and decides its text sizes when its console driver
+  starts, a large screen shows the text in a corner: `mode -max` takes the
+  largest text size available and `gop -fit` lowers the resolution to the
+  smallest one that still holds the text console, so the text fills the screen.
+- **Safety.** Before switching to a smaller resolution NESH moves the console to
+  a text mode that fits, so the firmware never draws outside the frame buffer.
+
 ### D17. English for the product, Italian for the discussion
 
 - Messages, help texts, code comments and the manuals are in English (the
@@ -276,8 +291,9 @@ All work took place in one long working session (2026-09-19), in phases.
 | **5. Script-friendly output** | `-sfo` replaced by `-data` with `RECORDS`/`FIELD$` (D14). The QEMU test runner was found to report "OK" for scripts that stopped on an error; the pass rule was tightened (D19). |
 | **6. IPv6** | `ifconfig6`, `ping6`, IPv6 in `ping`/`tftp`/`http` (D15), tested with QEMU user networking; an IPv6 address parser/formatter checked against 29 cases; `ifconfig` now shows the DHCP gateway. |
 | **7. Documentation** | Help texts written for all 84 commands by reading their code. That review found and fixed real defects: `mv` could lose the target file if the rename failed; `exit` did not stop a running script; `which` ignored `path`; `load` did not connect drivers when one file failed; `mkdir -p` accepted a file in the path; `vol fs1` without colon showed the wrong volume; missing UEFI Shell options (`reset -c/-fwui`, `pause -q`, `exit /b`, `memmap -b`, `sermode` stop bits 0); the editor lost tab characters and the UTF-8 BOM; the example boot menu failed on read-only volumes and listed hidden entries. User and developer manuals written; examples executed by the test suite. |
-| **8. Secure Boot** | Tested for real in QEMU with own test keys enrolled in OVMF (`make qemu-sbtest`, part of CI): unsigned images refused by the firmware, hardware writes refused, clock/serial allowed, keys unchangeable. One defect found and fixed: refusals were reported as a bare "access denied". |
-| **9. Publication** | Repository published on GitHub as `NG-EFI_SHELL`, public (owner's request); provisional all-rights-reserved license; manuals online with GitHub Pages; GitHub Actions builds and tests every push and publishes a Release with `nesh.efi` for each version tag (binaries are distributed as Releases, not committed to the repository). |
+| **8. Screen** | While adding `gop 1024 768` / `-max` / `-fit` (owner's suggestion) it turned out that changing the resolution had no lasting effect at all, and that the text console covers only part of a large screen (a firmware property, now explained in the manual). |
+| **9. Secure Boot** | Tested for real in QEMU with own test keys enrolled in OVMF (`make qemu-sbtest`, part of CI): unsigned images refused by the firmware, hardware writes refused, clock/serial allowed, keys unchangeable. One defect found and fixed: refusals were reported as a bare "access denied". |
+| **10. Publication** | Repository published on GitHub as `NG-EFI_SHELL`, public (owner's request); provisional all-rights-reserved license; manuals online with GitHub Pages; GitHub Actions builds and tests every push and publishes a Release with `nesh.efi` for each version tag (binaries are distributed as Releases, not committed to the repository). |
 
 ### The original plan and what came of it
 

@@ -69,6 +69,9 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # the annotated tag object, for the release notes
+          fetch-tags: true
 
       - uses: actions/download-artifact@v4
         with:

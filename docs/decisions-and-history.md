@@ -295,6 +295,28 @@ From it came the working rules of the project:
   reported as passing.
 - Every bug fixed gets a test.
 
+### D20. License: CC BY-NC 4.0
+
+- **Context.** The repository was published with a provisional "all rights
+  reserved" notice, to be decided later.
+- **Requirements** given by the owner: anyone may use the project and
+  redistribute it unchanged; anyone may modify it for their own use; a modified
+  version that is redistributed must credit the original author; no commercial
+  use of any kind.
+- **Options.** (a) CC BY-NC 4.0; (b) PolyForm Noncommercial 1.0.0, written for
+  software; (c) a permissive license (MIT, BSD-2) plus a non-commercial rider,
+  which would be a custom licence nobody knows.
+- **Decision.** (a) CC BY-NC 4.0: it matches the five requirements one by one
+  (attribution, statement of changes, non-commercial), GitHub recognizes it and
+  users know it. PolyForm Noncommercial stays the alternative if a
+  software-specific text is preferred later.
+- **Consequences.** The project is *not* open source by the OSI definition;
+  Linux distributions and some catalogues will not package it. Creative Commons
+  advises against its licenses for software, because they do not deal with
+  patents or with the source code of a program: only the copyright side is
+  covered. Third-party components in the repository keep their own, more
+  permissive, licenses (`NOTICE.md`).
+
 ---
 
 ## 3. History
@@ -334,4 +356,4 @@ listing), `bootmgr scan`, and the language's `ON ERROR`.
 | `https` | Needs a TLS driver in the firmware; untested. Host names in `http` URLs (DNS) are untested. |
 | UEFI Shell options not supported | `time -tz/-d`; `-l LANG` of `devices`/`devtree` is accepted and ignored. |
 | Not implemented | See "The original plan" above. |
-| License | Provisional: all rights reserved (owner: "Per il tipo di licenza non ho ancora deciso nulla di definitivo. Al momento usiamo quella restrittiva, poi la cambieremo"). MIT or BSD-2-Clause were proposed at the start. |
+| License | Settled: CC BY-NC 4.0 (see D20). A non-commercial license is not "open source" by the OSI definition, so some distributions and catalogues will not accept the project. |

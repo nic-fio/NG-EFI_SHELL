@@ -16,7 +16,7 @@
 <nav class="sidebar" aria-label="Table of contents">
   <div class="brand">
     <div class="brand-logo">&gt;_</div>
-    <div class="brand-text"><strong>NESH User Manual</strong><span>New EFI Shell 0.1.0</span></div>
+    <div class="brand-text"><strong>NESH User Manual</strong><span>New EFI Shell 0.2.0</span></div>
   </div>
   <div class="search">
     <input type="search" placeholder="Search commands, functions, topics  ( / )" aria-label="Search">
@@ -37,7 +37,7 @@
   <p class="lead">A modern command shell for UEFI firmware: files, disks, boot entries, UEFI variables,
   drivers, hardware and network, with a real scripting language built in.</p>
   <div class="meta">
-    <span><b>Version</b> 0.1.0</span>
+    <span><b>Version</b> 0.2.0</span>
     <span><b>Platform</b> UEFI x86-64</span>
     <span><b>File</b> nesh.efi (one file)</span>
     <span><b>Audience</b> users, administrators, script writers</span>
@@ -166,7 +166,7 @@ way to try it without touching a real computer.</p>
 <p>Choose the USB stick (or the NESH boot entry) in the firmware boot menu — usually opened with <kbd>F12</kbd>,
 <kbd>F11</kbd>, <kbd>F8</kbd> or <kbd>Esc</kbd> during power-on, depending on the manufacturer. NESH starts with a short
 banner and a prompt showing the current directory:</p>
-<pre class="terminal">NESH 0.1.0 - New EFI Shell (UEFI x86_64)
+<pre class="terminal">NESH 0.2.0 - New EFI Shell (UEFI x86_64)
 Type 'help' for the commands, 'help basic' for the scripting language.
 
 fs0:\> </pre>
@@ -595,7 +595,7 @@ PRINT "Hello from NESH "; VERSION$
 name$ = "world"
 PRINT "Hello, " + name$ + "!"</pre>
 <pre class="terminal" data-example-output="hello">fs0:\&gt; hello
-Hello from NESH 0.1.0
+Hello from NESH 0.2.0
 Hello, world!</pre>
 <ul>
   <li>A line starting with <code>'</code> (or <code>REM</code>) is a comment.</li>
@@ -2989,7 +2989,7 @@ of 4 columns; the Tab key inserts 4 spaces. Needs an interactive console.</pre>
 <div id="index-list"></div>
 
 <footer class="doc-footer">
-  NESH User Manual — for NESH 0.1.0. See also the <a href="developer-manual.html">developer manual</a> and
+  NESH User Manual — for NESH 0.2.0. See also the <a href="developer-manual.html">developer manual</a> and
   the <a href="https://github.com/nic-fio/NG-EFI_SHELL/blob/main/docs/decisions-and-history.md">design decisions and project history</a>.
 </footer>
 

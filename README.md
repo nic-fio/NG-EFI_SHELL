@@ -78,6 +78,6 @@ licenses, listed in the LICENSE file.
 
 ## Status
 
-Version 0.1.0. Tested in QEMU with OVMF; not yet tested on real hardware or
-with Secure Boot enabled. See the open questions at the end of the
+Version 0.2.0. Tested in QEMU with OVMF, including Secure Boot with test keys;
+not yet tested on real hardware. See the open questions at the end of the
 [decisions document](docs/decisions-and-history.md).

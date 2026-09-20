@@ -82,8 +82,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cat > notes.md <<EOF
-          NESH ${GITHUB_REF_NAME} — built and tested by GitHub Actions from this tag.
+          # the annotation of the tag becomes the description of the release
+          git tag -l --format='%(contents)' "$GITHUB_REF_NAME" > notes.md
+          [ -s notes.md ] || echo "NESH $GITHUB_REF_NAME" > notes.md
+          cat >> notes.md <<EOF
+
+          Built and tested by GitHub Actions from this tag.
 
           **Download** \`nesh.efi\` (UEFI x86-64). Copy it to a FAT USB stick as
           \`\EFI\BOOT\BOOTX64.EFI\` to boot it from the firmware menu, or start it

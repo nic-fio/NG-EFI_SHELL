@@ -14,6 +14,11 @@ PRINT "not in path: ERR="; ERR
 SETENV "path", ENV$("path") + ";tools"
 PRINT INSTR(RUN$("which hello"), "hello.nsb") > 0
 PRINT RUN$("which LEN")
+' a file without a known extension is executable only if it is a UEFI application
+WRITEFILE "data.img", "not an EFI image"
+PRINT RUN$("which data.img")
+RUN "data.img"
+PRINT "data.img: ERR="; ERR
 ' mv replaces an existing file only after the move
 WRITEFILE "a.txt", "new"
 WRITEFILE "b.txt", "old"

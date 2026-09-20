@@ -427,38 +427,6 @@ static int order_index(const unsigned *v, int n, unsigned id)
     return -1;
 }
 
-/* ---- PE validation ---- */
-
-static const char *check_pe(const char *path)
-{
-    char *d;
-    size_t n;
-    if (file_read_all(path, &d, &n))
-        return "cannot read the file";
-    const char *err = NULL;
-    const uint8_t *u = (const uint8_t *)d;
-    if (n < 0x40 || u[0] != 'M' || u[1] != 'Z') {
-        err = "not an EFI executable (no MZ header)";
-    } else {
-        uint32_t pe = u[0x3c] | u[0x3d] << 8 | u[0x3e] << 16 | (uint32_t)u[0x3f] << 24;
-        if ((size_t)pe + 0x5e > n || memcmp(u + pe, "PE\0\0", 4))
-            err = "not an EFI executable (no PE header)";
-        else {
-            unsigned machine = u[pe + 4] | u[pe + 5] << 8;
-            unsigned magic = u[pe + 24] | u[pe + 25] << 8;
-            unsigned subsys = u[pe + 24 + 68] | u[pe + 24 + 69] << 8;
-            if (machine != 0x8664)
-                err = "the executable is not for x86_64";
-            else if (magic != 0x20b)
-                err = "not a PE32+ image";
-            else if (subsys != 10)
-                err = "not an EFI application (driver or other subsystem)";
-        }
-    }
-    free(d);
-    return err;
-}
-
 /* ---- Commands ---- */
 
 typedef struct {
@@ -667,7 +635,7 @@ static int bm_add(BArgs *a, const char *kind)
         free(path);
         return cmd_err("bootmgr", "%s: file not found", a->pos[0]);
     }
-    const char *bad = check_pe(path);
+    const char *bad = file_check_efi_app(path);
     if (bad && !a->f) {
         free(path);
         return cmd_err("bootmgr", "%s: %s (use -f to add it anyway)", a->pos[0], bad);
@@ -826,7 +794,7 @@ static int bm_rewrite(BArgs *a, const char *kind, const char *sub)
                 rc = cmd_err("bootmgr", "%s: file not found", a->file);
                 goto out;
             }
-            const char *bad = check_pe(path);
+            const char *bad = file_check_efi_app(path);
             if (bad && !a->f) {
                 free(path);
                 rc = cmd_err("bootmgr", "%s: %s (use -f to use it anyway)", a->file, bad);

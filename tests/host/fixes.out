@@ -6,6 +6,10 @@ hello: not found
 not in path: ERR=127
 -1
 LEN: BASIC function
+data.img: not found
+
+data.img: command not found
+data.img: ERR=127
 mv: new a exists=0
 mkdir: fs0:\f: not a directory
 mkdir -p through a file: ERR=1

@@ -10,8 +10,8 @@
 '   fs0:\> linuxboot.nsb
 ' or copy it to fs0:\startup.nsb to get the menu at every boot.
 
-kernel$ = "fs0:\vmlinuz.efi"        ' the kernel, on this volume
-initrd$ = "\initrd.img"             ' path on the kernel's volume, "" if none
+kernel$ = "fs0:\vmlinuz"            ' the kernel, on this volume
+initrd$ = "initrd.img"              ' path on the kernel's volume, "" if none
 root$   = "root=PARTUUID=00000000-0000-0000-0000-000000000000 ro"
 
 IF NOT FILEEXISTS(kernel$) THEN

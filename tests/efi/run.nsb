@@ -67,6 +67,13 @@ check "env uefiversion", ENV$("uefiversion") = "2.7"
 out$ = RUN$("fs0:\tests\apps\shelltest.efi", "alpha", "beta gamma")
 PRINT out$
 check "shell protocol test app", ERR = 0 AND INSTR(out$, "SHELLTEST DONE ok") > 0
+' a UEFI application without an extension runs too (this is how vmlinuz starts)
+out$ = RUN$("fs0:\tests\apps\shelltest", "alpha", "beta gamma")
+check "application without extension", ERR = 0 AND INSTR(out$, "SHELLTEST DONE ok") > 0
+check "which without extension", INSTR(RUN$("which fs0:\tests\apps\shelltest"), "shelltest") > 0
+WRITEFILE "fs1:\tmp\datafile", "not an EFI image"
+out$ = RUN$("fs1:\tmp\datafile")
+check "data file without extension is not executable", ERR = 127
 out$ = RUN$("fs0:\tests\apps\pci.efi")
 check "EDK2 pci.efi", ERR = 0 AND INSTR(out$, "Host/PCI bridge") > 0
 out$ = RUN$("fs0:\tests\apps\usb.efi")

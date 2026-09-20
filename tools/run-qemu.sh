@@ -132,6 +132,8 @@ elif [ $TEST = 1 ]; then
     cp -r "$ROOT/tests/efi" "$ESP/tests"
     mkdir -p "$ESP/tests/apps"
     cp "$ROOT/build/tests/shelltest.efi" "$ESP/tests/apps/"
+    # the same application without an extension: it must still be executable
+    cp "$ROOT/build/tests/shelltest.efi" "$ESP/tests/apps/shelltest"
     cp "$ROOT"/tests/fixtures/edk2/*.efi "$ESP/tests/apps/"
     # PCI option ROM for the loadpcirom test, from the QEMU installation (iPXE, GPL)
     ROM=${QEMU_ROM:-/usr/share/qemu/efi-virtio.rom}

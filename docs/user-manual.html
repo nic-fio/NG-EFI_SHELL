@@ -304,8 +304,13 @@ fs0:\> fs0:\efi\tools\memtest.efi</pre>
 <p>A name without a folder is searched in the directories listed in the environment variable <code>path</code>
 (separated by <code>;</code>, where <code>.</code> is the current directory). By default <code>path</code> is
 <code>.;fsN:\efi\tools;fsN:\efi\boot;fsN:\</code>, where <code>fsN:</code> is the boot volume. For each directory NESH tries
-<code>NAME</code>, then <code>NAME.nsb</code>, then <code>NAME.efi</code>; only files ending in <code>.nsb</code> or
-<code>.efi</code> can be run. <code>which NAME</code> tells what a name refers to.</p>
+<code>NAME.nsb</code>, then <code>NAME.efi</code>, then <code>NAME</code> itself. <code>which NAME</code> tells what a name
+refers to.</p>
+<p>A file <em>without</em> one of those two extensions is run only when it really is a UEFI application for this
+machine: NESH reads its headers and asks for the <code>MZ</code> and <code>PE</code> signatures, x86-64 code and an
+application (not a driver). This is what makes <code>vmlinuz</code> — a Linux kernel with the EFI stub, which nobody
+names <code>vmlinuz.efi</code> — start by typing its name, while a data file such as <code>live.img</code> answers
+<code>command not found</code>. A script must end in <code>.nsb</code>: there is no signature to recognise it by.</p>
 
 <h3 id="environment" data-index="environment variables;set">Environment variables</h3>
 <p>Environment variables are named text values shared by the shell and the programs it starts.
@@ -1113,11 +1118,12 @@ start; <kbd>Esc</kbd> during the three-second countdown before it (or the “Sta
 <h3 id="linux-options">Starting a Linux kernel with different options</h3>
 <p>A menu does not have to choose between different systems: it can choose between different ways of starting the
 <em>same</em> one. Almost every x86-64 distribution ships a kernel built as an EFI application (the “EFI stub”), so
-NESH can start <code>vmlinuz</code> itself and give it a command line — exactly what a boot loader does. Anything the
-script writes after the file name reaches the kernel:</p>
-<pre class="terminal">fs0:\> vmlinuz.efi initrd=\initrd.img root=/dev/sda2 ro quiet splash</pre>
+NESH can start <code>vmlinuz</code> itself and give it a command line — exactly what a boot loader does. The kernel
+is usually called <code>vmlinuz</code>, without an extension, and NESH runs it as it is. Anything the script writes
+after the file name reaches the kernel:</p>
+<pre class="terminal">fs0:\> vmlinuz initrd=initrd.img root=/dev/sda2 ro quiet splash</pre>
 <p>In a script the line is built as a string, so one entry per set of options is all it takes:</p>
-<pre class="code" data-lang="basic">kernel$ = "fs0:\vmlinuz.efi"
+<pre class="code" data-lang="basic">kernel$ = "fs0:\vmlinuz"
 root$   = "root=/dev/sda2 ro"
 
 choice = MENU("Start Linux", "Normal|Safe graphics|Rescue", 10, 1)
@@ -1126,19 +1132,19 @@ SELECT CASE choice
   CASE 2 : opt$ = root$ + " nomodeset"
   CASE 3 : opt$ = root$ + " single"
 END SELECT
-RUN kernel$ + " initrd=\initrd.img " + opt$</pre>
+RUN kernel$ + " initrd=initrd.img " + opt$</pre>
 <p><code>examples\linuxboot.nsb</code> is the finished version, with a ten-second countdown and an entry that asks for
 the options from the keyboard. Two details are worth knowing:</p>
 <ul>
-  <li>The kernel receives the file name as the first word of its command line (<code>Command line: fs0:\vmlinuz.efi
+  <li>The kernel receives the file name as the first word of its command line (<code>Command line: fs0:\vmlinuz
       root=…</code>). This is what the UEFI Shell does as well, and the kernel ignores it.</li>
-  <li><code>initrd=</code> is a path <em>on the kernel's own volume</em>, written with a leading backslash and no
-      <code>fsN:</code> prefix: the kernel's EFI stub loads the file itself.</li>
+  <li><code>initrd=</code> is a path <em>on the kernel's own volume</em>, without the <code>fsN:</code> prefix: the
+      kernel's EFI stub loads the file itself, next to the kernel unless a leading backslash says otherwise.</li>
 </ul>
 <div class="callout note"><span class="callout-title">Kernel or boot entry?</span>
 <p>Starting the kernel directly, as above, keeps everything in one script and lets you change the options without
 touching the firmware. The other way is to create one firmware boot entry per set of options —
-<code>bootmgr add fs0:\vmlinuz.efi "Linux (rescue)" "initrd=\initrd.img root=/dev/sda2 ro single"</code> — and let the
+<code>bootmgr add fs0:\vmlinuz "Linux (rescue)" "initrd=initrd.img root=/dev/sda2 ro single"</code> — and let the
 menu pick one with <code>bootmgr next ID</code> followed by <code>reset</code>. Use that when other boot menus, or the
 firmware itself, must see the entries too.</p></div>
 

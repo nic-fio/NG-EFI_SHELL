@@ -41,8 +41,9 @@ int shell_exec_line(const char *line); /* splits words, handles "> file" and ">>
 char **shell_split(const char *line, int *argc, const char **err);
 void argv_free(char **argv);
 int shell_last_status(void);
-/* Looks for NAME, NAME.nsb, NAME.efi like the command lookup does (the "path"
- * variable unless NAME contains a path). Returns a canonical path or NULL. */
+/* Looks for NAME.nsb, NAME.efi and NAME like the command lookup does (the
+ * "path" variable unless NAME contains a path); a file without one of those
+ * extensions counts only when it is a UEFI application. Canonical path or NULL. */
 char *shell_find_executable(const char *name);
 
 /* Paths: canonical form is "fsN:\dir\file". */
@@ -61,6 +62,9 @@ int file_read_all(const char *path, char **data, size_t *len);
 int file_write_all(const char *path, const char *data, size_t len, bool append);
 /* Text file -> UTF-8 (handles UTF-8 BOM and UCS-2 LE with BOM). */
 int file_read_text(const char *path, char **text, size_t *len);
+/* NULL when the file is a UEFI application this machine can start, otherwise
+ * the reason why it is not (only the headers are read). */
+const char *file_check_efi_app(const char *path);
 
 /* Command helpers: print "cmd: message" and return RC_FAIL. */
 int cmd_err(const char *cmd, const char *fmt, ...) __attribute__((format(printf, 2, 3)));

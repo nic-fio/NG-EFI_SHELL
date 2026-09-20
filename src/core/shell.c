@@ -369,6 +369,47 @@ int file_read_all(const char *path, char **data, size_t *len)
     return PAL_OK;
 }
 
+/* The reason why the headers are not those of a UEFI application, or NULL when
+ * they are. Only the first kilobyte of the file is needed: the subsystem sits
+ * 0x5e bytes past the PE signature, and the signature itself is near the top. */
+static const char *pe_check(const uint8_t *u, size_t n)
+{
+    if (n < 0x40 || u[0] != 'M' || u[1] != 'Z')
+        return "not an EFI executable (no MZ header)";
+    uint32_t pe = u[0x3c] | u[0x3d] << 8 | u[0x3e] << 16 | (uint32_t)u[0x3f] << 24;
+    if ((size_t)pe + 0x5e > n || memcmp(u + pe, "PE\0\0", 4))
+        return "not an EFI executable (no PE header)";
+    unsigned machine = u[pe + 4] | u[pe + 5] << 8;
+    unsigned magic = u[pe + 24] | u[pe + 25] << 8;
+    unsigned subsys = u[pe + 24 + 68] | u[pe + 24 + 69] << 8;
+    if (machine != 0x8664)
+        return "the executable is not for x86_64";
+    if (magic != 0x20b)
+        return "not a PE32+ image";
+    if (subsys != 10)
+        return "not an EFI application (driver or other subsystem)";
+    return NULL;
+}
+
+const char *file_check_efi_app(const char *path)
+{
+    PalFile *f;
+    if (pal_open(path, PAL_O_READ, &f))
+        return "cannot read the file";
+    uint8_t head[1024];
+    size_t got = 0;
+    int e = PAL_OK;
+    while (got < sizeof(head)) {
+        size_t n;
+        e = pal_read(f, (char *)head + got, sizeof(head) - got, &n);
+        if (e || !n)
+            break;
+        got += n;
+    }
+    pal_close(f);
+    return e ? "cannot read the file" : pe_check(head, got);
+}
+
 int file_write_all(const char *path, const char *data, size_t len, bool append)
 {
     PalFile *f;
@@ -520,11 +561,11 @@ static bool has_ext(const char *p, const char *ext)
     return l > e && !strcasecmp(p + l - e, ext);
 }
 
-/* Looks for NAME, NAME.nsb, NAME.efi: as given if it contains a path,
+/* Looks for NAME.nsb, NAME.efi and NAME: as given if it contains a path,
  * otherwise in the directories of the "path" environment variable. */
 char *shell_find_executable(const char *name)
 {
-    static const char *exts[] = { "", SCRIPT_EXT, ".efi" };
+    static const char *exts[] = { SCRIPT_EXT, ".efi", "" };
     bool is_path = strpbrk(name, "\\/:") != NULL;
     bool has_known_ext = has_ext(name, SCRIPT_EXT) || has_ext(name, ".efi");
     char **dirs = NULL;
@@ -549,8 +590,8 @@ char *shell_find_executable(const char *name)
     char *found = NULL;
     for (int d = 0; d < nd && !found; d++) {
         for (size_t e = 0; e < ARRAY_SIZE(exts) && !found; e++) {
-            /* only files with a known extension are executable */
-            if (!*exts[e] ? !has_known_ext : has_known_ext)
+            /* a name that already ends in .nsb or .efi is taken as it is */
+            if (has_known_ext && *exts[e])
                 continue;
             char *cand = xasprintf("%s%s", name, exts[e]);
             char *full = dirs[d] ? path_join(dirs[d], cand) : xstrdup(cand);
@@ -558,7 +599,10 @@ char *shell_find_executable(const char *name)
             char *canon = path_resolve(full);
             free(full);
             PalStat st;
-            if (canon && pal_stat(canon, &st) == PAL_OK && !st.is_dir)
+            /* without a known extension the file is executable only when it is
+             * a UEFI application: this is how "vmlinuz" starts a Linux kernel */
+            if (canon && pal_stat(canon, &st) == PAL_OK && !st.is_dir &&
+                (has_known_ext || *exts[e] || !file_check_efi_app(canon)))
                 found = canon;
             else
                 free(canon);

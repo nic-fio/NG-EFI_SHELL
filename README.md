@@ -58,13 +58,22 @@ make test            # language and command tests, documentation checks
 make qemu-test       # automated tests inside QEMU/OVMF
 make qemu-nettest    # network tests (IPv4 and IPv6) inside QEMU
 make qemu            # interactive session in QEMU (serial console)
+make usb             # build/nesh-usb.img, a bootable disk image (needs mtools)
 ```
 
 `OVMF=/path/to/OVMF.fd` selects the firmware image.
 
 ## Install
 
-Copy `build/nesh.efi` to a FAT-formatted USB stick or EFI system partition,
+The quickest way is the ready-made disk image from the
+[latest release](https://github.com/nic-fio/NG-EFI_SHELL/releases/latest)
+(`nesh-usb.img`, also `make usb`): write it to a USB stick and boot it.
+
+```
+dd if=nesh-usb.img of=/dev/sdX bs=4M conv=fsync    # on Windows: Rufus, balenaEtcher
+```
+
+Otherwise, copy `build/nesh.efi` to a FAT-formatted USB stick or EFI system partition,
 then either copy it as `\EFI\BOOT\BOOTX64.EFI` to boot it directly from the
 firmware boot menu, start it from another shell, or add a boot entry with
 `bootmgr add`. With Secure Boot active, sign it with a trusted key first

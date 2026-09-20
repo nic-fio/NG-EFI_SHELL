@@ -3,6 +3,7 @@
 #   make            build build/nesh.efi (UEFI x86_64) and build/nesh-host (Linux test build)
 #   make test       run the language/command tests with the host build, check the docs
 #   make docs       regenerate the command reference of docs/user-manual.html
+#   make usb        build/nesh-usb.img, a bootable disk image (dd it to a USB stick)
 #   make qemu       boot build/nesh.efi in QEMU/OVMF (interactive, serial console)
 #   make qemu-test  run the automated tests inside QEMU
 #   make qemu-sbtest  run the Secure Boot tests inside QEMU (own test keys)
@@ -71,6 +72,11 @@ test: $(BUILD)/nesh-host
 docs:
 	@$(PYTHON) tools/gen-docs.py
 
+# bootable USB/disk image: GPT + EFI system partition with NESH and the examples
+usb: $(BUILD)/nesh-usb.img
+$(BUILD)/nesh-usb.img: $(BUILD)/nesh.efi tools/mkusb.sh $(wildcard examples/*.nsb)
+	@tools/mkusb.sh $(BUILD)/nesh.efi $@
+
 qemu: $(BUILD)/nesh.efi
 	@tools/run-qemu.sh $(OVMF) $(BUILD)/nesh.efi
 
@@ -97,6 +103,6 @@ qemu-sbtest: $(BUILD)/nesh.efi
 clean:
 	rm -rf $(BUILD)
 
-.PHONY: all test docs qemu qemu-test qemu-nettest qemu-sbtest clean
+.PHONY: all test docs usb qemu qemu-test qemu-nettest qemu-sbtest clean
 
 -include $(EFI_OBJ:.o=.d) $(HOST_OBJ:.o=.d)

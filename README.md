@@ -62,6 +62,11 @@ tools/setup-dev.sh --install    # packages (asks for sudo) and the git identity
 make && make test && make qemu-test
 ```
 
+[CLAUDE.md](CLAUDE.md) says how the project is worked on: the agreements, the
+decisions that are settled and must not be reopened, and what to check before
+committing. `tools/backup.sh` packs the whole repository, history and tags
+included, into a single file that restores without a network.
+
 Requirements, if you prefer to install them yourself: `gcc`, GNU `ld`, `make`,
 `python3`; for the UEFI tests `qemu-system-x86_64`, OVMF firmware and
 `mkfs.fat`; for `make usb` also `mtools`; for the Secure Boot tests

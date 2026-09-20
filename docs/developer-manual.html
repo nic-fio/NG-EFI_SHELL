@@ -113,7 +113,7 @@ explained where they are needed, and the <a href="#glossary">glossary</a> summar
         <code>cmd_util.c</code>, <code>cmd_edit.c</code> (edit, hexedit).</td></tr>
     <tr><td><code>src/platform/efi/</code></td><td>UEFI-only modules (see <a href="#efi-modules">UEFI modules</a>).</td></tr>
     <tr><td><code>src/platform/host.c</code></td><td>Stubs of the platform hooks for the Linux build.</td></tr>
-    <tr><td><code>tools/</code></td><td><code>efi.lds</code>, <code>elf2efi.py</code>, <code>run-qemu.sh</code>, <code>gen-docs.py</code>, <code>check-doc-examples.py</code>, <code>mkusb.sh</code>, <code>record-demo.py</code>, <code>setup-dev.sh</code>.</td></tr>
+    <tr><td><code>tools/</code></td><td><code>efi.lds</code>, <code>elf2efi.py</code>, <code>run-qemu.sh</code>, <code>gen-docs.py</code>, <code>check-doc-examples.py</code>, <code>mkusb.sh</code>, <code>record-demo.py</code>, <code>setup-dev.sh</code>, <code>backup.sh</code>.</td></tr>
     <tr><td><code>tests/</code></td><td><code>host/*.nsb</code> + <code>.out</code> (Linux tests), <code>efi/*.nsb</code> (QEMU tests), <code>apps/shelltest.c</code>,
         <code>fixtures/</code> (EDK2 test binaries).</td></tr>
     <tr><td><code>examples/</code></td><td>Example scripts shipped with NESH.</td></tr>
@@ -299,6 +299,11 @@ $ tools/setup-dev.sh --install</pre>
     <tr><td><code>ffmpeg</code></td><td><code>tools/record-demo.py</code>, the animation of the README. Optional.</td></tr>
   </tbody>
 </table>
+<p>How the project is worked on &mdash; the agreements with its author, the decisions that are settled, what to
+check before a commit and where the project stands &mdash; is in <code>CLAUDE.md</code> at the root of the
+repository. <code>tools/backup.sh</code> writes the whole repository, history and tags included, into a single
+bundle file that clones back without a network.</p>
+
 <div class="callout note"><span class="callout-title">What a clone does not carry</span>
 <p>Two things live outside the repository and have to be set again on a new machine. The first is the git identity
 used for the public history, which is kept in <code>.git/config</code>: <code>tools/setup-dev.sh</code> sets it
@@ -1097,6 +1102,7 @@ captured.</p>
     <tr><td><code>tools/gen-docs.py</code></td><td>231</td><td>Generates the command reference of the user manual from the command tables in the C sources, so that the manual and the built-in 'help' never disagree</td></tr>
     <tr><td><code>tools/mkusb.sh</code></td><td>70</td><td>Builds build/nesh-usb.img, a bootable disk image (GPT + EFI system partition) with NESH, the examples and a README on it</td></tr>
     <tr><td><code>tools/record-demo.py</code></td><td>188</td><td>Records the animation of the README: drives a QEMU session through the monitor (sendkey/screendump) and turns the frames into a GIF</td></tr>
+    <tr><td><code>tools/backup.sh</code></td><td>32</td><td>Packs the repository into one git bundle, with every branch, tag and commit, for a restore without a network</td></tr>
     <tr><td><code>tools/setup-dev.sh</code></td><td>89</td><td>Checks (or installs) the packages a clone needs and sets the git identity of the working copy, which is not cloned</td></tr>
     <tr><td><code>tools/run-qemu.sh</code></td><td>86</td><td>Boots nesh.efi in QEMU/OVMF: interactive, --test and --nettest modes</td></tr>
   </tbody>

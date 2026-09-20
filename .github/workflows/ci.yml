@@ -99,7 +99,12 @@ jobs:
           **Secure Boot:** the file is not signed. Sign it with your own key or
           disable Secure Boot (see the user manual).
 
+          **Licence:** Apache 2.0 with the Commons Clause, attached here as
+          \`LICENSE\` and \`NOTICE.md\`: free to use, to copy and to modify,
+          not to sell. Source-available, not OSI open source.
+
           Documentation: https://nic-fio.github.io/NG-EFI_SHELL/
           EOF
           gh release create "$GITHUB_REF_NAME" dist/nesh.efi dist/SHA256SUMS \
+            LICENSE NOTICE.md \
             --title "NESH $GITHUB_REF_NAME" --notes-file notes.md --verify-tag

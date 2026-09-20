@@ -1,7 +1,7 @@
 #!/bin/sh
 # Build a bootable disk image with NESH on it: GPT + one EFI system
-# partition (FAT32) holding \EFI\BOOT\BOOTX64.EFI, the examples and a
-# README. Write it to a USB stick with
+# partition (FAT32) holding \EFI\BOOT\BOOTX64.EFI, the examples, the
+# licence and a README. Write it to a USB stick with
 #     dd if=nesh-usb.img of=/dev/sdX bs=4M conv=fsync
 # or start it in QEMU with
 #     qemu-system-x86_64 -bios OVMF.fd -drive format=raw,file=nesh-usb.img
@@ -44,6 +44,15 @@ mcopy -i "$M" "$ROOT"/examples/*.nsb ::/examples/
 
 TMP=$(mktemp)
 trap 'rm -f "$TMP"' EXIT
+
+# the licence travels with the binary: Apache 2.0 asks for a copy of the
+# licence in every distribution, and the Commons Clause for its own notice.
+# Everything on the stick is CRLF, so a text editor on any system reads it.
+sed 's/$/\r/' "$ROOT"/LICENSE > "$TMP"
+mcopy -i "$M" "$TMP" ::/LICENSE.txt
+sed -e 's/\[LICENSE\](LICENSE)/LICENSE.txt/' -e 's/$/\r/' "$ROOT"/NOTICE.md > "$TMP"
+mcopy -i "$M" "$TMP" ::/NOTICE.txt
+
 sed 's/$/\r/' > "$TMP" <<'EOF'
 NESH - New EFI Shell
 ====================
@@ -75,6 +84,17 @@ https://github.com/nic-fio/NG-EFI_SHELL/issues/new?template=hardware-report.yml
 
 Documentation: https://nic-fio.github.io/NG-EFI_SHELL/
 Project:       https://github.com/nic-fio/NG-EFI_SHELL
+
+Licence
+-------
+
+Copyright (c) 2026 nic-fio. NESH is released under the Apache License
+2.0 with the Commons Clause: use it for anything, at home or at work,
+free of charge; copy it, modify it and share it, keeping the notices
+and saying what you changed. What you may not do is sell it, or sell a
+product or service whose value comes substantially from it - that needs
+a commercial licence, which you can ask for by opening an issue on
+GitHub. The full text is in LICENSE.txt, the summary in NOTICE.txt.
 EOF
 mcopy -i "$M" "$TMP" ::/README.txt
 

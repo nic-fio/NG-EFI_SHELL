@@ -71,6 +71,7 @@ void lex_init(Lexer *lx, const char *src, size_t len);
 void lex_next(Lexer *lx);
 const char *tok_name(TokType t);
 bool is_statement_keyword(TokType t);
+bool basic_is_keyword(const char *name);
 
 /* ---- AST ---- */
 

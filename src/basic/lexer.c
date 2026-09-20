@@ -33,6 +33,15 @@ const char *tok_name(TokType t)
     return "?";
 }
 
+/* Is name (any case) a keyword of the language? */
+bool basic_is_keyword(const char *name)
+{
+    for (size_t i = 0; i < ARRAY_SIZE(keywords); i++)
+        if (!strcasecmp(keywords[i].name, name))
+            return true;
+    return false;
+}
+
 bool is_statement_keyword(TokType t)
 {
     switch (t) {

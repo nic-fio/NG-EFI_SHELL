@@ -35,3 +35,11 @@ RUN "cd", "dir with space"
 RUN "mkdir", "dir with space"
 RUN "cd", "dir with space"
 PRINT CWD$
+' help also covers the statements and functions of the language
+out$ = RUN$("help input")
+PRINT LEFT$(out$, 30)
+PRINT INSTR(out$, "INPUT ""Name""") > 0
+out$ = RUN$("help len")
+PRINT LEFT$(out$, 38)
+RUN "help nosuchthing"
+PRINT "unknown: ERR="; ERR

@@ -81,6 +81,59 @@ static void print_wrapped_table(void)
     }
 }
 
+/* Prints the lines of a help text that mention "word" as a whole word.
+ * The help texts write statements and functions in capitals, so the match is
+ * case-sensitive: it does not catch the same word used in a sentence.
+ * Returns how many lines were printed. */
+static int print_lines_about(const char *text, const char *word)
+{
+    size_t wl = strlen(word);
+    int printed = 0;
+    for (const char *line = text; *line;) {
+        const char *nl = strchr(line, '\n');
+        size_t len = nl ? (size_t)(nl - line) : strlen(line);
+        for (size_t i = 0; i + wl <= len; i++) {
+            char before = i ? line[i - 1] : ' ', after = line[i + wl];
+            if (strncmp(line + i, word, wl) || isalnum((uint8_t)before) || before == '_' || before == '$')
+                continue;
+            if (isalnum((uint8_t)after) || after == '_' || (after == '$' && word[wl - 1] != '$'))
+                continue;
+            out_printf("  %.*s\n", (int)len, line);
+            printed++;
+            break;
+        }
+        line = nl ? nl + 1 : line + len;
+    }
+    return printed;
+}
+
+/* "help PRINT", "help LEN": statements and built-in functions of NESH BASIC. */
+static int help_basic_word(const char *name)
+{
+    bool func = basic_find_func(name) != NULL;
+    bool keyword = basic_is_keyword(name);
+    if (!func && !keyword) {
+        /* LEN is registered as "len", RIGHT$ as "right$": try both spellings */
+        char *with = xasprintf("%s$", name);
+        func = basic_find_func(with) != NULL;
+        free(with);
+        if (!func)
+            return RC_NOTFOUND;
+    }
+    char *upper = xstrdup(name);
+    for (char *q = upper; *q; q++)
+        *q = (char)toupper((uint8_t)*q);
+    out_printf("%s is a NESH BASIC %s.\n\n", upper, func && !keyword ? "built-in function" : "statement");
+    int n = print_lines_about(help_basic, upper);
+    n += print_lines_about(help_functions, upper);
+    if (!n)
+        out_printf("  See 'help basic' and 'help functions'.\n");
+    else
+        out_puts("\nMore: 'help basic' (language), 'help functions' (functions).\n");
+    free(upper);
+    return RC_OK;
+}
+
 static int cmd_help(int argc, char **argv)
 {
     if (argc < 2) {
@@ -98,8 +151,11 @@ static int cmd_help(int argc, char **argv)
         return RC_OK;
     }
     const Cmd *c = shell_find_cmd(argv[1]);
-    if (!c)
-        return cmd_err("help", "no help for '%s'", argv[1]);
+    if (!c) {
+        if (help_basic_word(argv[1]) == RC_OK)
+            return RC_OK;
+        return cmd_err("help", "no help for '%s' (try 'help', 'help basic' or 'help functions')", argv[1]);
+    }
     out_printf("usage: %s\n\n%s\n", c->usage ? c->usage : c->name, c->summary ? c->summary : "");
     if (c->help)
         out_printf("\n%s", c->help);
@@ -256,13 +312,15 @@ static int cmd_type(int argc, char **argv)
 }
 
 static const Cmd core_cmds[] = {
-    { "help", cmd_help, "help [COMMAND | basic | functions]", "Show help",
+    { "help", cmd_help, "help [COMMAND | STATEMENT | FUNCTION | basic | functions]", "Show help",
       "  help                list all the commands with a one-line summary\n"
       "  help NAME           usage and details of one command\n"
+      "  help PRINT          a statement or function of the language: the lines\n"
+      "                      about it from the references below\n"
       "  help basic          quick reference of the BASIC scripting language\n"
       "  help functions      list of the built-in BASIC functions\n"
-      "Command names are not case-sensitive. 'help language' and 'help func' also\n"
-      "work. An unknown NAME is an error.\n" },
+      "Names are not case-sensitive. 'help language' and 'help func' also work.\n"
+      "An unknown NAME is an error.\n" },
     { "ver", cmd_ver, "ver", "Show shell, firmware and UEFI versions",
       "  ver                 shell version and platform; on UEFI also the firmware\n"
       "                      vendor and revision, UEFI version and Secure Boot state\n"

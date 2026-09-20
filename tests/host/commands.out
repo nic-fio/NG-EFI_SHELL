@@ -19,4 +19,9 @@ not found ERR=127
 missing file ERR=1
 cd: dir with space: not found
 fs0:\dir with space
+INPUT is a NESH BASIC statemen
+-1
+LEN is a NESH BASIC built-in function.
+help: no help for 'nosuchthing' (try 'help', 'help basic' or 'help functions')
+unknown: ERR=1
 [exit 0]

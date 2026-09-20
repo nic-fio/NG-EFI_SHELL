@@ -384,11 +384,11 @@
       theme: "base",
       fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, sans-serif",
       themeVariables: {
-        background: "#ffffff", primaryColor: "#e8f1fb", primaryTextColor: "#1c2530", primaryBorderColor: "#0a66c2",
-        lineColor: "#56636f", secondaryColor: "#eaf6ee", tertiaryColor: "#f6f8fa", noteBkgColor: "#fff5e0",
-        noteTextColor: "#1c2530", actorBkg: "#e8f1fb", actorTextColor: "#1c2530", actorBorder: "#0a66c2",
-        signalColor: "#1c2530", signalTextColor: "#1c2530", clusterBkg: "#f6f8fa", clusterBorder: "#dde3ea",
-        edgeLabelBackground: "#ffffff", nodeTextColor: "#1c2530"
+        background: "#ffffff", primaryColor: "#eef5ff", primaryTextColor: "#1b2430", primaryBorderColor: "#14427c",
+        lineColor: "#4a6076", secondaryColor: "#fff0e0", tertiaryColor: "#f6f9ff", noteBkgColor: "#fff5ea",
+        noteTextColor: "#1b2430", actorBkg: "#eef5ff", actorTextColor: "#1b2430", actorBorder: "#14427c",
+        signalColor: "#1b2430", signalTextColor: "#1b2430", clusterBkg: "#f8fbff", clusterBorder: "#d5e3f7",
+        edgeLabelBackground: "#ffffff", nodeTextColor: "#1b2430"
       }
     });
     diagrams.forEach(function (d) {

@@ -941,6 +941,9 @@ Secure Boot OVMF build the target prints why it is skipped and succeeds.</p>
       user manual, writes it as <code>NAME.nsb</code>, checks the syntax of all of them (<code>nesh -k</code>), then runs the ones that
       have an output block (<code>data-example-output="NAME"</code>) in page order and compares the output. Examples marked
       <code>data-platform="efi"</code> are only syntax-checked.</li>
+  <li><strong>Look</strong>: chosen by comparing ten proposals built by <code>tools/make-previews.py</code> into
+      <code>docs-preview/</code> (not published, not in the repository). Run it again to try another design: each
+      proposal is a layout plus a palette, applied to the same sample content.</li>
   <li><strong>Pages</strong>: plain HTML with <code>assets/docs.css</code> and <code>assets/docs.js</code> (table of contents, numbering,
       search, index, syntax colors) and a local copy of Mermaid for the diagrams, so the manuals work offline. In a
       Mermaid block write line breaks as <code>&amp;lt;br/&amp;gt;</code>: a literal tag would be eaten by the HTML parser.</li>

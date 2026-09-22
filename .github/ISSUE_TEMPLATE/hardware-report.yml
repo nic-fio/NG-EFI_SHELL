@@ -6,9 +6,10 @@ body:
   - type: markdown
     attributes:
       value: |
-        NESH has only ever been tested in QEMU with OVMF. What real firmware
-        does with it is the project's main open question, and the one thing
-        that cannot be answered without you.
+        NESH is tested in QEMU with OVMF, and has only been started on a
+        couple of real machines. What real firmware does with it is the
+        project's main open question, and the one thing that cannot be
+        answered without you.
 
         Four commands collect most of what is asked below, and NESH can write
         them to the stick you booted from, to be attached here:

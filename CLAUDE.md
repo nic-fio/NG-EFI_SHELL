@@ -74,9 +74,13 @@ builds `nesh.efi` and publishes it. `nesh-usb.img` is uploaded by hand
 
 ## Where the project stands
 
-Tested in QEMU with OVMF, including Secure Boot with generated test keys;
-**not yet tested on real hardware** — that is the main open item, and the
-reason for the announcement on the OSDev forum asking for reports. Also open:
+Tested in QEMU with OVMF, including Secure Boot with generated test keys.
+**On real hardware, only a first smoke test** (September 2026, by the user): on a
+Chuwi tablet and a server with a Gigabyte motherboard the prompt came up, `dir`
+worked and NESH booted Linux — nothing else was tried, firmware vendor and
+Secure Boot state were not recorded. Broader hardware coverage is still the
+main open item, and the reason for the announcement on the OSDev forum asking
+for reports. Also open:
 `find`, `crc32`, `sha256`, `efiinfo`, a `secureboot` key listing,
 `bootmgr scan`, `ON ERROR`; `https` and host names in `http` are untested;
 ARM64 and IA32 builds do not exist yet.

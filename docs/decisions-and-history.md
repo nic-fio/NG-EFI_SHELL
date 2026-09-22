@@ -371,7 +371,7 @@ listing), `bootmgr scan`, and the language's `ON ERROR`.
 
 | Topic | Status |
 |---|---|
-| Real hardware | All tests run in QEMU/OVMF. Behavior on real firmware (AMI, Insyde, Phoenix) is untested. |
+| Real hardware | The automatic tests run in QEMU/OVMF. NESH has been started on two real machines, a Chuwi tablet and a server with a Gigabyte motherboard: the prompt came up, `dir` listed the files, and NESH booted Linux. Nothing else was tried there, and the firmware vendor and Secure Boot state were not recorded; the other commands, and firmware from AMI, Insyde or Phoenix in general, remain unverified. |
 | Architectures | x86-64 only; AArch64 and IA32 builds are possible future work. |
 | `https` | Needs a TLS driver in the firmware; untested. Host names in `http` URLs (DNS) are untested. |
 | UEFI Shell options not supported | `time -tz/-d`; `-l LANG` of `devices`/`devtree` is accepted and ignored. |

@@ -102,11 +102,13 @@ firmware boot menu, start it from another shell, or add a boot entry with
 
 ## Reports from real hardware
 
-NESH has only ever run in QEMU with OVMF. What AMI, Insyde or Phoenix firmware
-makes of it is the project's main open question, and the one thing that cannot
-be settled here. If you start NESH on a real machine, please say how it went —
-a machine where everything worked is as useful a report as one where nothing
-did: [open a hardware report](https://github.com/nic-fio/NG-EFI_SHELL/issues/new?template=hardware-report.yml).
+NESH is tested in QEMU with OVMF. On real machines it has so far only been
+started on two — a Chuwi tablet and a server with a Gigabyte motherboard —
+where the prompt came up, `dir` listed the files and NESH booted Linux. What
+AMI, Insyde or Phoenix firmware makes of the rest is the project's main open
+question, and the one thing that cannot be settled here. If you start NESH on a
+real machine, please say how it went — a machine where everything worked is as
+useful a report as one where nothing did: [open a hardware report](https://github.com/nic-fio/NG-EFI_SHELL/issues/new?template=hardware-report.yml).
 
 Four commands collect most of what the report asks, and NESH can write them to
 the stick you booted from:
@@ -140,7 +142,10 @@ definition. Third-party components keep their own licences, listed in
 
 ## Status
 
-Version 0.2.0. Tested in QEMU with OVMF, including Secure Boot with test keys;
-not yet tested on real hardware — see [Reports from real
-hardware](#reports-from-real-hardware) above, and the open questions at the end
-of the [decisions document](docs/decisions-and-history.md).
+Version 0.2.0. Tested in QEMU with OVMF, including Secure Boot with test keys.
+Started on two real machines, a Chuwi tablet and a server with a Gigabyte
+motherboard: the prompt came up, `dir` listed the files, and NESH booted Linux.
+Only those steps were tried; the rest of the commands are still verified only
+in QEMU — see [Reports from real hardware](#reports-from-real-hardware) above,
+and the open questions at the end of the
+[decisions document](docs/decisions-and-history.md).

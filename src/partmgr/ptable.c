@@ -351,21 +351,39 @@ static const struct {
     { "7C3457EF-0000-11AA-AA11-00306543ECAC", "Apple APFS" },
 };
 
+/* the common ones first: this is also the order of the list to choose from */
 static const struct {
     uint8_t type;
     const char *name;
 } mbr_types[] = {
-    { 0x01, "FAT12" },           { 0x04, "FAT16 <32M" },       { 0x05, "Extended" },
-    { 0x06, "FAT16" },           { 0x07, "NTFS/exFAT" },       { 0x0B, "FAT32" },
-    { 0x0C, "FAT32 (LBA)" },     { 0x0E, "FAT16 (LBA)" },      { 0x0F, "Extended (LBA)" },
-    { 0x11, "Hidden FAT12" },    { 0x14, "Hidden FAT16 <32M" }, { 0x16, "Hidden FAT16" },
-    { 0x17, "Hidden NTFS" },     { 0x1B, "Hidden FAT32" },     { 0x1C, "Hidden FAT32 (LBA)" },
-    { 0x1E, "Hidden FAT16 (LBA)" }, { 0x27, "Windows recovery" }, { 0x42, "Windows LDM" },
-    { 0x82, "Linux swap" },      { 0x83, "Linux" },            { 0x85, "Linux extended" },
-    { 0x8E, "Linux LVM" },       { 0xA5, "FreeBSD" },          { 0xA6, "OpenBSD" },
-    { 0xAF, "Apple HFS+" },      { 0xEE, "GPT protective" },   { 0xEF, "EFI system" },
-    { 0xFD, "Linux RAID" },
+    { 0x0C, "FAT32 (LBA)" },     { 0x07, "NTFS/exFAT" },       { 0x83, "Linux" },
+    { 0x82, "Linux swap" },      { 0xEF, "EFI system" },       { 0x8E, "Linux LVM" },
+    { 0xFD, "Linux RAID" },      { 0x0E, "FAT16 (LBA)" },      { 0x0B, "FAT32" },
+    { 0x06, "FAT16" },           { 0x27, "Windows recovery" }, { 0x17, "Hidden NTFS" },
+    { 0x1C, "Hidden FAT32 (LBA)" }, { 0x1B, "Hidden FAT32" },  { 0x1E, "Hidden FAT16 (LBA)" },
+    { 0x16, "Hidden FAT16" },    { 0x14, "Hidden FAT16 <32M" }, { 0x11, "Hidden FAT12" },
+    { 0x04, "FAT16 <32M" },      { 0x01, "FAT12" },            { 0x42, "Windows LDM" },
+    { 0xA5, "FreeBSD" },         { 0xA6, "OpenBSD" },          { 0xAF, "Apple HFS+" },
+    { 0x05, "Extended" },        { 0x0F, "Extended (LBA)" },   { 0x85, "Linux extended" },
+    { 0xEE, "GPT protective" },
 };
+
+bool pt_type_at(int kind, int i, const char **name, uint8_t *mbr_type, uint8_t guid[16])
+{
+    if (kind == PT_GPT) {
+        if (i < 0 || i >= (int)ARRAY_SIZE(gpt_types))
+            return false;
+        *name = gpt_types[i].name;
+        pt_guid_parse(gpt_types[i].guid, guid);
+        return true;
+    }
+    /* the last four (extended and protective) are never chosen by hand */
+    if (i < 0 || i >= (int)ARRAY_SIZE(mbr_types) - 4)
+        return false;
+    *name = mbr_types[i].name;
+    *mbr_type = mbr_types[i].type;
+    return true;
+}
 
 const char *pt_type_name(const PtTable *t, const PtPart *p)
 {

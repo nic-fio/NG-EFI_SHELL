@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Generates from the sources the parts of the manuals that describe them: the
 command reference of the user manual (from the command tables, so that the
-manual and the built-in 'help' never disagree) and the line counts of the
-developer manual (so that its source map cannot drift away from the tree).
+manual and the built-in 'help' never disagree) and the line counts of the two
+technical manuals, NESH's and partmgr's (so that their source maps cannot drift
+away from the tree). The files of src/partmgr and tests/partmgr belong to the
+partmgr manual's map, every other source file to NESH's.
 
   tools/gen-docs.py           rewrite the generated parts of the two manuals
   tools/gen-docs.py --check   fail if a manual is out of date, if a command has
@@ -18,6 +20,8 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 MANUAL = ROOT / "docs" / "user-manual.html"
 DEVMANUAL = ROOT / "docs" / "developer-manual.html"
+PMDEVMANUAL = ROOT / "docs" / "partmgr-developer-manual.html"
+PARTMGR_DIRS = ("src/partmgr/", "tests/partmgr/")
 BEGIN = "<!-- BEGIN GENERATED: command-reference (tools/gen-docs.py) -->"
 END = "<!-- END GENERATED: command-reference -->"
 
@@ -150,14 +154,19 @@ def lines_of(path):
 
 
 def source_files():
-    """The files the source map of the developer manual lists: the headers, the
-    C sources of NESH, the tools and the two test programs."""
+    """The files the source maps list: the headers, the C sources, the tools,
+    the test programs and the partmgr tests."""
     files = set((ROOT / "include").glob("*.h"))
     files |= {p for p in (ROOT / "src").rglob("*") if p.suffix in (".c", ".h")}
     files |= {p for p in (ROOT / "tools").iterdir() if p.is_file()}
     files |= {ROOT / "tests" / "run-host-tests.sh"}
     files |= set((ROOT / "tests" / "apps").glob("*.c"))
+    files |= {p for p in (ROOT / "tests" / "partmgr").iterdir() if p.is_file()}
     return {str(p.relative_to(ROOT)) for p in files}
+
+
+def partmgr_file(f):
+    return f.startswith(PARTMGR_DIRS)
 
 
 def dir_lines(names):
@@ -177,9 +186,10 @@ FILE_ROW = re.compile(r"(<tr><td><code>)([^<]+)(</code></td><td>)(\d+)(</td>)")
 AREA_ROW = re.compile(r"(<tr><td>[^<]*</td><td>)((?:<code>[^<]+</code>(?:, )?)+)(</td><td>)([\d,]+)(</td>)")
 
 
-def count_lines(text, problems):
-    """Rewrites the line counts of the developer manual: the source map row by
-    row, then the totals of the area table."""
+def count_lines(manual, text, problems, required):
+    """Rewrites the line counts of a technical manual: the source map row by
+    row, then the totals of the area table. REQUIRED: the files its map must
+    list."""
     listed = []
 
     def file_row(m):
@@ -187,7 +197,7 @@ def count_lines(text, problems):
         listed.append(path)
         if not (ROOT / path).is_file():
             problems.append("%s: the source map lists '%s', which is not a file"
-                            % (DEVMANUAL.name, path))
+                            % (manual.name, path))
             return m.group(0)
         return m.group(1) + path + m.group(3) + str(lines_of(ROOT / path)) + m.group(5)
 
@@ -198,11 +208,13 @@ def count_lines(text, problems):
         return m.group(1) + m.group(2) + m.group(3) + format(dir_lines(names), ",") + m.group(5)
 
     new = AREA_ROW.sub(area_row, FILE_ROW.sub(file_row, text))
-    for f in sorted(source_files() - set(listed)):
-        problems.append("%s: '%s' has no row in the source map" % (DEVMANUAL.name, f))
+    for f in sorted(required - set(listed)):
+        problems.append("%s: '%s' has no row in the source map" % (manual.name, f))
     for f in sorted(set(listed)):
         if listed.count(f) > 1:
-            problems.append("%s: the source map lists '%s' twice" % (DEVMANUAL.name, f))
+            problems.append("%s: the source map lists '%s' twice" % (manual.name, f))
+        if f not in required and f in source_files():
+            problems.append("%s: '%s' belongs to the source map of the other manual" % (manual.name, f))
     return new
 
 
@@ -276,10 +288,14 @@ def main():
     for f in basic_functions():
         if f not in documented:
             problems.append("BASIC function %s has no entry in the function reference of %s" % (f.upper(), MANUAL.name))
+    files = source_files()
     devtext = DEVMANUAL.read_text()
-    devnew = count_lines(devtext, problems)
+    devnew = count_lines(DEVMANUAL, devtext, problems, {f for f in files if not partmgr_file(f)})
+    pmtext = PMDEVMANUAL.read_text()
+    pmnew = count_lines(PMDEVMANUAL, pmtext, problems, {f for f in files if partmgr_file(f)})
+    pages = ((MANUAL, text, new), (DEVMANUAL, devtext, devnew), (PMDEVMANUAL, pmtext, pmnew))
     if check:
-        for man, before, after in ((MANUAL, text, new), (DEVMANUAL, devtext, devnew)):
+        for man, before, after in pages:
             if before != after:
                 problems.append("%s is out of date: run 'make docs'" % man.relative_to(ROOT))
         if problems:
@@ -288,7 +304,7 @@ def main():
         print("docs: %d commands, %d BASIC functions documented, %d source files counted"
               % (len(cmds), len(basic_functions()), len(source_files())))
         return 0
-    for man, before, after in ((MANUAL, text, new), (DEVMANUAL, devtext, devnew)):
+    for man, before, after in pages:
         if before != after:
             man.write_text(after)
             print("updated %s" % man.relative_to(ROOT))

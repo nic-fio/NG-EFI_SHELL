@@ -14,8 +14,10 @@
  *     write                         write the table to the image
  *     reread                        read the table again from the image
  *     backup FILE | restore FILE
+ *     size TEXT                     how the screens read a size (units.c)
  */
 #include "../../src/partmgr/ptable.h"
+#include "../../src/partmgr/units.h"
 #include "../../src/pal/pal.h"
 
 void rt_fatal(const char *msg)
@@ -182,6 +184,19 @@ int main(int argc, char **argv)
             if (!o || fwrite(data, 1, len, o) != len || fclose(o))
                 fail("cannot write the backup file");
             free(data);
+        } else if (!strcmp(c, "size")) {
+            uint64_t bytes;
+            bool rest;
+            const char *err = pm_parse_size(ARG(), bsize, &bytes, &rest);
+            char f[32], e[32];
+            pm_fmt_size(f, sizeof(f), bytes);
+            pm_fmt_exact(e, sizeof(e), bytes);
+            if (err)
+                printf("size error=%s\n", err);
+            else
+                printf("size bytes=%llu rest=%s fmt=%s exact=%s\n", (unsigned long long)bytes, rest ? "yes" : "no",
+                       f, e);
+            continue;
         } else if (!strcmp(c, "restore")) {
             FILE *in = fopen(ARG(), "rb");
             if (!in)

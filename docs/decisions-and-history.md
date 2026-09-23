@@ -416,6 +416,10 @@ From it came the working rules of the project:
   time shows its progress; for the wipe a **progress bar is mandatory**, with
   the pass (1 of 2 random data, 2 of 2 zeros), the percentage, the amount
   written, the speed and the estimated time left. Esc asks before stopping.
+- **Documentation.** partmgr has two manuals of its own, a user manual and a
+  technical manual, with the same style, structure and depth as NESH's — owner:
+  "partmgr e' un applicativo a parte, quindi merita 2 manuali dedicati a lui".
+  NESH's manuals only point to them.
 - **No command line.** `partmgr.efi` has only the full-screen interface, so it
   cannot be driven by scripts; a proposal for `list`/`backup`/`restore` on the
   command line was declined.

@@ -22,7 +22,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            qemu-system-x86 ovmf ipxe-qemu dosfstools fdisk python3 \
+            qemu-system-x86 ovmf ipxe-qemu dosfstools fdisk parted python3 \
             sbsigntool python3-virt-firmware
 
       - name: Enable KVM

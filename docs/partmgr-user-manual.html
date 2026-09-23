@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>partmgr User Manual</title>
+<meta name="description" content="User manual of partmgr, the partition manager that ships with NESH: GPT and MBR partition tables in UEFI, changes shown before they are written, backup and restore.">
+<link rel="stylesheet" href="assets/docs.css">
+</head>
+<body>
+<div class="topbar">
+  <button class="btn menu-btn" type="button" aria-label="Open the table of contents">&#9776; Contents</button>
+  <strong>partmgr User Manual</strong>
+</div>
+<div class="layout">
+<nav class="sidebar" aria-label="Table of contents">
+  <div class="brand">
+    <div class="brand-logo">[#]</div>
+    <div class="brand-text"><strong>partmgr User Manual</strong><span>partmgr 0.1 · with NESH</span></div>
+  </div>
+  <div class="search">
+    <input type="search" placeholder="Search  ( / )" aria-label="Search">
+    <div class="search-results" role="listbox"></div>
+  </div>
+  <div class="toc"></div>
+  <div class="side-tools">
+    <button class="btn print-btn" type="button">Print / PDF</button>
+    <a class="btn" href="partmgr-developer-manual.html">Technical manual</a>
+    <a class="btn" href="user-manual.html">NESH manual</a>
+  </div>
+</nav>
+
+<main>
+
+<header class="titlepage">
+  <div class="kicker">User manual</div>
+  <h1>partmgr — the partition manager</h1>
+  <p class="lead">A full-screen program for UEFI firmware that shows, creates and changes GPT and MBR partition tables.
+  Every change is shown on the screen first and written only when you ask for it, after a clear warning.</p>
+  <div class="meta">
+    <span><b>Version</b> 0.1</span>
+    <span><b>Platform</b> UEFI x86-64</span>
+    <span><b>File</b> partmgr.efi (one file)</span>
+    <span><b>Audience</b> users, technicians preparing disks</span>
+  </div>
+</header>
+
+<section class="unnumbered no-toc">
+  <h2 class="unnumbered" id="contents">Contents</h2>
+  <div class="toc-print" id="contents-list"></div>
+  <p>The <a href="#index">alphabetical index</a> at the end lists keys, messages and topics.
+  Press <kbd>/</kbd> to search.</p>
+</section>
+
+<!-- ===================================================================== -->
+<h2 id="introduction">Introduction</h2>
+
+<p class="chapter-intro">What partmgr is, what it does and does not do, and how it fits next to NESH.</p>
+
+<h3 id="what-is-partmgr">What partmgr is</h3>
+<p>A disk is divided into <em>partitions</em>, and a small table at its beginning — the <em>partition table</em> —
+says where each partition starts, how big it is and what it is for. Preparing a disk (for a new system, a
+recovery stick, a second drive) starts with that table. Usually it means booting a whole Linux or Windows
+environment just to run a partitioning tool.</p>
+<p>partmgr does it directly in the UEFI firmware, before any operating system. It is a single file,
+<code>partmgr.efi</code>, that you start from <a href="user-manual.html">NESH</a>, from another UEFI shell or from the
+firmware boot menu. It offers:</p>
+
+<div class="cards">
+  <div class="card"><div class="icon">[#]</div><h4>GPT and MBR</h4>
+    <p>Both kinds of table, read and written in full: MBR with primary, extended and logical partitions.</p></div>
+  <div class="card"><div class="icon">*</div><h4>See first, write later</h4>
+    <p>Changes are made on the screen; the disk changes only when you choose Write and type its name.</p></div>
+  <div class="card"><div class="icon">&#8635;</div><h4>Backup and restore</h4>
+    <p>The partition table of a disk saved to a file, and written back exactly as it was.</p></div>
+  <div class="card"><div class="icon">&#9888;</div><h4>Safe by design</h4>
+    <p>The disk partmgr was started from is never written; damaged tables are recognised and explained.</p></div>
+  <div class="card"><div class="icon">&#8801;</div><h4>Readable</h4>
+    <p>Types chosen from a list, sizes such as <code>512M</code> or <code>rest</code>, no codes to remember.</p></div>
+  <div class="card"><div class="icon">&gt;_</div><h4>Part of the NESH project</h4>
+    <p>Same release, same disk names as NESH's <code>map</code> (<code>blk3</code> is the same disk in both).</p></div>
+</div>
+
+<h3 id="what-it-does-not">What partmgr does not do</h3>
+<p>partmgr works on <strong>partition tables only</strong>. It never touches the data inside a partition, so it does not
+<strong>format</strong> partitions (the firmware or the operating system does that), does not <strong>resize</strong> or
+<strong>move</strong> them, and does not install boot code. Deleting a partition removes it from the table; its data
+stays on the disk until something overwrites it.</p>
+<div class="callout"><span class="callout-title">Coming</span>
+<p><em>Wipe</em> — overwriting the contents of a partition to destroy the data in it, with a progress bar — is
+planned and not in this version.</p></div>
+
+<h3 id="partmgr-and-nesh">partmgr and NESH</h3>
+<p>partmgr is a separate program, not a NESH command: <code>nesh.efi</code> stays one file with the shell in it, and
+partmgr is a second file of the same project, built from the same sources and published in the same release. They
+share the way disks are numbered: the <code>blkN</code> names of partmgr are the ones NESH's <code>map</code> shows.
+The reasons are recorded as decision D21 in the
+<a href="https://github.com/nic-fio/NG-EFI_SHELL/blob/main/docs/decisions-and-history.md">design decisions</a>.</p>
+
+<h3 id="conventions">Conventions used in this manual</h3>
+<table>
+  <thead><tr><th>You see</th><th>It means</th></tr></thead>
+  <tbody>
+    <tr><td><kbd>N</kbd>, <kbd>Enter</kbd>, <kbd>Esc</kbd></td><td>Keys to press. Letters work in upper or lower case.</td></tr>
+    <tr><td><code>512M</code></td><td>Something you type.</td></tr>
+    <tr><td><code>blk3</code></td><td>A disk, as partmgr and NESH name it.</td></tr>
+    <tr><td><em>Delete</em> / <em>wipe</em></td><td>To <em>delete</em> a partition removes it from the table; to <em>wipe</em> it
+        destroys its contents. The manual never uses one word for the other.</td></tr>
+  </tbody>
+</table>
+
+<!-- ===================================================================== -->
+<h2 id="getting-started">Getting started</h2>
+
+<p class="chapter-intro">How to get partmgr.efi, where to put it and how to start it.</p>
+
+<h3 id="requirements">Requirements</h3>
+<ul>
+  <li>A computer or virtual machine with <strong>UEFI firmware</strong> on <strong>x86-64</strong>.</li>
+  <li>A text console of at least 80 columns and 25 rows (every firmware has one).</li>
+  <li>A FAT volume the firmware can read, for <code>partmgr.efi</code> itself — and, for backups, a FAT volume that can
+      be written.</li>
+</ul>
+
+<h3 id="getting" data-index="partmgr.efi;building partmgr">Getting partmgr.efi</h3>
+<p>partmgr is built together with NESH:</p>
+<pre class="terminal">$ make
+$ ls -l build/partmgr.efi</pre>
+<p><code>make</code> produces <code>build/partmgr.efi</code> next to <code>build/nesh.efi</code>. partmgr is new: the
+downloads of NESH 0.2.0 do not include it yet; the next release will.</p>
+
+<h3 id="installing">Putting it on a stick</h3>
+<p>Copy <code>partmgr.efi</code> to the FAT volume, next to <code>nesh.efi</code> or in a tools folder, for example
+<code>\EFI\tools\partmgr.efi</code>. To have it as the only program of a stick, copy it as
+<code>\EFI\BOOT\BOOTX64.EFI</code>: the firmware boot menu then starts partmgr directly.</p>
+
+<h3 id="starting" data-index="starting partmgr">Starting partmgr</h3>
+<p>From the NESH prompt, type its name with the volume and folder, or just <code>partmgr</code> when its folder is in
+NESH's <code>path</code>:</p>
+<pre class="terminal">fs0:\> fs0:\partmgr.efi</pre>
+<p>A boot entry works too: <code>bootmgr add fs0:\EFI\tools\partmgr.efi "partmgr"</code> in NESH puts it in the firmware
+boot menu. When you leave partmgr (<kbd>Q</kbd> on the list of disks) the screen is cleared and you are back where you
+started it from.</p>
+
+<h3 id="secure-boot" data-index="Secure Boot">Secure Boot</h3>
+<p>With Secure Boot active the firmware starts only signed programs. <code>partmgr.efi</code> is a file of its own, so it
+needs its own signature, made in the same way as for <code>nesh.efi</code> (see <em>Signing nesh.efi</em> in the
+<a href="user-manual.html">NESH manual</a>):</p>
+<pre class="terminal">$ sbsign --key db.key --cert db.crt --output partmgr-signed.efi build/partmgr.efi</pre>
+<p>Secure Boot does not limit what partmgr may do: writing a partition table is a disk write, like writing a file,
+and does not get around the protection of the firmware.</p>
+
+<!-- ===================================================================== -->
+<h2 id="screens">The screens</h2>
+
+<p class="chapter-intro">partmgr has two screens: the list of disks, and the screen of one disk.</p>
+
+<h3 id="disk-list" data-index="list of disks;blkN;rescan">The list of disks</h3>
+<figure class="demo">
+  <img src="assets/partmgr-list.png" width="816" height="608"
+       alt="The list of disks: blk1 marked as the disk partmgr was started from, blk3 with GPT and three partitions, blk7 with MBR, blk12 without a table">
+  <figcaption>The list of disks. The highlighted row is the one <kbd>Enter</kbd> opens.</figcaption>
+</figure>
+<p>Every whole disk with a medium in it has a row: its name, the kind of connection (NVMe, SATA, USB, SCSI, SD… or
+just <em>disk</em> when the firmware does not say), its size, the kind of partition table and the number of partitions.
+Empty drives and single partitions are not listed.</p>
+<ul>
+  <li><strong>Names.</strong> Disks are called <code>blkN</code> with the numbers of NESH's <code>map</code>: the numbers
+      count every block device, partitions included, which is why they are not consecutive.</li>
+  <li><strong>started from here: read only</strong> marks the disk partmgr was loaded from. It can be looked at and
+      backed up, never changed: changing the table under the running program could destroy it.</li>
+  <li><strong>write-protected</strong> marks a medium the firmware reports as read-only.</li>
+  <li><strong>no table</strong>: the disk has no partition table — new, erased, or with a file system written directly on
+      the whole disk.</li>
+</ul>
+<table>
+  <thead><tr><th>Key</th><th>Does</th></tr></thead>
+  <tbody>
+    <tr><td><kbd>&uarr;</kbd> <kbd>&darr;</kbd> <kbd>Home</kbd> <kbd>End</kbd></td><td>Move.</td></tr>
+    <tr><td><kbd>Enter</kbd></td><td>Opens the disk.</td></tr>
+    <tr><td><kbd>R</kbd></td><td>Reads the disks again (after plugging in a stick).</td></tr>
+    <tr><td><kbd>Q</kbd> or <kbd>Esc</kbd></td><td>Leaves partmgr.</td></tr>
+  </tbody>
+</table>
+
+<h3 id="disk-screen" data-index="screen of a disk;free space;changes not written">The screen of a disk</h3>
+<figure class="demo">
+  <img src="assets/partmgr-disk.png" width="816" height="608"
+       alt="The screen of a GPT disk: partitions 1 to 3, a new partition 4 marked with a star, the free space after it, and the message Partition 4 added">
+  <figcaption>A GPT disk after adding partition 4: the star and the title say it is not written yet.</figcaption>
+</figure>
+<p>The title bar names the disk, its kind, its size and its table. Below it are the partitions <strong>and the free
+areas, in the order they have on the disk</strong>:</p>
+<table>
+  <thead><tr><th>Column</th><th>Content</th></tr></thead>
+  <tbody>
+    <tr><td>#</td><td>The partition number: the entry of a GPT, or 1–4 (primary and extended) and 5 onward (logical) on an MBR.
+        <code>-</code> for a free area. A star (<code>4*</code>) marks what changed since the table was read.</td></tr>
+    <tr><td>Start</td><td>Where the partition starts, from the beginning of the disk.</td></tr>
+    <tr><td>Size</td><td>Its size. Sizes use binary units: 1 MiB = 1024 KiB, 1 GiB = 1024 MiB.</td></tr>
+    <tr><td>Type</td><td>What the partition is for (<em>EFI system</em>, <em>Linux filesystem</em>, <em>NTFS/exFAT</em>…),
+        or the raw type when partmgr has no name for it.</td></tr>
+    <tr><td>Flags</td><td>MBR only: <em>active</em> (the partition old BIOS systems start) or <em>logical</em>.</td></tr>
+    <tr><td>Name</td><td>GPT only: the name stored with the partition.</td></tr>
+  </tbody>
+</table>
+<p>Free areas appear in grey: <em>free space</em>, or on an MBR disk <em>free space (for logical partitions)</em>
+when the area is inside the extended partition. Only areas of at least 1 MiB are shown, starting on a 1 MiB boundary.
+Changed rows are yellow, and the title says <em>* = changes not written</em> as long as there is something to write.</p>
+<p>Under the list, <em>Note:</em> lines explain anything unusual partmgr found in the table (see <a href="#notes">What the
+notes mean</a>), and a green or red line reports the result of the last action. The two bars at the bottom show the keys;
+the first one changes with the selected row: <kbd>N</kbd> on free space, <kbd>D</kbd> <kbd>T</kbd> and
+<kbd>R</kbd> or <kbd>A</kbd> on a partition.</p>
+
+<figure class="demo">
+  <img src="assets/partmgr-mbr.png" width="816" height="608"
+       alt="The screen of an MBR disk: an active FAT32 partition, the extended partition, logical partitions 5 and 6 and free space inside and outside the extended partition">
+  <figcaption>An MBR disk: the extended partition 2 holds the logical partitions 5 and 6 and two free areas.</figcaption>
+</figure>
+
+<!-- ===================================================================== -->
+<h2 id="concepts">Partition tables in brief</h2>
+
+<p class="chapter-intro">The few ideas needed to use partmgr well.</p>
+
+<h3 id="gpt" data-index="GPT;GUID;protective MBR">GPT</h3>
+<p>The <em>GUID Partition Table</em> is the table of UEFI. It holds up to 128 partitions (more on some disks), each
+with a type and an identifier written as a GUID, and a name. It is kept twice: at the beginning of the disk and, as a
+backup, at the end, each copy with a checksum. Block 0 keeps a <em>protective MBR</em> that tells old tools the disk is
+in use. Disks of any size are fine.</p>
+
+<h3 id="mbr" data-index="MBR;primary partition;extended partition;logical partition;active partition">MBR</h3>
+<p>The <em>Master Boot Record</em> is the older table, in block 0 only. It holds <strong>four entries</strong>. To have
+more partitions, one entry is an <em>extended partition</em>, a container for any number of <em>logical partitions</em>,
+each described by a small table of its own chained to the next. The <em>active</em> flag marks the partition old BIOS
+systems start. An MBR addresses at most <strong>2 TiB</strong> (with the usual 512-byte blocks).</p>
+<table>
+  <thead><tr><th></th><th>GPT</th><th>MBR</th></tr></thead>
+  <tbody>
+    <tr><td>Partitions</td><td>128</td><td>4 primary, or 3 primary + extended with any number of logical</td></tr>
+    <tr><td>Disk size</td><td>no practical limit</td><td>2 TiB</td></tr>
+    <tr><td>Copies</td><td>two, with checksums</td><td>one</td></tr>
+    <tr><td>Names</td><td>yes</td><td>no</td></tr>
+    <tr><td>Starts</td><td>UEFI</td><td>UEFI and old BIOS (with boot code from a boot loader)</td></tr>
+  </tbody>
+</table>
+<p>For a disk used only with UEFI, choose GPT. Choose MBR for sticks and disks that must also start on old
+BIOS/CSM systems, or for devices that accept nothing else.</p>
+
+<h3 id="alignment" data-index="alignment;1 MiB">Alignment</h3>
+<p>partmgr starts partitions on <strong>1 MiB boundaries</strong>, as current systems do: it is good for SSDs and
+disks with 4096-byte sectors. A start you type is rounded up to the next MiB.</p>
+
+<!-- ===================================================================== -->
+<h2 id="changing">Changing a disk</h2>
+
+<p class="chapter-intro">Every change in this chapter is made on the screen only. Nothing reaches the disk until
+<a href="#writing">Write</a>.</p>
+
+<h3 id="new-partition" data-index="N;new partition;size;rest">New partition</h3>
+<p>Select a free area and press <kbd>N</kbd>. partmgr asks, one at a time:</p>
+<ol class="steps">
+  <li><strong>On an MBR disk, primary or logical</strong> — only when the disk has no extended partition yet. A logical
+      partition <em>creates the extended partition</em> over the whole free area. In a free area inside the extended
+      partition the new partition is logical without asking.</li>
+  <li><strong>Start</strong>, proposed as the beginning of the free area. <kbd>Enter</kbd> accepts it; typing replaces it.
+      The start must lie in the free area. A logical partition that creates the extended one starts 1 MiB into the
+      area: that first MiB holds the table of the chain.</li>
+</ol>
+<figure class="demo">
+  <img src="assets/partmgr-start.png" width="816" height="608"
+       alt="The dialog New partition: start, proposing 317 MiB and saying the free area goes from 317 MiB to 511.9 MiB">
+  <figcaption>The start is proposed; the dialog says where the free area begins and ends.</figcaption>
+</figure>
+<ol class="steps" start="3">
+  <li><strong>Size</strong>, proposed as <code>rest</code>: all the free space after the start. Or type a size:
+      <code>512M</code>, <code>20G</code>, <code>1.5T</code> (see <a href="#sizes">Writing sizes</a>). If it does not fit,
+      partmgr says how much does.</li>
+  <li><strong>Type</strong>, chosen from a list; <em>Other…</em> at the end takes a type GUID (GPT) or a type byte in
+      hexadecimal (MBR). See <a href="#types">Partition types</a>.</li>
+  <li><strong>Name</strong>, on GPT only: up to 36 characters, or empty.</li>
+</ol>
+<figure class="demo">
+  <img src="assets/partmgr-type.png" width="816" height="608"
+       alt="The Partition type list of a GPT disk, with Linux filesystem selected">
+  <figcaption>Types are chosen from a list: no codes to remember.</figcaption>
+</figure>
+<p><kbd>Esc</kbd> at any step cancels the new partition. On an MBR disk the new logical partitions are numbered in disk
+order, so adding one in front of others renumbers them (and marks them with a star).</p>
+
+<h3 id="delete-partition" data-index="D;delete a partition">Delete a partition</h3>
+<p>Select it and press <kbd>D</kbd>. The partition disappears from the table and its space becomes free. Deleting the
+<strong>extended partition</strong> deletes its logical partitions too; partmgr asks first when there are any.
+The data of a deleted partition stays on the disk: deleting is not <a href="#what-it-does-not">wiping</a>.</p>
+
+<h3 id="change-type" data-index="T;type of a partition">Change the type</h3>
+<p><kbd>T</kbd> opens the list of types with the current one selected. The extended partition keeps its type, and no
+other partition can be given an extended type: extended partitions are made by adding logical ones.</p>
+
+<h3 id="rename" data-index="R;rename;name of a partition">Rename (GPT)</h3>
+<p><kbd>R</kbd> changes the name of a GPT partition: up to 36 characters, or empty. MBR partitions have no names.</p>
+
+<h3 id="active" data-index="A;active flag">Active flag (MBR)</h3>
+<p><kbd>A</kbd> makes the selected partition the active one, or takes the flag away if it has it. Only one partition is
+active at a time: setting it moves it. The extended partition cannot be active.</p>
+
+<h3 id="new-table" data-index="Z;new partition table">New partition table</h3>
+<p><kbd>Z</kbd> replaces the table with a new, empty one: GPT or MBR, chosen from a list. A new table is made
+<strong>from zero</strong>: every partition of the disk goes, the disk gets new identifiers, and block 0 has no boot code
+(boot code belongs to boot loaders, which install their own). Add partitions, then Write.</p>
+
+<h3 id="delete-table" data-index="X;delete the partition table">Delete the partition table</h3>
+<p><kbd>X</kbd> removes the table altogether. After Write the disk looks empty to every system; the data of the
+partitions is not touched.</p>
+
+<!-- ===================================================================== -->
+<h2 id="writing">Writing the changes</h2>
+
+<p class="chapter-intro">The one moment the disk changes, and how partmgr protects it.</p>
+
+<h3 id="write" data-index="Enter;Write;confirmation">Write</h3>
+<p>When the screen shows the table you want, press <kbd>Enter</kbd>. partmgr shows a warning in red with the disk, its
+size and what will happen, and asks you to <strong>type the name of the disk</strong>:</p>
+<figure class="demo">
+  <img src="assets/partmgr-write.png" width="816" height="608"
+       alt="The red warning Write the partition table: the table of blk3 will be replaced; type blk3 and press Enter to go on">
+  <figcaption>Nothing is written until the name of the disk is typed.</figcaption>
+</figure>
+<p>Type it (<code>blk3</code> here) and press <kbd>Enter</kbd>: the table is written, read back from the disk and shown
+again, and the message line says <em>Written.</em> Anything else does nothing: <kbd>Esc</kbd> cancels, a wrong name
+says so and writes nothing. There is <strong>no automatic copy</strong> of the old table: if you want one, press
+<kbd>Esc</kbd> and make a <a href="#backup">backup</a> first.</p>
+
+<h3 id="what-write-does" data-index="repair a GPT;boot code">What Write writes</h3>
+<ul>
+  <li><strong>GPT:</strong> the protective MBR and both copies of the table. Writing therefore also <em>repairs</em> a
+      table whose primary or backup copy was damaged, and moves the backup copy to the real end of a disk that was
+      enlarged (a disk image, a cloned disk). A <em>hybrid</em> MBR (see <a href="#notes">notes</a>) is left as it is.</li>
+  <li><strong>MBR:</strong> block 0 with the entries, and the chain of tables of the logical partitions. The boot code
+      already in block 0 is kept; the disk signature too. If the disk had a GPT before, its headers are cleared, so that
+      no system finds the old GPT.</li>
+  <li><strong>No table</strong> (after <kbd>X</kbd>): block 0 and both GPT headers are cleared.</li>
+</ul>
+<p>The data inside the partitions is never touched.</p>
+
+<h3 id="leaving" data-index="Esc;leaving with changes">Leaving without writing</h3>
+<p><kbd>Esc</kbd> goes back to the list of disks. If there are changes not written, partmgr asks <em>Throw them away?</em>:
+<kbd>Y</kbd> leaves them, <kbd>N</kbd> stays. Leaving without writing leaves the disk exactly as it was.</p>
+
+<!-- ===================================================================== -->
+<h2 id="backup-restore">Backup and restore</h2>
+
+<p class="chapter-intro">A copy of the partition table in a small file, and the way back.</p>
+
+<h3 id="backup" data-index="B;backup;backup file">Backup</h3>
+<p><kbd>B</kbd> saves the partition table <strong>as it is on the disk</strong> — changes on the screen that are not
+written yet are not in it. partmgr proposes a file on the volume it was started from, or on the first volume that can
+be written when that one cannot:</p>
+<pre class="terminal">fs1:\partmgr-blk7.bin</pre>
+<p>The dialog lists the volumes, marking the read-only ones. Type another path if you like, always with its volume
+(<code>fs1:\backups\disk.bin</code>; the folder must exist). partmgr asks before replacing an existing file. A backup is
+small: one or a few kilobytes for an MBR, about 34 KB for a GPT.</p>
+<p>What the file holds: the blocks of the table exactly as they are on the disk — block 0 and the tables of the logical
+partitions for an MBR; the protective MBR and both GPT copies for a GPT — with the size of the disk and a checksum.
+It does <em>not</em> hold any data of the partitions.</p>
+
+<h3 id="restore" data-index="S;restore">Restore</h3>
+<p><kbd>S</kbd> writes a backup back. partmgr proposes the file of the last backup or restore since it was started, reads it and checks it before anything
+else: it must be a partmgr backup, undamaged, made on a disk of the <strong>same size and block size</strong>.
+Then it shows the red warning and asks for the name of the disk.</p>
+<p>A restore is written <strong>at once</strong>, not with Write: it replaces the table on the disk, and the changes on the
+screen that were not written are lost. If the disk has a GPT now and the backup is of an MBR, the GPT is cleared too, so
+the disk comes back as it was.</p>
+<div class="callout tip"><span class="callout-title">A safe routine</span>
+<p>Before changing a disk that matters: <kbd>B</kbd> to a stick, then the changes, then Write. If the result is not
+what you wanted, <kbd>S</kbd> brings the old table back — and with it every partition that was there, since their
+data was never touched.</p></div>
+
+<!-- ===================================================================== -->
+<h2 id="safety">Safety and limits</h2>
+
+<p class="chapter-intro">What partmgr refuses, what it cannot do, and why.</p>
+
+<h3 id="read-only-disks" data-index="read only;boot disk;write-protected">Disks that are only shown</h3>
+<p>The disk partmgr was started from, and write-protected disks, can be opened and backed up, but every change is
+refused with a message. To change the disk partmgr runs from, start partmgr from another stick.</p>
+
+<h3 id="limits" data-index="limits;2 TiB">Limits</h3>
+<table>
+  <thead><tr><th>Limit</th><th>Why</th></tr></thead>
+  <tbody>
+    <tr><td>MBR: four primary partitions, the extended one included</td><td>Block 0 has four entries.</td></tr>
+    <tr><td>MBR: nothing beyond 2 TiB</td><td>An MBR stores positions in 32 bits. Use GPT.</td></tr>
+    <tr><td>One extended partition</td><td>A second one is not part of the MBR scheme; partmgr reads only the first.</td></tr>
+    <tr><td>GPT names: 36 characters</td><td>The size of the name field.</td></tr>
+    <tr><td>No resize, move, format</td><td>They change the data inside partitions, which partmgr never touches.</td></tr>
+  </tbody>
+</table>
+
+<h3 id="notes" data-index="notes;damaged table;hybrid MBR">What the notes mean</h3>
+<p>When the table of a disk is unusual or damaged, partmgr shows it as well as it can and explains below the list.
+Write then writes a clean table — which is also how most of these are repaired.</p>
+<table>
+  <thead><tr><th>Note</th><th>Meaning, and what to do</th></tr></thead>
+  <tbody>
+    <tr><td>the primary GPT … ; the backup copy is used</td><td>The copy at the beginning is damaged; partmgr shows the
+        backup. Write repairs the primary copy.</td></tr>
+    <tr><td>the backup GPT …</td><td>The copy at the end is damaged or missing. Write repairs it.</td></tr>
+    <tr><td>the backup GPT is not in the last block (the disk was enlarged?)</td><td>Usual after copying a disk image
+        to a bigger disk. Write moves the backup to the end and makes the new space usable.</td></tr>
+    <tr><td>the primary and backup GPT differ; the primary one is shown</td><td>The copies disagree. Write makes both
+        like the one shown.</td></tr>
+    <tr><td>the protective MBR announces a GPT, but both GPT copies are damaged</td><td>No table can be read. Restore a
+        backup if you have one; otherwise a new table (<kbd>Z</kbd>) is the way on.</td></tr>
+    <tr><td>the protective MBR is missing</td><td>A GPT without block 0. Write puts it back.</td></tr>
+    <tr><td>hybrid MBR: block 0 also describes partitions for legacy systems</td><td>An old trick to start a GPT disk
+        on BIOS systems. partmgr keeps block 0 as it is when writing.</td></tr>
+    <tr><td>partition N lies outside the usable area of the disk / goes beyond the end of the disk</td><td>The table
+        does not match the disk, typically after copying it to a smaller one.</td></tr>
+    <tr><td>invalid extended boot record / the chain of logical partitions … </td><td>The chain of logical partitions
+        is broken; the partitions before the break are shown.</td></tr>
+    <tr><td>more than one extended partition; only the first one is read</td><td>Not a valid MBR layout.</td></tr>
+    <tr><td>no partition table: a file system covers the whole disk</td><td>A stick formatted without partitions (a
+        "superfloppy"). Nothing to change; a new table would hide that file system.</td></tr>
+    <tr><td>block 0 ends like an MBR, but its partition entries are invalid</td><td>Block 0 holds something else, such as
+        boot code with no table.</td></tr>
+  </tbody>
+</table>
+
+<h3 id="messages" data-index="messages;errors">Messages when adding a partition</h3>
+<table>
+  <thead><tr><th>Message</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td>the partition overlaps another one</td><td>Start or size reach into a partition.</td></tr>
+    <tr><td>Too big: at most … fit here</td><td>Use a smaller size, or <code>rest</code>.</td></tr>
+    <tr><td>an MBR holds at most four primary partitions, the extended one included</td><td>Add logical partitions
+        instead, or use GPT.</td></tr>
+    <tr><td>no room for an extended partition: the MBR already has four partitions</td><td>A logical partition needs an
+        extended one, which needs a free entry.</td></tr>
+    <tr><td>a logical partition must start at least 1 MiB into the free area</td><td>The first MiB holds its table.</td></tr>
+    <tr><td>an MBR cannot address beyond 2 TiB: use GPT</td><td>See <a href="#limits">Limits</a>.</td></tr>
+    <tr><td>the partition table is full</td><td>All the entries of the GPT are in use.</td></tr>
+  </tbody>
+</table>
+
+<!-- ===================================================================== -->
+<h2 id="reference">Reference</h2>
+
+<h3 id="keys" data-index="keys">Keys</h3>
+<table>
+  <thead><tr><th>Key</th><th>Where</th><th>Does</th></tr></thead>
+  <tbody>
+    <tr><td><kbd>&uarr;</kbd> <kbd>&darr;</kbd> <kbd>Home</kbd> <kbd>End</kbd></td><td>both screens</td><td>Move.</td></tr>
+    <tr><td><kbd>Enter</kbd></td><td>list</td><td>Open the disk.</td></tr>
+    <tr><td><kbd>R</kbd></td><td>list</td><td>Read the disks again.</td></tr>
+    <tr><td><kbd>Q</kbd> <kbd>Esc</kbd></td><td>list</td><td>Leave partmgr.</td></tr>
+    <tr><td><kbd>N</kbd></td><td>disk, on free space</td><td><a href="#new-partition">New partition</a>.</td></tr>
+    <tr><td><kbd>D</kbd></td><td>disk, on a partition</td><td><a href="#delete-partition">Delete it</a>.</td></tr>
+    <tr><td><kbd>T</kbd></td><td>disk, on a partition</td><td><a href="#change-type">Change its type</a>.</td></tr>
+    <tr><td><kbd>R</kbd></td><td>disk, GPT partition</td><td><a href="#rename">Rename it</a>.</td></tr>
+    <tr><td><kbd>A</kbd></td><td>disk, MBR partition</td><td><a href="#active">Active flag</a>.</td></tr>
+    <tr><td><kbd>Z</kbd></td><td>disk</td><td><a href="#new-table">New table</a> (GPT or MBR).</td></tr>
+    <tr><td><kbd>X</kbd></td><td>disk</td><td><a href="#delete-table">Delete the table</a>.</td></tr>
+    <tr><td><kbd>B</kbd></td><td>disk</td><td><a href="#backup">Backup</a> to a file.</td></tr>
+    <tr><td><kbd>S</kbd></td><td>disk</td><td><a href="#restore">Restore</a> from a file (at once).</td></tr>
+    <tr><td><kbd>Enter</kbd></td><td>disk</td><td><a href="#write">Write</a> the changes.</td></tr>
+    <tr><td><kbd>Esc</kbd></td><td>disk</td><td>Back to the list (asks if changes are not written).</td></tr>
+  </tbody>
+</table>
+<p>In a dialog: <kbd>Enter</kbd> accepts, <kbd>Esc</kbd> cancels. In a text field the first key you type replaces the
+proposed text; <kbd>&larr;</kbd> <kbd>&rarr;</kbd> <kbd>Home</kbd> <kbd>End</kbd> <kbd>Backspace</kbd> <kbd>Del</kbd>
+edit it. In a question, <kbd>Y</kbd> means yes, <kbd>N</kbd> or <kbd>Esc</kbd> no.</p>
+
+<h3 id="sizes" data-index="sizes;units;MiB;GiB">Writing sizes</h3>
+<table>
+  <thead><tr><th>You write</th><th>It means</th></tr></thead>
+  <tbody>
+    <tr><td><code>512M</code> <code>512MB</code> <code>512 MiB</code></td><td>512 MiB. Units are binary: <code>K</code> = 1024 bytes,
+        <code>M</code> = 1024 K, <code>G</code> = 1024 M, <code>T</code> = 1024 G; <code>B</code> and <code>iB</code> after
+        them change nothing.</td></tr>
+    <tr><td><code>300</code></td><td>A number without a unit is in MiB.</td></tr>
+    <tr><td><code>1.5G</code> <code>0,5M</code></td><td>Decimals, with a point or a comma.</td></tr>
+    <tr><td><code>4096B</code></td><td>Bytes.</td></tr>
+    <tr><td><code>2048s</code></td><td>Blocks (sectors) of the disk.</td></tr>
+    <tr><td><code>rest</code> <code>all</code> <code>max</code></td><td>Size only: all the free space after the start.</td></tr>
+  </tbody>
+</table>
+<p>A size that is not a whole number of blocks is rounded down; a start is rounded up to the next MiB.</p>
+
+<h3 id="types" data-index="partition types;type GUID;type byte">Partition types</h3>
+<p>The lists, in the order partmgr shows them (the MBR table reads down its first column, then the second). Other
+types are entered with <em>Other…</em>, and a type partmgr has no name for is shown as its GUID or byte.</p>
+<table>
+  <thead><tr><th>GPT type</th><th>Type GUID</th></tr></thead>
+  <tbody>
+    <tr><td>EFI system</td><td><code>C12A7328-F81F-11D2-BA4B-00A0C93EC93B</code></td></tr>
+    <tr><td>BIOS boot</td><td><code>21686148-6449-6E6F-744E-656564454649</code></td></tr>
+    <tr><td>Microsoft reserved</td><td><code>E3C9E316-0B5C-4DB8-817D-F92DF00215AE</code></td></tr>
+    <tr><td>Microsoft basic data</td><td><code>EBD0A0A2-B9E5-4433-87C0-68B6B72699C7</code></td></tr>
+    <tr><td>Windows recovery</td><td><code>DE94BBA4-06D1-4D40-A16A-BFD50179D6AC</code></td></tr>
+    <tr><td>Windows LDM metadata</td><td><code>5808C8AA-7E8F-42E0-85D2-E1E90434CFB3</code></td></tr>
+    <tr><td>Windows LDM data</td><td><code>AF9B60A0-1431-4F62-BC68-3311714A69AD</code></td></tr>
+    <tr><td>Linux filesystem</td><td><code>0FC63DAF-8483-4772-8E79-3D69D8477DE4</code></td></tr>
+    <tr><td>Linux root (x86-64)</td><td><code>4F68BCE3-E8CD-4DB1-96E7-FBCAF984B709</code></td></tr>
+    <tr><td>Linux home</td><td><code>933AC7E1-2EB4-4F13-B844-0E14E2AEF915</code></td></tr>
+    <tr><td>Linux extended boot</td><td><code>BC13C2FF-59E6-4262-A352-B275FD6F7172</code></td></tr>
+    <tr><td>Linux swap</td><td><code>0657FD6D-A4AB-43C4-84E5-0933C84B4F4F</code></td></tr>
+    <tr><td>Linux LVM</td><td><code>E6D6D379-F507-44C2-A23C-238F2A3DF928</code></td></tr>
+    <tr><td>Linux RAID</td><td><code>A19D880F-05FC-4D3B-A006-743F0F84911E</code></td></tr>
+    <tr><td>Apple HFS+</td><td><code>48465300-0000-11AA-AA11-00306543ECAC</code></td></tr>
+    <tr><td>Apple APFS</td><td><code>7C3457EF-0000-11AA-AA11-00306543ECAC</code></td></tr>
+  </tbody>
+</table>
+<table>
+  <thead><tr><th>MBR type</th><th>Byte</th><th>MBR type</th><th>Byte</th></tr></thead>
+  <tbody>
+    <tr><td>FAT32 (LBA)</td><td><code>0C</code></td><td>Hidden NTFS</td><td><code>17</code></td></tr>
+    <tr><td>NTFS/exFAT</td><td><code>07</code></td><td>Hidden FAT32 (LBA)</td><td><code>1C</code></td></tr>
+    <tr><td>Linux</td><td><code>83</code></td><td>Hidden FAT32</td><td><code>1B</code></td></tr>
+    <tr><td>Linux swap</td><td><code>82</code></td><td>Hidden FAT16 (LBA)</td><td><code>1E</code></td></tr>
+    <tr><td>EFI system</td><td><code>EF</code></td><td>Hidden FAT16</td><td><code>16</code></td></tr>
+    <tr><td>Linux LVM</td><td><code>8E</code></td><td>Hidden FAT16 &lt;32M</td><td><code>14</code></td></tr>
+    <tr><td>Linux RAID</td><td><code>FD</code></td><td>Hidden FAT12</td><td><code>11</code></td></tr>
+    <tr><td>FAT16 (LBA)</td><td><code>0E</code></td><td>FAT16 &lt;32M</td><td><code>04</code></td></tr>
+    <tr><td>FAT32</td><td><code>0B</code></td><td>FAT12</td><td><code>01</code></td></tr>
+    <tr><td>FAT16</td><td><code>06</code></td><td>Windows LDM</td><td><code>42</code></td></tr>
+    <tr><td>Windows recovery</td><td><code>27</code></td><td>FreeBSD / OpenBSD</td><td><code>A5</code> / <code>A6</code></td></tr>
+    <tr><td></td><td></td><td>Apple HFS+</td><td><code>AF</code></td></tr>
+  </tbody>
+</table>
+<p>The extended types (<code>05</code>, <code>0F</code>, <code>85</code>) and the GPT protective type (<code>EE</code>) are
+recognised but never chosen by hand: partmgr creates the extended partition itself, with <code>05</code>, or
+<code>0F</code> when it reaches beyond 8 GB.</p>
+
+<!-- ===================================================================== -->
+<h2 id="glossary">Glossary</h2>
+<dl class="defs">
+  <dt id="g-active" data-kind="term" data-index="Active partition">Active partition</dt><dd>On an MBR disk, the partition an old BIOS starts. UEFI ignores it.</dd>
+  <dt id="g-block" data-kind="term" data-index="Block">Block</dt><dd>The unit a disk is read and written in: 512 or 4096 bytes. Also called a sector.</dd>
+  <dt id="g-bootcode" data-kind="term" data-index="Boot code">Boot code</dt><dd>The small program at the start of an MBR, written by a boot loader for BIOS systems. partmgr keeps it when changing a table and leaves it empty in a new one.</dd>
+  <dt id="g-ebr" data-kind="term" data-index="Extended boot record;EBR">Extended boot record</dt><dd>The small table in front of each logical partition, chained to the next one.</dd>
+  <dt id="g-esp" data-kind="term" data-index="ESP;EFI system partition">EFI system partition</dt><dd>The FAT partition UEFI firmware starts boot loaders from.</dd>
+  <dt id="g-gpt" data-kind="term" data-index="GPT">GPT</dt><dd>GUID Partition Table, the partition table of UEFI.</dd>
+  <dt id="g-guid" data-kind="term" data-index="GUID">GUID</dt><dd>A 128-bit identifier, written <code>C12A7328-F81F-11D2-BA4B-00A0C93EC93B</code>.</dd>
+  <dt id="g-mbr" data-kind="term" data-index="MBR">MBR</dt><dd>Master Boot Record, the partition table of the PC BIOS, in block 0.</dd>
+  <dt id="g-partition" data-kind="term" data-index="Partition">Partition</dt><dd>A part of a disk, described in the partition table, usually holding one file system.</dd>
+  <dt id="g-superfloppy" data-kind="term" data-index="Superfloppy">Superfloppy</dt><dd>A disk formatted as a whole, with no partition table.</dd>
+  <dt id="g-wipe" data-kind="term" data-index="Wipe">Wipe</dt><dd>To overwrite the contents of a partition so that its data is gone. Not the same as deleting it.</dd>
+</dl>
+
+<!-- ===================================================================== -->
+<h2 id="index" class="unnumbered">Index</h2>
+<p>Keys, messages and topics in alphabetical order. The number after each entry is the section.</p>
+<div id="index-list"></div>
+
+<footer class="doc-footer">
+  partmgr User Manual — for partmgr 0.1. See also the <a href="partmgr-developer-manual.html">technical manual</a>,
+  the <a href="user-manual.html">NESH user manual</a> and the
+  <a href="https://github.com/nic-fio/NG-EFI_SHELL/blob/main/docs/decisions-and-history.md">design decisions</a> (D21).
+  <br>Copyright (c) 2026 nic-fio, licensed
+  <a href="https://github.com/nic-fio/NG-EFI_SHELL/blob/main/LICENSE">Apache 2.0 with the Commons
+  Clause</a>: free to use and to share, selling it needs a commercial licence.
+</footer>
+
+</main>
+</div>
+<script src="assets/vendor/mermaid.min.js"></script>
+<script src="assets/docs.js"></script>
+</body>
+</html>

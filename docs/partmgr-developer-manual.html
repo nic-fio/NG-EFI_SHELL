@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>partmgr Technical Manual</title>
+<meta name="description" content="Technical manual of partmgr, the partition manager of the NESH project: architecture, partition table code, writing rules, backup format, the UEFI program, testing and conventions.">
+<link rel="stylesheet" href="assets/docs.css">
+</head>
+<body>
+<div class="topbar">
+  <button class="btn menu-btn" type="button" aria-label="Open the table of contents">&#9776; Contents</button>
+  <strong>partmgr Technical Manual</strong>
+</div>
+<div class="layout">
+<nav class="sidebar" aria-label="Table of contents">
+  <div class="brand">
+    <div class="brand-logo">{ }</div>
+    <div class="brand-text"><strong>partmgr Technical Manual</strong><span>partmgr 0.1 · with NESH</span></div>
+  </div>
+  <div class="search">
+    <input type="search" placeholder="Search  ( / )" aria-label="Search">
+    <div class="search-results" role="listbox"></div>
+  </div>
+  <div class="toc"></div>
+  <div class="side-tools">
+    <button class="btn print-btn" type="button">Print / PDF</button>
+    <a class="btn" href="partmgr-user-manual.html">User manual</a>
+    <a class="btn" href="developer-manual.html">NESH developer manual</a>
+  </div>
+</nav>
+
+<main>
+
+<header class="titlepage">
+  <div class="kicker">Technical manual</div>
+  <h1>Inside partmgr</h1>
+  <p class="lead">Everything a programmer needs to understand, build, test and extend partmgr: the partition table code,
+  the rules it writes by, the backup format, the UEFI program around it and the way it is tested.</p>
+  <div class="meta">
+    <span><b>Version</b> 0.1</span>
+    <span><b>Language</b> C (gnu11), Python 3 tests</span>
+    <span><b>Size</b> ~2,800 lines of C</span>
+    <span><b>Target</b> UEFI x86-64 · Linux test tool</span>
+  </div>
+</header>
+
+<section class="unnumbered no-toc">
+  <h2 class="unnumbered" id="contents">Contents</h2>
+  <div class="toc-print" id="contents-list"></div>
+  <p>Press <kbd>/</kbd> to search. The <a href="#index">index</a> lists files, functions and topics.</p>
+</section>
+
+<!-- ===================================================================== -->
+<h2 id="overview">Overview</h2>
+
+<p class="chapter-intro">What partmgr is from the inside, the principles that shaped it, and a map of this manual.</p>
+
+<h3 id="what-you-learn">What this manual covers</h3>
+<p>The <a href="partmgr-user-manual.html">user manual</a> explains what partmgr does. This manual explains <em>how</em>:
+after reading it you should be able to find your way in every source file, build and test partmgr, and change the
+way it reads or writes tables without breaking a disk. It assumes the <a href="developer-manual.html">NESH developer
+manual</a> for what the two programs share: the build pipeline, <code>elf2efi.py</code>, the freestanding runtime and
+the platform layer.</p>
+
+<h3 id="principles">Design principles</h3>
+<ul>
+  <li><strong>The table code knows no firmware.</strong> Reading, changing and writing tables (<code>ptable.c</code>,
+      <code>ptedit.c</code>, <code>ptwrite.c</code>) reach the disk only through a read and a write function
+      (<code>PtDev</code>). The same code runs on a UEFI block device and, in the tests, on a disk image file, where
+      <code>sfdisk</code> and <code>parted</code> check every table it writes.</li>
+  <li><strong>Nothing is written until Write.</strong> Every change is made on a <code>PtTable</code> in memory; only
+      <code>pt_write</code> and <code>pt_restore</code> write to a disk (decision D21).</li>
+  <li><strong>Protection at the lowest level.</strong> The disk partmgr was started from, and a write-protected one, get
+      no write function at all: no mistake in the interface can write them.</li>
+  <li><strong>Only the table.</strong> partmgr never writes inside a partition. The blocks it writes are the MBR, the
+      extended boot records and the GPT headers and arrays.</li>
+  <li><strong>Damage is shown, not hidden.</strong> A damaged table is read as far as possible and explained with
+      <em>notes</em>; writing a table always writes a clean and complete one.</li>
+  <li><strong>One project with NESH.</strong> Same repository, same release, same platform layer, same disk names; no
+      EDK2 code (D7).</li>
+</ul>
+
+<h3 id="numbers">The project in numbers</h3>
+<table>
+  <thead><tr><th>Area</th><th>Directory</th><th>Lines</th><th>Content</th></tr></thead>
+  <tbody>
+    <tr><td>partmgr</td><td><code>src/partmgr</code></td><td>2,841</td><td>table code, the UEFI program, the screens</td></tr>
+    <tr><td>Tests</td><td><code>tests/partmgr</code></td><td>1,229</td><td>the Linux test tool, the table tests, the QEMU test</td></tr>
+  </tbody>
+</table>
+<p><code>partmgr.efi</code> is about 67 KB. As in the NESH manual, the line counts here and in the
+<a href="#file-map">source file map</a> are written by <code>make docs</code> and checked by <code>make test</code>.</p>
+
+<!-- ===================================================================== -->
+<h2 id="source-and-build">Source tree and build</h2>
+
+<h3 id="layout">Files</h3>
+<table>
+  <thead><tr><th>Path</th><th>Content</th></tr></thead>
+  <tbody>
+    <tr><td><code>src/partmgr/ptable.h</code>, <code>ptint.h</code></td><td>The interface of the table code; little-endian helpers.</td></tr>
+    <tr><td><code>src/partmgr/ptable.c</code></td><td>Reading GPT and MBR; type names.</td></tr>
+    <tr><td><code>src/partmgr/ptedit.c</code></td><td>Changes in memory and free space.</td></tr>
+    <tr><td><code>src/partmgr/ptwrite.c</code></td><td>Writing tables; backup and restore.</td></tr>
+    <tr><td><code>src/partmgr/units.c</code></td><td>Sizes as the user writes and reads them.</td></tr>
+    <tr><td><code>src/partmgr/disks_efi.c</code>, <code>disks.h</code></td><td>The disks of the machine through block I/O.</td></tr>
+    <tr><td><code>src/partmgr/ui.c</code>, <code>ui.h</code></td><td>Drawing and dialogs.</td></tr>
+    <tr><td><code>src/partmgr/main.c</code>, <code>diskview.c</code>, <code>partmgr.h</code></td><td>The program: the list of disks and the screen of a disk.</td></tr>
+    <tr><td><code>src/lib/crc32.c</code></td><td>CRC-32 of GPT headers and arrays (in the shared runtime, described in the NESH manual).</td></tr>
+    <tr><td><code>tests/partmgr/</code></td><td><code>pttool.c</code>, <code>run-tests.py</code>, <code>qemu-test.py</code>.</td></tr>
+  </tbody>
+</table>
+
+<h3 id="tools-needed">Tools needed</h3>
+<table>
+  <thead><tr><th>Tool</th><th>Used for</th></tr></thead>
+  <tbody>
+    <tr><td>GCC, GNU ld, Python 3</td><td>The build, as for NESH.</td></tr>
+    <tr><td><code>sfdisk</code> (fdisk)</td><td>The table tests: it builds the test images and is the reference.</td></tr>
+    <tr><td><code>parted</code></td><td>A second reader of the tables partmgr writes (the check is skipped without it).</td></tr>
+    <tr><td><code>mkfs.fat</code> (dosfstools)</td><td>A disk without a table, and the writable volume of the QEMU test.</td></tr>
+    <tr><td>QEMU and OVMF</td><td><code>make qemu-partmgr</code>.</td></tr>
+  </tbody>
+</table>
+
+<h3 id="make-targets">Make targets</h3>
+<table>
+  <thead><tr><th>Target</th><th>Does</th></tr></thead>
+  <tbody>
+    <tr><td><code>make</code></td><td>Builds <code>build/partmgr.efi</code> with <code>nesh.efi</code>.</td></tr>
+    <tr><td><code>make test</code></td><td>Also builds <code>build/tests/pttool</code> and runs <code>tests/partmgr/run-tests.py</code>.</td></tr>
+    <tr><td><code>make qemu-partmgr</code></td><td>Runs <code>tests/partmgr/qemu-test.py</code>: partmgr.efi in QEMU/OVMF.</td></tr>
+    <tr><td><code>make docs</code></td><td>Rewrites the line counts of this manual.</td></tr>
+  </tbody>
+</table>
+
+<h3 id="build">How partmgr.efi is linked</h3>
+<p>The Makefile lists two groups: <code>PARTMGR_SRC</code>, the portable part also compiled into the Linux test tool,
+and <code>PARTMGR_EFI_SRC</code>, which adds the program and what it needs from NESH's runtime and platform layer:</p>
+<pre class="code" data-lang="make" data-title="Makefile">PARTMGR_SRC := src/partmgr/ptable.c src/partmgr/ptedit.c src/partmgr/ptwrite.c src/partmgr/units.c \
+	src/lib/crc32.c src/lib/util.c
+PARTMGR_EFI_SRC := $(PARTMGR_SRC) src/partmgr/main.c src/partmgr/diskview.c src/partmgr/ui.c src/partmgr/disks_efi.c \
+	src/lib/libc.c src/lib/fmt.c src/pal/pal_efi.c src/pal/pal_common.c</pre>
+<p>The objects are compiled with the EFI flags of NESH, linked with <code>tools/efi.lds</code> into
+<code>build/partmgr.so</code> and converted to PE32+ by <code>tools/elf2efi.py</code>. <code>pal_efi.c</code> is the same
+file NESH uses: it does not know which program it starts. It calls <code>app_main</code> and names the program
+<code>app_name</code> in fatal errors; <code>src/partmgr/main.c</code> defines both, as <code>src/core/shell.c</code> does for
+NESH. So partmgr gets the 1 MiB private stack, the console, the keyboard and the file functions of NESH, and the shell
+itself is not linked in.</p>
+
+<!-- ===================================================================== -->
+<h2 id="architecture">Architecture</h2>
+
+<h3 id="layers">Layers</h3>
+<figure>
+<pre class="mermaid">
+flowchart TB
+  subgraph P["The program (UEFI only)"]
+    M["main.c&lt;br/&gt;list of disks"] --> V["diskview.c&lt;br/&gt;screen of a disk, actions"]
+    V --> U["ui.c&lt;br/&gt;drawing, dialogs"]
+    V --> N["units.c&lt;br/&gt;sizes"]
+  end
+  subgraph T["Table code (portable)"]
+    E["ptedit.c&lt;br/&gt;changes, free space"]
+    W["ptwrite.c&lt;br/&gt;write, backup, restore"]
+    R["ptable.c&lt;br/&gt;read, type names"]
+  end
+  V --> E
+  V --> W
+  V --> R
+  E --> D["PtDev&lt;br/&gt;read / write / random"]
+  W --> D
+  R --> D
+  D --> K["disks_efi.c&lt;br/&gt;block I/O, RNG"]
+  D -.-> I["pttool.c (tests)&lt;br/&gt;an image file"]
+  U --> PAL["pal_efi.c&lt;br/&gt;console, keys, files"]
+  K --> FW["UEFI firmware"]
+  PAL --> FW
+</pre>
+<figcaption>The table code sees a disk only as a PtDev</figcaption>
+</figure>
+
+<h3 id="startup">Start-up</h3>
+<p><code>efi_main</code> (in <code>pal_efi.c</code>) sets up the firmware globals, the volumes and the arguments, switches to
+the private stack and calls <code>app_main</code>. partmgr hides the cursor and loops on the list of disks: every turn
+calls <code>pm_disks</code>, which locates the block devices again (so <kbd>R</kbd>, or any key, rescans), and reads each
+disk's table to fill the columns. <kbd>Enter</kbd> calls <code>pm_disk_screen</code>; <kbd>Q</kbd> resets the colours,
+clears the screen and returns 0 to the caller.</p>
+
+<h3 id="edit-flow">Life of a change</h3>
+<figure>
+<pre class="mermaid">
+sequenceDiagram
+  participant K as Keyboard
+  participant V as diskview.c
+  participant E as ptedit.c
+  participant W as ptwrite.c
+  participant D as Disk (PtDev)
+  K->>V: N on a free area
+  V->>V: dialogs: start, size, type, name
+  V->>E: pt_add(table, part)
+  E-->>V: NULL or a message
+  V->>V: build_rows, draw (4*, "changes not written")
+  K->>V: Enter
+  V->>V: red warning, disk name typed
+  V->>W: pt_write(dev, table)
+  W->>D: blocks of the table
+  V->>D: pt_read: the table as written
+  V->>V: "Written."
+</pre>
+<figcaption>A new partition, from the key to the disk</figcaption>
+</figure>
+
+<!-- ===================================================================== -->
+<h2 id="data-model">The data model</h2>
+
+<p class="chapter-intro">Three structures carry everything: the disk, the table and its partitions.</p>
+
+<h3 id="ptdev" data-index="PtDev">PtDev: the disk</h3>
+<pre class="code" data-lang="c" data-title="src/partmgr/ptable.h">typedef struct {
+    PtReadFn read;
+    PtWriteFn write;   /* NULL: the disk is read-only */
+    PtRandomFn random;
+    void *ctx;
+    uint32_t bsize;   /* bytes per block: 512 or 4096 */
+    uint64_t nblocks; /* size of the disk in blocks */
+} PtDev;</pre>
+<p><code>read</code> and <code>write</code> move whole blocks and return 0 or a <code>PAL_E*</code> code; <code>random</code>
+fills identifiers. On UEFI <code>ctx</code> is the <code>EFI_BLOCK_IO_PROTOCOL</code>; in <code>pttool</code> it is the image
+file. <code>write</code> is <code>NULL</code> for the boot disk and write-protected media, and every write function of
+<code>ptwrite.c</code> then returns <code>PAL_EROFS</code>.</p>
+
+<h3 id="pttable" data-index="PtTable;PtPart">PtTable and PtPart</h3>
+<table>
+  <thead><tr><th>Field</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td><code>kind</code></td><td><code>PT_NONE</code>, <code>PT_MBR</code> or <code>PT_GPT</code>.</td></tr>
+    <tr><td><code>mbr_sig</code>, <code>disk_guid</code></td><td>The disk identifier of each kind.</td></tr>
+    <tr><td><code>first_usable</code>, <code>last_usable</code></td><td>GPT: the blocks partitions may use.</td></tr>
+    <tr><td><code>max_entries</code>, <code>entry_size</code></td><td>GPT: the entry array (usually 128 × 128 bytes).</td></tr>
+    <tr><td><code>primary_entries_lba</code>, <code>backup_lba</code>, <code>backup_entries_lba</code></td><td>GPT: where the copies are (for backups).</td></tr>
+    <tr><td><code>primary_ok</code>, <code>backup_ok</code>, <code>hybrid</code></td><td>GPT: which copies passed the checks; block 0 has more than the protective entry.</td></tr>
+    <tr><td><code>lba0</code></td><td>The first 512 bytes of block 0 as read: boot code and signature, kept when writing.</td></tr>
+    <tr><td><code>parts</code>, <code>nparts</code></td><td>The partitions, in table order (MBR: primary and extended, then logical in disk order).</td></tr>
+    <tr><td><code>notes</code></td><td>Up to 8 sentences for the user about what was unusual.</td></tr>
+    <tr><td><code>changed</code></td><td>Something changed since the table was read (drives the title and <kbd>Esc</kbd>).</td></tr>
+  </tbody>
+</table>
+<p>A <code>PtPart</code> has <code>num</code> (the GPT entry index + 1, or 1–4 and 5… on MBR), <code>role</code>
+(<code>PT_PRIMARY</code>, <code>PT_EXTENDED</code>, <code>PT_LOGICAL</code>), <code>start</code> and <code>size</code> in blocks,
+the MBR fields <code>mbr_type</code>, <code>active</code>, <code>ebr_lba</code> (the block of the record that describes a
+logical partition), the GPT fields <code>type_guid</code>, <code>guid</code>, <code>attrs</code>, <code>name</code> (UTF-8), and
+<code>changed</code>, which puts the star on the screen. <code>pt_free</code> releases the array; a table is otherwise a plain
+value.</p>
+
+<h3 id="ptfree" data-index="PtFree">PtFree</h3>
+<p><code>pt_free_space</code> returns the free areas as <code>PtFree</code>: <code>start</code>, <code>size</code> and
+<code>logical</code>, true for an area inside the extended partition, where only a logical partition fits. Areas are
+aligned and at least 1 MiB; the screen merges them with the partitions and sorts by start.</p>
+
+<!-- ===================================================================== -->
+<h2 id="reading">Reading tables: ptable.c</h2>
+
+<h3 id="detection" data-index="pt_read;superfloppy">What block 0 says</h3>
+<p><code>pt_read</code> reads block 0 and decides:</p>
+<ol class="steps">
+  <li><strong>55 AA</strong> at bytes 510–511 and every entry's status byte 00 or 80: a valid MBR sector.</li>
+  <li>An entry of type <code>EE</code>: a <strong>protective MBR</strong>, so the disk is GPT; other entries next to it make
+      it <em>hybrid</em>.</li>
+  <li>A valid MBR sector that is not the boot sector of a file system (a jump instruction and <code>NTFS</code>,
+      <code>EXFAT</code> or <code>FAT</code> at their places): an <strong>MBR</strong>.</li>
+  <li>Otherwise: if block 1 starts with <code>EFI PART</code>, a GPT whose protective MBR was wiped; if block 0 is a file
+      system's boot sector, a disk formatted without a table; else nothing.</li>
+</ol>
+
+<h3 id="gpt-read" data-index="gpt_copy;GPT checks">GPT: two copies, checked</h3>
+<p><code>gpt_copy</code> reads a header and its entry array and accepts them only if every check passes: signature
+<code>EFI PART</code>; header size between 92 bytes and one block; header CRC-32 (computed with the CRC field zeroed);
+<code>MyLBA</code> equal to where it was read; a possible layout (first ≤ last usable &lt; disk size, entry size ≥ 128 and a
+multiple of 8, at most 1 MiB of array); the array readable and its CRC-32 right. The primary copy is read from block 1,
+the backup from the primary's <code>AlternateLBA</code> — or from the last block when the primary is damaged. The primary is
+used when good, else the backup; each failure is a note saying which check failed. Entries whose type GUID is zero are
+empty and skipped; names are converted from UTF-16.</p>
+
+<h3 id="mbr-read" data-index="extended boot record;logical partitions">MBR: the chain of logical partitions</h3>
+<p>The four entries of block 0 give the primary partitions and at most one extended partition (types <code>05</code>,
+<code>0F</code>, <code>85</code>). <code>mbr_logicals</code> then follows the chain: each record, at a block inside the
+extended partition, has in entry 1 its logical partition <em>relative to the record</em> and in entry 2 the next record
+<em>relative to the start of the extended partition</em>. The walk stops with a note on a record without
+<code>55 AA</code>, on a link that does not move forward or leaves the extended partition, and after 128 records — so a
+looping or broken chain cannot hang partmgr. Logical partitions are numbered from 5 in chain order, as Linux does.</p>
+
+<h3 id="type-names">Type names</h3>
+<p>Two tables at the end of <code>ptable.c</code>, <code>gpt_types</code> and <code>mbr_types</code>, give the names.
+Their order is the order of the list the user chooses from (<code>pt_type_at</code>); the last four MBR entries (extended
+and protective) are names only and never offered.</p>
+
+<!-- ===================================================================== -->
+<h2 id="editing">Changing tables: ptedit.c</h2>
+
+<h3 id="new-table" data-index="pt_new">A table from zero</h3>
+<p><code>pt_new</code> replaces the table with an empty one: all fields cleared, <code>lba0</code> zero (no boot code), new
+identifiers from <code>dev-&gt;random</code>. A GPT gets 128 entries of 128 bytes: the array takes 32 blocks of 512 bytes
+(4 of 4096), so <code>first_usable</code> is 34 (or 6) and <code>last_usable</code> is the block before the backup array.
+GUIDs are random with the version 4 and RFC 4122 variant bits set; an MBR signature is random and never zero.
+<code>PT_NONE</code> is the empty table that <code>pt_write</code> turns into deleting the table.</p>
+
+<h3 id="free-space" data-index="pt_free_space;alignment">Free space</h3>
+<p>Free areas are the gaps between <em>spans</em>. At the top level the spans are the partitions that are not logical,
+inside the GPT usable area or blocks 1 … min(disk, 2<sup>32</sup>) − 1 of an MBR. Inside the extended partition the spans
+are:</p>
+<ul>
+  <li>its <strong>first block</strong>, always reserved: the chain must start there;</li>
+  <li>for each logical partition, <strong>the block before it</strong> and the partition: every logical partition needs a
+      record somewhere before it, and the block right before it is the one that is always free.</li>
+</ul>
+<p>A gap becomes a <code>PtFree</code> after rounding its start up to 1 MiB (for logical gaps, from the block after the
+gap's first one, which will hold the new record) if at least 1 MiB is left. This rule is what lets the space of a
+deleted first logical partition be used again: the record of the next one moves to the first block of the extended
+partition when writing, and the space in front of it is free.</p>
+
+<h3 id="adding" data-index="pt_add">Adding</h3>
+<p><code>pt_add</code> checks the request and returns a message for the user, or <code>NULL</code>:</p>
+<table>
+  <thead><tr><th>Table</th><th>Rules</th></tr></thead>
+  <tbody>
+    <tr><td>GPT</td><td>Type not zero; inside the usable area; no overlap; a free entry (the lowest); name ≤ 36 UTF-16
+        units. The new partition gets a random GUID.</td></tr>
+    <tr><td>MBR primary</td><td>Type not zero and not extended; not in block 0; below 2<sup>32</sup> blocks; no overlap with
+        top-level partitions; a free slot among 1–4.</td></tr>
+    <tr><td>MBR logical, no extended yet</td><td>A free slot for the extended partition, which is created over the whole
+        raw gap containing the start, from the gap's start rounded to 1 MiB; type <code>0F</code> if it reaches beyond
+        block 0xFFFFFF (8 GiB, the reach of CHS), else <code>05</code>. The logical partition must start after the
+        extended one's first block; its record is that first block.</td></tr>
+    <tr><td>MBR logical in the extended</td><td>Inside the extended partition and inside a logical gap, starting after the
+        gap's first block, which becomes its record (<code>ebr_lba</code>).</td></tr>
+  </tbody>
+</table>
+<p>After an MBR change <code>renumber</code> sorts the partitions (primary and extended by number, logical by start) and
+numbers the logical ones 5, 6…; a partition whose number changes is marked changed.</p>
+
+<h3 id="other-changes" data-index="pt_delete;pt_set_type;pt_set_name;pt_set_active">Delete, type, name, active</h3>
+<ul>
+  <li><code>pt_delete</code> removes a partition; the extended one takes its logical partitions with it.</li>
+  <li><code>pt_set_type</code> refuses a zero type, and on MBR any change between extended and non-extended types.</li>
+  <li><code>pt_set_name</code> is GPT only, 36 UTF-16 units.</li>
+  <li><code>pt_set_active</code> is MBR only, not for the extended partition, and clears the flag everywhere else.</li>
+</ul>
+
+<!-- ===================================================================== -->
+<h2 id="writing">Writing: ptwrite.c</h2>
+
+<h3 id="gpt-write" data-index="write_gpt">GPT</h3>
+<p><code>write_gpt</code> recomputes the last usable block from the real disk size (so an enlarged disk gets its backup
+at the end) and refuses a table whose partitions do not fit. It builds the entry array (entries at index
+<code>num − 1</code>, names converted to UTF-16) and writes, in this order:</p>
+<ol class="steps">
+  <li>block 0, the protective MBR — unless the table is <em>hybrid</em>, whose block 0 is left alone: the first 440
+      bytes as read (boot code; zero for a new table), one entry of type <code>EE</code> from block 1 over the disk (at most
+      2<sup>32</sup> − 1 blocks), CHS 00 02 00 as the specification gives, <code>55 AA</code>;</li>
+  <li>the primary array at block 2, then the primary header at block 1;</li>
+  <li>the backup array just before the last block, then the backup header in the last block.</li>
+</ol>
+<p>Headers are revision 1.0, 92 bytes, with the array CRC and then the header CRC. Both copies are always written,
+which is also how a damaged copy is repaired.</p>
+
+<h3 id="mbr-write" data-index="write_mbr;CHS">MBR</h3>
+<p><code>write_mbr</code> writes block 0 with the boot code as read, the signature, one entry per primary or extended
+partition at slot <code>num − 1</code>, and <code>55 AA</code>. Before it, a GPT header in block 1 or in the last block is
+cleared — if it is not inside a partition of the new table — so that no system finds the old GPT. Every entry gets CHS
+fields computed with 255 heads and 63 sectors, or <code>FE FF FF</code> beyond cylinder 1023.</p>
+<p>Then the chain, with the logical partitions in disk order. Record <var>i</var> goes:</p>
+<ul>
+  <li>for the first logical partition, to the first block of the extended partition;</li>
+  <li>for the others, where it was (<code>ebr_lba</code>) if that block is still between the previous partition and this
+      one, else to the block just before the partition — which <code>ptedit.c</code> keeps free.</li>
+</ul>
+<p>Entry 1 of a record is its logical partition relative to the record. Entry 2 links to the next record: type
+<code>05</code>, start relative to the extended partition, and size from the next record to the end of the next logical
+partition — the convention of fdisk and sfdisk, which the tests check byte by byte. An extended partition without logical
+ones gets an empty record with <code>55 AA</code>.</p>
+
+<h3 id="erase" data-index="erase">No table</h3>
+<p>For <code>PT_NONE</code>, <code>erase</code> writes zeros to block 0, block 1 and the last block: the MBR and both GPT
+headers, which is what every system looks at. Nothing else is touched.</p>
+
+<!-- ===================================================================== -->
+<h2 id="backup-format">Backup and restore</h2>
+
+<h3 id="file-format" data-index="backup file format;PARTMGR1">The backup file</h3>
+<p><code>pt_backup</code> builds the file in memory from the table <em>as read from the disk</em>. All numbers are
+little-endian.</p>
+<table>
+  <thead><tr><th>Offset</th><th>Size</th><th>Content</th></tr></thead>
+  <tbody>
+    <tr><td>0</td><td>8</td><td><code>PARTMGR1</code></td></tr>
+    <tr><td>8</td><td>4</td><td>Format version: 1</td></tr>
+    <tr><td>12</td><td>4</td><td>Block size of the disk</td></tr>
+    <tr><td>16</td><td>8</td><td>Size of the disk in blocks</td></tr>
+    <tr><td>24</td><td>4</td><td>Number of extents</td></tr>
+    <tr><td>28</td><td>…</td><td>For each extent: first block (8), number of blocks (4), the blocks</td></tr>
+    <tr><td>end − 4</td><td>4</td><td>CRC-32 of everything before it</td></tr>
+  </tbody>
+</table>
+<p>The extents are block 0 and, for a GPT, block 1, the primary array, the backup header and the backup array; for an
+MBR, the first block of the extended partition and every logical partition's record. A disk without a table has nothing
+to back up.</p>
+
+<h3 id="restore" data-index="pt_restore">Restore</h3>
+<p><code>pt_restore</code> checks the whole file before writing a block: the magic, the CRC, the version, the block size
+and the disk size (a backup never goes to a different disk), and every extent inside the disk and inside the file, with
+no data left over. It reads the current table, writes the extents, and — when the backup has no GPT but the disk had one
+— clears the old GPT's headers and arrays except where a restored partition lies, so that restoring over a changed disk
+gives back the same blocks (the tests compare the images byte for byte).</p>
+
+<!-- ===================================================================== -->
+<h2 id="program">The UEFI program</h2>
+
+<h3 id="disks" data-index="pm_disks;boot disk;blkN">Finding the disks: disks_efi.c</h3>
+<p><code>pm_disks</code> locates every handle with <code>EFI_BLOCK_IO_PROTOCOL</code>, sorts them by device path text and
+names them <code>blkN</code> by position — exactly NESH's <code>map</code> — then keeps the whole disks with a medium and a
+block size of at least 512. The disk partmgr was loaded from is the one whose device path the path of
+<code>gLoadedImage-&gt;DeviceHandle</code> (the partition) starts with, followed by <code>/</code>; it and write-protected
+media get <code>write = NULL</code>. The kind (NVMe, SATA, USB…) comes from the node names in the device path.</p>
+<p>Block I/O goes through a page-aligned bounce buffer from <code>AllocatePages</code>, which satisfies any
+<code>IoAlign</code>; every write is followed by <code>FlushBlocks</code>. Random bytes come from
+<code>EFI_RNG_PROTOCOL</code> when the firmware has it, else from a SplitMix64 generator stirred with the time-stamp
+counter and the clock.</p>
+
+<h3 id="ui" data-index="ui_input;ui_menu;ui_yesno;ui_message">Drawing and dialogs: ui.c</h3>
+<p><code>ui_text</code> writes a UTF-8 text at a position, padded or cut to a width counted in characters; it never writes
+the last cell of the screen, which scrolls some consoles. Dialogs are boxes in the middle of the screen, drawn over it:
+the caller redraws the screen before the next dialog (<code>draw</code> in <code>diskview.c</code>).
+<code>ui_input</code> shows a field whose proposed text is replaced by the first character typed; <code>ui_menu</code> is a
+scrolling list; <code>ui_yesno</code> takes <kbd>Y</kbd>, <kbd>N</kbd>, <kbd>Esc</kbd>. With <code>warn</code> set they are
+white on red: every operation that destroys data uses them.</p>
+
+<h3 id="diskview" data-index="diskview.c;View;confirm_destroy">The screen of a disk: diskview.c</h3>
+<p>A <code>View</code> holds the disk, its <code>PtTable</code>, the rows (partitions and free areas merged by start), the
+selection and the message line. Every action follows the same pattern: <code>may_change</code> refuses on the boot disk
+and read-only media; dialogs collect the input; one <code>pt_*</code> call changes the table and returns a message on
+refusal; <code>build_rows</code> and <code>say</code> update the screen. Only three functions reach the disk:
+<code>write_table</code> (Write), <code>restore</code> and <code>backup</code> (which only reads it); the first two go
+through <code>confirm_destroy</code>, the red warning that wants the disk name typed. After writing, the table is read
+back from the disk, so the screen shows what the disk holds.</p>
+
+<h3 id="units" data-index="pm_parse_size;pm_fmt_size">Sizes: units.c</h3>
+<p><code>pm_parse_size</code> reads a number with up to six decimals (point or comma) and a binary unit (<code>B</code>,
+<code>K</code>, <code>M</code>, <code>G</code>, <code>T</code>, optionally followed by <code>B</code> or <code>iB</code>;
+<code>s</code> for blocks; no unit means MiB), or <code>rest</code>/<code>all</code>/<code>max</code>, and refuses overflows.
+<code>pm_fmt_size</code> prints one decimal (<code>194.9 MiB</code>); <code>pm_fmt_exact</code> prints whole MiB or GiB when
+exact, so that a proposed start reads back to the same block.</p>
+
+<!-- ===================================================================== -->
+<h2 id="testing">Testing</h2>
+
+<p class="chapter-intro">The table code is tested on Linux against sfdisk and parted; the program is tested in QEMU.</p>
+
+<h3 id="pttool" data-index="pttool">pttool</h3>
+<p><code>tests/partmgr/pttool.c</code> is the table code compiled for Linux (with AddressSanitizer and UBSan) around an
+image file. It reads the table, runs commands on it in order, and prints the result as <code>key=value</code> lines:</p>
+<pre class="terminal">$ build/tests/pttool disk.img new gpt add primary 2048 204800 C12A7328-F81F-11D2-BA4B-00A0C93EC93B "EFI" write
+$ build/tests/pttool disk.img del 2 free
+$ build/tests/pttool disk.img backup table.bin
+$ build/tests/pttool disk.img -b 4096 size 1.5G</pre>
+<p>Commands: <code>new gpt|mbr|none</code>, <code>add primary|logical START SIZE TYPE NAME</code>, <code>del</code>,
+<code>type</code>, <code>name</code>, <code>active</code>, <code>free</code>, <code>write</code>, <code>reread</code>,
+<code>backup</code>, <code>restore</code>, <code>size</code>. An error prints <code>error=MESSAGE</code> and exits with 1.</p>
+
+<h3 id="table-tests" data-index="run-tests.py">The table tests</h3>
+<p><code>tests/partmgr/run-tests.py</code>, run by <code>make test</code>:</p>
+<ul>
+  <li><strong>Reading.</strong> Images built with <code>sfdisk</code> — GPT with 512- and 4096-byte blocks, gaps, entries
+      out of order, accented names, attributes; MBR with primary, extended and logical partitions; empty tables — must
+      read exactly as <code>sfdisk --json</code> reports them. Then 13 kinds of damage (broken primary header or array,
+      broken backup, both broken, wiped protective MBR, hybrid MBR, enlarged disk, looping chain, record without
+      signature, partition beyond the end, whole-disk FAT, invalid entries) must be read as well as possible and noted.</li>
+  <li><strong>Sizes.</strong> What <code>pm_parse_size</code> accepts, refuses and prints.</li>
+  <li><strong>Writing.</strong> Every table partmgr writes is read back by <code>sfdisk</code> (which must find what was
+      asked and nothing wrong with <code>--verify</code>) and by <code>parted</code>: new tables, logical partitions creating
+      the extended one, changes to tables made by sfdisk (identifiers of untouched partitions unchanged), deleting and
+      refilling the first logical partition, deleting the extended one, GPT to MBR and back, deleting a table, repairing,
+      an enlarged disk, boot code kept or cleared, a hybrid MBR left alone, and the refusals.</li>
+  <li><strong>Independently of partmgr</strong>, a Python function reads every MBR written byte by byte (CHS fields, the
+      chain, the link sizes) — and agrees with the MBRs sfdisk writes.</li>
+  <li><strong>Backups</strong> are restored over a changed disk, which must equal the original byte for byte; backups
+      of another disk, damaged ones, and disks without a table are refused.</li>
+</ul>
+<p>The tests were checked by breaking the code on purpose — logical numbering, sizes off by one, the boot flag, the
+backup GPT's CRC, the link sizes of the chain, the CHS heads: each break fails them. Where <code>sfdisk</code> lacks
+<code>--sector-size</code> (util-linux 2.39, the version of Ubuntu 24.04 and of CI) the 4096-byte comparisons are skipped
+and the script says <code>SKIPPED</code>.</p>
+
+<h3 id="qemu-test" data-index="qemu-test.py">In QEMU</h3>
+<p><code>make qemu-partmgr</code> runs <code>tests/partmgr/qemu-test.py</code>. It boots NESH in QEMU/OVMF from a virtual
+FAT disk holding <code>partmgr.efi</code>, attaches test disks made by sfdisk, starts partmgr from the prompt and drives it
+with <code>sendkey</code> through the QEMU monitor. Everything partmgr draws also reaches the serial console; the test
+strips the terminal sequences, makes every run of blanks one space (so dialog texts wrapped over two lines still match),
+and waits for the expected text after the previous match — the screen is drawn top to bottom, so rows come before the
+message line under them.</p>
+<ol class="steps">
+  <li><strong>Looking:</strong> the list (names as in NESH's map, the boot disk marked), every row of both disks, the
+      return to NESH, and the disks identical byte for byte.</li>
+  <li><strong>Changing:</strong> the boot disk refuses; on the GPT disk a new partition (start, size, type, name), a
+      rename, a delete, <kbd>Esc</kbd> asking, a wrong disk name refused, Write; on the MBR disk a logical partition
+      (renumbering the next one), the active flag, a backup to a writable FAT disk, Write, delete the table, restore.
+      Then, outside QEMU, sfdisk must find the GPT disk exactly as asked and the MBR disk exactly as before.</li>
+</ol>
+
+<!-- ===================================================================== -->
+<h2 id="extending">Extending partmgr</h2>
+
+<h3 id="add-type">Adding a partition type</h3>
+<p>Add the GUID and name to <code>gpt_types</code>, or the byte and name to <code>mbr_types</code> before the last four
+entries, in <code>src/partmgr/ptable.c</code>. The order is the order of the list on the screen. Add the type to the
+tables of the <a href="partmgr-user-manual.html#types">user manual</a>, and a check in <code>run-tests.py</code> if its
+name matters.</p>
+
+<h3 id="add-action">Adding an action to the screen of a disk</h3>
+<ol class="steps">
+  <li>Put the change of the table in <code>ptedit.c</code>, as a function that returns <code>NULL</code> or a message and
+      sets <code>changed</code>; test it through a new <code>pttool</code> command.</li>
+  <li>In <code>diskview.c</code>, write the action: <code>may_change</code>, the dialogs (redraw with <code>draw</code>
+      before each), the call, <code>build_rows</code>, <code>say</code>. Add its key to the loop of
+      <code>pm_disk_screen</code> and to the key bar in <code>draw</code>.</li>
+  <li>Anything that writes a disk must go through <code>confirm_destroy</code>.</li>
+  <li>Extend <code>qemu-test.py</code>, and describe the key in the user manual.</li>
+</ol>
+
+<h3 id="add-note">Adding a note</h3>
+<p>Call <code>note(t, ...)</code> in <code>ptable.c</code> where the problem is found, add the damaged case to
+<code>run-tests.py</code> with <code>has_note</code>, and explain it in the table of notes of the user manual.</p>
+
+<!-- ===================================================================== -->
+<h2 id="conventions">Conventions</h2>
+<ul>
+  <li>The code style, English texts and help rules of NESH apply (see the NESH developer manual).</li>
+  <li><em>Delete</em> a partition: remove it from the table. <em>Wipe</em>: destroy its contents. The code, the texts and
+      the manuals never use one for the other.</li>
+  <li>Blocks are written only in <code>ptwrite.c</code>, and only by <code>pt_write</code> and <code>pt_restore</code>.</li>
+  <li>Messages for the user are sentences without a capital or a full stop at the end when they come from the table code
+      (<code>pt_add</code> and friends); the screen puts them in dialogs as they are.</li>
+  <li>Line counts in this manual are generated: run <code>make docs</code> after changing a file.</li>
+</ul>
+
+<!-- ===================================================================== -->
+<h2 id="file-map">Source file map</h2>
+<table>
+  <thead><tr><th>File</th><th>Lines</th><th>Purpose</th></tr></thead>
+  <tbody>
+    <tr><td><code>src/partmgr/disks.h</code></td><td>23</td><td>A disk as the table code sees it (name, kind, size, boot disk, read and write functions)</td></tr>
+    <tr><td><code>src/partmgr/disks_efi.c</code></td><td>173</td><td>Finds the whole disks through block I/O, numbered as NESH's map; recognises the disk partmgr was started from; random numbers from EFI_RNG_PROTOCOL</td></tr>
+    <tr><td><code>src/partmgr/diskview.c</code></td><td>725</td><td>The screen of one disk: rows, keys, every action, Write, backup and restore</td></tr>
+    <tr><td><code>src/partmgr/main.c</code></td><td>78</td><td>app_main and the list of disks</td></tr>
+    <tr><td><code>src/partmgr/partmgr.h</code></td><td>17</td><td>What the screens share: version, table names, the disk screen</td></tr>
+    <tr><td><code>src/partmgr/ptable.c</code></td><td>402</td><td>Reads GPT (both copies checked, the backup used when the primary is damaged) and MBR tables, extended and logical partitions included; partition type names and the list to choose from</td></tr>
+    <tr><td><code>src/partmgr/ptable.h</code></td><td>133</td><td>The description of a disk's partition table and the functions that read, change and write it</td></tr>
+    <tr><td><code>src/partmgr/ptedit.c</code></td><td>420</td><td>Changes to a table in memory (new table, add, delete, type, name, active flag) and the free areas, with the rules for logical partitions and their boot records</td></tr>
+    <tr><td><code>src/partmgr/ptint.h</code></td><td>22</td><td>Internals: little-endian fields, extended partition types</td></tr>
+    <tr><td><code>src/partmgr/ptwrite.c</code></td><td>408</td><td>Writing GPT (both copies, protective MBR) and MBR (chain of logical partitions, CHS fields), deleting a table, backup files and restore</td></tr>
+    <tr><td><code>src/partmgr/ui.c</code></td><td>280</td><td>Drawing on the text console and the dialogs: messages, questions, text fields, menus</td></tr>
+    <tr><td><code>src/partmgr/ui.h</code></td><td>34</td><td>The drawing and dialog functions, the EFI colours</td></tr>
+    <tr><td><code>src/partmgr/units.c</code></td><td>106</td><td>Sizes as the user writes and reads them</td></tr>
+    <tr><td><code>src/partmgr/units.h</code></td><td>20</td><td>Size parsing and formatting</td></tr>
+    <tr><td><code>tests/partmgr/pttool.c</code></td><td>223</td><td>Drives the table code on a disk image file: reads, changes, writes, backs up, restores, parses sizes (Linux only)</td></tr>
+    <tr><td><code>tests/partmgr/qemu-test.py</code></td><td>317</td><td>partmgr.efi in QEMU/OVMF: started from NESH, driven with keys, checked on the serial console and with sfdisk afterwards</td></tr>
+    <tr><td><code>tests/partmgr/run-tests.py</code></td><td>689</td><td>The table tests: the reader and the writer compared with sfdisk and parted, damaged images, sizes, backups restored byte for byte</td></tr>
+  </tbody>
+</table>
+
+<!-- ===================================================================== -->
+<h2 id="glossary">Glossary</h2>
+<dl class="defs">
+  <dt id="g-blockio" data-kind="term" data-index="Block I/O">Block I/O</dt><dd>The UEFI protocol that reads and writes the blocks of a disk or partition.</dd>
+  <dt id="g-chs" data-kind="term" data-index="CHS">CHS</dt><dd>Cylinder/head/sector addresses of old BIOSes, still stored in MBR entries next to the block numbers.</dd>
+  <dt id="g-ebr" data-kind="term" data-index="EBR">EBR</dt><dd>Extended boot record: the one-block table in front of each logical partition, chained to the next.</dd>
+  <dt id="g-extent" data-kind="term" data-index="Extent">Extent</dt><dd>A run of blocks saved in a backup file, with its position.</dd>
+  <dt id="g-hybrid" data-kind="term" data-index="Hybrid MBR">Hybrid MBR</dt><dd>A GPT disk whose block 0 also lists some partitions for BIOS systems; partmgr reads it as GPT and leaves block 0 alone.</dd>
+  <dt id="g-note" data-kind="term" data-index="Note">Note</dt><dd>A sentence the reader adds to a table about something unusual it found.</dd>
+  <dt id="g-pmbr" data-kind="term" data-index="Protective MBR">Protective MBR</dt><dd>Block 0 of a GPT disk: one entry of type EE over the disk.</dd>
+  <dt id="g-span" data-kind="term" data-index="Span">Span</dt><dd>In ptedit.c, a run of blocks in use; free areas are the gaps between spans.</dd>
+</dl>
+
+<!-- ===================================================================== -->
+<h2 id="index" class="unnumbered">Index</h2>
+<p>Files, functions and topics in alphabetical order. The number after each entry is the section.</p>
+<div id="index-list"></div>
+
+<footer class="doc-footer">
+  partmgr Technical Manual — for partmgr 0.1. See also the <a href="partmgr-user-manual.html">user manual</a>, the
+  <a href="developer-manual.html">NESH developer manual</a> and the
+  <a href="https://github.com/nic-fio/NG-EFI_SHELL/blob/main/docs/decisions-and-history.md">design decisions</a> (D21).
+  <br>Copyright (c) 2026 nic-fio, licensed
+  <a href="https://github.com/nic-fio/NG-EFI_SHELL/blob/main/LICENSE">Apache 2.0 with the Commons
+  Clause</a>: free to use and to share, selling it needs a commercial licence.
+</footer>
+
+</main>
+</div>
+<script src="assets/vendor/mermaid.min.js"></script>
+<script src="assets/docs.js"></script>
+</body>
+</html>

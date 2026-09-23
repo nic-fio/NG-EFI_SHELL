@@ -77,6 +77,10 @@ void pt_free(PtTable *t);
  * NULL when the type is not known. */
 const char *pt_type_name(const PtTable *t, const PtPart *p);
 
+/* The types to choose from for a table of KIND, common ones first: the name
+ * and the MBR type byte or the GPT type GUID of entry I; false past the end. */
+bool pt_type_at(int kind, int i, const char **name, uint8_t *mbr_type, uint8_t guid[16]);
+
 /* GUID as text, upper case: "C12A7328-F81F-11D2-BA4B-00A0C93EC93B". */
 void pt_guid_str(const uint8_t g[16], char out[37]);
 bool pt_guid_parse(const char *s, uint8_t g[16]);

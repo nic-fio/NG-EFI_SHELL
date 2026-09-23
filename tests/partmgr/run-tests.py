@@ -18,6 +18,7 @@ byte for byte, to the original image.
 """
 import json
 import os
+import re
 import shutil
 import struct
 import subprocess
@@ -258,6 +259,8 @@ LNX = "0FC63DAF-8483-4772-8E79-3D69D8477DE4"
 if not SFDISK:
     print("partmgr tests: sfdisk not found (package fdisk, see tools/setup-dev.sh)")
     sys.exit(1)
+if not PARTED:
+    skipped.append("the checks with parted (not installed, see tools/setup-dev.sh)")
 
 GPT3 = """label: gpt
 size=100M, type=U, name="EFI system partition"
@@ -426,6 +429,35 @@ try:
     crc = struct.unpack("<I", hdr[16:20])[0]
     hdr[16:20] = b"\0\0\0\0"
     check("crc32", zlib.crc32(bytes(hdr)) == crc, "sfdisk header CRC does not match zlib")
+
+    # ================================================================ sizes typed in the screens
+
+    def size(text, bsize=512):
+        out = subprocess.run([PTTOOL, image("sizes", 1), "-b", str(bsize), "size", text],
+                             capture_output=True, text=True, check=True).stdout.splitlines()[0]
+        if "error=" in out:
+            return {"error": out.split("error=", 1)[1]}
+        m = re.match(r"size bytes=(\S+) rest=(\S+) fmt=(.*) exact=(.*)$", out)
+        return dict(zip(("bytes", "rest", "fmt", "exact"), m.groups()))
+
+    K, M, G, T = 1024, 1024 ** 2, 1024 ** 3, 1024 ** 4
+    for text, want in (("512M", 512 * M), ("512", 512 * M), ("1.5G", 3 * G // 2), ("20 GiB", 20 * G),
+                       ("2g", 2 * G), ("100MB", 100 * M), ("64k", 64 * K), ("1T", T), ("4096B", 4096),
+                       ("2048s", 2048 * 512), ("0,5M", M // 2), ("  8 M ", 8 * M), ("1.0625G", 1088 * M)):
+        r = size(text)
+        check("size " + text, r.get("bytes") == str(want) and r.get("rest") == "no", str(r))
+    check("size 2048s at 4K", size("2048s", 4096).get("bytes") == str(2048 * 4096), "")
+    for text in ("rest", "ALL", "max"):
+        check("size " + text, size(text).get("rest") == "yes", str(size(text)))
+    for text, words in (("", "write a size"), ("abc", "write a size"), ("12X", "unknown unit"),
+                        ("5 MiBs", "unknown unit"), ("99999999999999999999", "too large"),
+                        ("99999999999T", "too large")):
+        r = size(text)
+        check("size error %r" % text, words in r.get("error", ""), str(r))
+    for n, fmt, exact in ((512, "512 B", "512 B"), (M, "1.0 MiB", "1 MiB"), (1536 * K, "1.5 MiB", "1.5 MiB"),
+                          (20 * G, "20.0 GiB", "20 GiB"), (1025 * M, "1.0 GiB", "1025 MiB")):
+        r = size("%dB" % n)
+        check("format %d" % n, r.get("fmt") == fmt and r.get("exact") == exact, str(r))
 
     # ================================================================ writing
 

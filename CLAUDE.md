@@ -72,7 +72,7 @@ user brings them up. The reasoning for each is in
 Releases: bump `NESH_VERSION` in `src/core/shell.h` **and** the version strings
 in `README.md`, `docs/index.html`, both manuals (including the tested example
 output), then tag. The annotated tag message becomes the release notes; CI
-builds `nesh.efi` and publishes it. `nesh-usb.img` is uploaded by hand
+builds `nesh.efi` and `partmgr.efi` and publishes them as two separate files. `nesh-usb.img` is uploaded by hand
 (`make usb`, then `gh release upload`).
 
 ## Where the project stands

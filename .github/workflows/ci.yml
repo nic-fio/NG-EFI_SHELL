@@ -1,5 +1,6 @@
-# Build and test NESH on every push and pull request; on a version tag (v*),
-# also publish a GitHub Release with nesh.efi built here from the tagged source.
+# Build and test NESH and partmgr on every push and pull request; on a version
+# tag (v*), also publish a GitHub Release with nesh.efi and partmgr.efi built
+# here from the tagged source (two separate files: two separate products).
 name: CI
 
 on:
@@ -87,8 +88,13 @@ jobs:
           name: nesh.efi
           path: dist
 
+      - uses: actions/download-artifact@v4
+        with:
+          name: partmgr.efi
+          path: dist
+
       - name: Checksum
-        run: cd dist && sha256sum nesh.efi > SHA256SUMS && cat SHA256SUMS
+        run: cd dist && sha256sum nesh.efi partmgr.efi > SHA256SUMS && cat SHA256SUMS
 
       - name: Create the release
         env:
@@ -103,10 +109,16 @@ jobs:
 
           **Download** \`nesh.efi\` (UEFI x86-64). Copy it to a FAT USB stick as
           \`\EFI\BOOT\BOOTX64.EFI\` to boot it from the firmware menu, or start it
-          from another shell. Check the download with \`sha256sum -c SHA256SUMS\`.
+          from another shell. Check the downloads with \`sha256sum -c --ignore-missing SHA256SUMS\`.
 
-          **Secure Boot:** the file is not signed. Sign it with your own key or
-          disable Secure Boot (see the user manual).
+          **Also attached: \`partmgr.efi\`**, the partition manager of the project,
+          a separate program: GPT and MBR partition tables, changes shown before
+          they are written, backup and restore, wipe. Start it from NESH or from
+          the firmware boot menu. Manual:
+          https://nic-fio.github.io/NG-EFI_SHELL/partmgr-user-manual.html
+
+          **Secure Boot:** the files are not signed. Sign them with your own key or
+          disable Secure Boot (see the user manuals).
 
           **Licence:** Apache 2.0 with the Commons Clause, attached here as
           \`LICENSE\` and \`NOTICE.md\`: free to use, to copy and to modify,
@@ -114,6 +126,6 @@ jobs:
 
           Documentation: https://nic-fio.github.io/NG-EFI_SHELL/
           EOF
-          gh release create "$GITHUB_REF_NAME" dist/nesh.efi dist/SHA256SUMS \
+          gh release create "$GITHUB_REF_NAME" dist/nesh.efi dist/partmgr.efi dist/SHA256SUMS \
             LICENSE NOTICE.md \
             --title "NESH $GITHUB_REF_NAME" --notes-file notes.md --verify-tag

@@ -126,8 +126,10 @@ The reasons are recorded as decision D21 in the
 <p>partmgr is built together with NESH:</p>
 <pre class="terminal">$ make
 $ ls -l build/partmgr.efi</pre>
-<p><code>make</code> produces <code>build/partmgr.efi</code> next to <code>build/nesh.efi</code>. partmgr is new: the
-downloads of NESH 0.2.0 do not include it yet; the next release will.</p>
+<p><code>make</code> produces <code>build/partmgr.efi</code> next to <code>build/nesh.efi</code>. Ready-made, it is a download of
+its own on the <a href="https://github.com/nic-fio/NG-EFI_SHELL/releases/latest">release page</a>, next to
+<code>nesh.efi</code>, with its checksum in <code>SHA256SUMS</code> (<code>sha256sum -c --ignore-missing SHA256SUMS</code> checks the files you downloaded). partmgr is
+new: the release of NESH 0.2.0 does not have it yet; the releases after it do.</p>
 
 <h3 id="installing">Putting it on a stick</h3>
 <p>Copy <code>partmgr.efi</code> to the FAT volume, next to <code>nesh.efi</code> or in a tools folder, for example

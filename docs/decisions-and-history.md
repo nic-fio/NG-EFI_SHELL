@@ -420,6 +420,10 @@ From it came the working rules of the project:
   technical manual, with the same style, structure and depth as NESH's — owner:
   "partmgr e' un applicativo a parte, quindi merita 2 manuali dedicati a lui".
   NESH's manuals only point to them.
+- **Distribution.** `partmgr.efi` is a separate file in the same GitHub
+  release as `nesh.efi`, with its checksum in `SHA256SUMS`; the ready-made
+  `nesh-usb.img` stays NESH's only, and partmgr has no image of its own
+  (owner's choice among the three).
 - **No command line.** `partmgr.efi` has only the full-screen interface, so it
   cannot be driven by scripts; a proposal for `list`/`backup`/`restore` on the
   command line was declined.
@@ -463,5 +467,5 @@ listing), `bootmgr scan`, and the language's `ON ERROR`.
 | `https` | Needs a TLS driver in the firmware; untested. Host names in `http` URLs (DNS) are untested. |
 | UEFI Shell options not supported | `time -tz/-d`; `-l LANG` of `devices`/`devtree` is accepted and ignored. |
 | Not implemented | See "The original plan" above. |
-| `partmgr.efi` | In progress (D21). Done and tested: reading, changing and writing GPT and MBR tables, backup and restore, the wipe with its progress bar (on Linux with disk images, compared with sfdisk and parted), and the full-screen program with every change, Write and the wipe, tested in QEMU; its user and technical manuals. Still to do: shipping it in the release and in `nesh-usb.img`, and trying it on real hardware. |
+| `partmgr.efi` | In progress (D21). Done and tested: reading, changing and writing GPT and MBR tables, backup and restore, the wipe with its progress bar (on Linux with disk images, compared with sfdisk and parted), and the full-screen program with every change, Write and the wipe, tested in QEMU; its user and technical manuals. Shipped as a separate file of the release from the next version on (the release job is ready, not yet run on a tag). Still to do: trying it on real hardware. |
 | License | Settled: Apache 2.0 with the Commons Clause (see D20). Not "open source" by the OSI definition, so some distributions and catalogues will not accept the project. Commercial licences are granted on request. |

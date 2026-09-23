@@ -1699,6 +1699,11 @@ APIC  0x1fb78000     120  rev 3   BOCHS   BXPC      checksum ok</pre>
       each character in a fixed cell (8 x 19 pixels in the common EDK2 firmware), and it decides which text sizes exist
       when it starts its console driver.</li>
 </ul>
+<p><strong>At start NESH switches to 100 columns</strong>, which read much better than 80: it takes the narrowest text
+mode with at least 100 columns and 25 rows (the narrowest has the largest characters), when the firmware offers one and
+the console is narrower, and puts the mode it found back when it ends — also when a script or <code>exit</code> ends it.
+Where the firmware only has 80-column modes, nothing changes. A <code>mode</code> command in <code>startup.nsb</code>
+still chooses any other size.</p>
 <p>This is why the shell often uses only part of a large screen: a 100 x 31 text console covers 800 x 589 pixels, so on a
 1920 x 1080 screen the text sits in a block in the middle. Three ways out, from the simplest:</p>
 <pre class="terminal">fs0:\> mode -max
@@ -2894,6 +2899,9 @@ a small block of text. -fill fixes that, but the screen resolution goes
 back to the firmware default and the consoles are disconnected for a
 moment (on a serial console you may lose some output). To keep a chosen
 resolution instead, gop -fit lowers it until the text fills the screen.
+At start NESH switches to the narrowest mode of at least 100 columns
+and 25 rows, when the console has one and is narrower, and puts the
+mode it found back when it ends.
 Example: mode -fill</pre>
 </article>
 <article class="cmd" id="cmd-gop" data-index="gop">

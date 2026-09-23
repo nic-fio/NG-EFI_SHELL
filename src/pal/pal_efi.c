@@ -885,11 +885,21 @@ void pal_reset(int type)
 
 void (*efi_exit_hook)(void);
 
+/* The text mode found at start, put back on leaving if NESH changed it. */
+static INT32 start_mode = -1;
+
+static void restore_text_mode(void)
+{
+    if (start_mode >= 0)
+        gST->ConOut->SetMode(gST->ConOut, (UINTN)start_mode);
+}
+
 void pal_exit(int code)
 {
     if (efi_exit_hook)
         efi_exit_hook();
     pal_con_reset_color();
+    restore_text_mode();
     gBS->Exit(gImage, code ? EFIERR(code) : EFI_SUCCESS, 0, NULL);
     for (;;)
         __asm__ volatile("hlt");
@@ -984,6 +994,27 @@ static void call_on_stack(void (*fn)(void), void *top)
                      : "rbx", "rax", "rcx", "rdx", "rsi", "rdi", "r8", "r9", "r10", "r11", "memory", "cc");
 }
 
+/* The narrowest text mode with at least MIN_COLS columns and MIN_ROWS rows
+ * (the narrowest has the largest characters); -1 if the firmware has none.
+ * The current mode counts too: if it is wide enough already, nothing changes. */
+static INT32 wide_text_mode(UINTN min_cols, UINTN min_rows)
+{
+    EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL *o = gST->ConOut;
+    INT32 best = -1;
+    UINTN best_cols = 0;
+    for (INT32 m = 0; m < o->Mode->MaxMode; m++) {
+        UINTN c, r;
+        if (o->QueryMode(o, (UINTN)m, &c, &r) != EFI_SUCCESS || c < min_cols || r < min_rows)
+            continue;
+        if (best < 0 || c < best_cols)
+            best = m, best_cols = c;
+    }
+    UINTN c, r;
+    if (o->QueryMode(o, (UINTN)o->Mode->Mode, &c, &r) == EFI_SUCCESS && c >= min_cols && r >= min_rows)
+        return -1;
+    return best;
+}
+
 EFI_STATUS EFIAPI efi_main(EFI_HANDLE image, EFI_SYSTEM_TABLE *st)
 {
     gImage = image;
@@ -997,6 +1028,11 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image, EFI_SYSTEM_TABLE *st)
     initial_attr = (UINTN)st->ConOut->Mode->Attribute;
     if (!initial_attr)
         initial_attr = 0x07;
+    /* 100 columns read better than 80: switch to such a mode when the
+     * firmware has one, and put back the mode found when NESH ends. */
+    INT32 wide = wide_text_mode(100, 25), found = st->ConOut->Mode->Mode;
+    if (wide >= 0 && st->ConOut->SetMode(st->ConOut, (UINTN)wide) == EFI_SUCCESS)
+        start_mode = found;
     st->ConOut->EnableCursor(st->ConOut, TRUE);
     calibrate_tsc();
     pal_volumes_refresh();
@@ -1015,5 +1051,6 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image, EFI_SYSTEM_TABLE *st)
     if (efi_exit_hook)
         efi_exit_hook(); /* nothing may point into this image after it exits */
     pal_con_reset_color();
+    restore_text_mode();
     return rc ? EFIERR(rc & 0xFF) : EFI_SUCCESS;
 }

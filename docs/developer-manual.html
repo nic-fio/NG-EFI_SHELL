@@ -82,11 +82,11 @@ explained where they are needed, and the <a href="#glossary">glossary</a> summar
   <thead><tr><th>Area</th><th>Directory</th><th>Lines</th><th>Content</th></tr></thead>
   <tbody>
     <tr><td>Runtime library</td><td><code>src/lib</code></td><td>1,523</td><td>libc subset, printf, string buffer, UTF-8, UEFI compression</td></tr>
-    <tr><td>Platform layer</td><td><code>src/pal</code></td><td>1,831</td><td>PAL interface, UEFI and Linux implementations</td></tr>
+    <tr><td>Platform layer</td><td><code>src/pal</code></td><td>1,868</td><td>PAL interface, UEFI and Linux implementations</td></tr>
     <tr><td>Shell core</td><td><code>src/core</code></td><td>2,782</td><td>command execution, console, environment, aliases, line editor, menus</td></tr>
     <tr><td>BASIC</td><td><code>src/basic</code></td><td>4,019</td><td>lexer, parser, interpreter, built-in functions</td></tr>
     <tr><td>Portable commands</td><td><code>src/cmd</code></td><td>3,336</td><td>files, text, utilities, editors</td></tr>
-    <tr><td>UEFI modules</td><td><code>src/platform/efi</code></td><td>10,215</td><td>shell protocol, variables, boot, drivers, disks, hardware, network</td></tr>
+    <tr><td>UEFI modules</td><td><code>src/platform/efi</code></td><td>10,218</td><td>shell protocol, variables, boot, drivers, disks, hardware, network</td></tr>
     <tr><td>UEFI definitions</td><td><code>include</code></td><td>724</td><td>UEFI types and protocols used by NESH</td></tr>
     <tr><td>Tools and tests</td><td><code>tools</code>, <code>tests</code></td><td>3,104</td><td>ELF→PE converter, QEMU runner, doc generators, test scripts</td></tr>
   </tbody>
@@ -209,7 +209,7 @@ sequenceDiagram
   participant NM as nesh_main (shell.c)
   participant PC as platform_cmds_init
   FW->>EM: StartImage(nesh.efi)
-  EM->>EM: globals gST/gBS/gRT, watchdog off,&lt;br/&gt;TSC calibration, volumes, arguments
+  EM->>EM: globals gST/gBS/gRT, watchdog off,&lt;br/&gt;a text mode of 100 columns,&lt;br/&gt;TSC calibration, volumes, arguments
   EM->>EM: allocate a 1 MiB stack and switch to it
   EM->>NM: nesh_main(argc, argv)
   NM->>NM: register BASIC functions and portable commands
@@ -228,6 +228,10 @@ sequenceDiagram
 <code>efi_main</code> allocates 1 MiB of pages and calls <code>nesh_main</code> on that stack (<code>call_on_stack</code>).
 Second, when NESH exits nothing may keep pointing into its image: <code>efi_exit_hook</code> uninstalls (or restores) the
 shell protocol.</p>
+<p>At start <code>efi_main</code> also switches the console to the narrowest text mode with at least 100 columns and 25
+rows (<code>wide_text_mode</code>), if the firmware has one and the current mode is narrower, and remembers the mode it
+found in <code>start_mode</code>; <code>restore_text_mode</code> puts it back both at the end of <code>efi_main</code> and in
+<code>pal_exit</code>, so every way out restores it.</p>
 <pre class="code" data-lang="c" data-title="src/pal/pal_efi.c">EFI_STATUS EFIAPI efi_main(EFI_HANDLE image, EFI_SYSTEM_TABLE *st)
 {
     gImage = image;
@@ -1087,14 +1091,14 @@ captured.</p>
     <tr><td><code>src/pal/efi_glue.h</code></td><td>38</td><td>Access to UEFI services for EFI-only modules</td></tr>
     <tr><td><code>src/pal/pal.h</code></td><td>156</td><td>Platform abstraction layer: everything the portable core needs from the machine</td></tr>
     <tr><td><code>src/pal/pal_common.c</code></td><td>25</td><td>Parts of the platform layer shared by the UEFI and Linux builds: error names</td></tr>
-    <tr><td><code>src/pal/pal_efi.c</code></td><td>1019</td><td>Platform layer for UEFI</td></tr>
+    <tr><td><code>src/pal/pal_efi.c</code></td><td>1056</td><td>Platform layer for UEFI</td></tr>
     <tr><td><code>src/pal/pal_host.c</code></td><td>593</td><td>Platform layer for Linux: used for fast development and automated tests</td></tr>
     <tr><td><code>src/platform/efi/efi_boot.c</code></td><td>1572</td><td>Boot manager: Boot#### / BootOrder / BootNext / Timeout</td></tr>
     <tr><td><code>src/platform/efi/efi_cmds.h</code></td><td>48</td><td>Shared declarations of the EFI-only command modules</td></tr>
     <tr><td><code>src/platform/efi/efi_disk.c</code></td><td>449</td><td>Block devices and disk-level commands: blkN: names, dblk, timezone, getmtc</td></tr>
     <tr><td><code>src/platform/efi/efi_drivers.c</code></td><td>1374</td><td>Drivers and devices: drivers, devices, devtree, dh, openinfo, connect, disconnect, reconnect, load, unload, drvdiag, drvcfg</td></tr>
     <tr><td><code>src/platform/efi/efi_guids.c</code></td><td>136</td><td>Names of well-known GUIDs (protocols, tables, variable vendors), plus the names registered at run time through the shell protocol</td></tr>
-    <tr><td><code>src/platform/efi/efi_hw.c</code></td><td>1601</td><td>Memory and hardware: dmem, mm, pci, smbiosview, acpiview, mode, sermode, loadpcirom, gop, cpuid</td></tr>
+    <tr><td><code>src/platform/efi/efi_hw.c</code></td><td>1604</td><td>Memory and hardware: dmem, mm, pci, smbiosview, acpiview, mode, sermode, loadpcirom, gop, cpuid</td></tr>
     <tr><td><code>src/platform/efi/efi_net.c</code></td><td>1025</td><td>Network commands on top of the firmware IPv4 stack: ifconfig, ping, tftp, http</td></tr>
     <tr><td><code>src/platform/efi/efi_net.h</code></td><td>39</td><td>Shared by the IPv4 (efi_net.c) and IPv6 (efi_net6.c) network commands</td></tr>
     <tr><td><code>src/platform/efi/efi_net6.c</code></td><td>791</td><td>IPv6 network commands on top of the firmware IPv6 stack: ifconfig6, ping6</td></tr>

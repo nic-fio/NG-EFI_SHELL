@@ -272,6 +272,20 @@ From it came the working rules of the project:
   themselves (`exit -b`, and `echo`, which prints its words as they are):
   they carry the flag `CMD_ARG_B`.
 
+### D16d. 100 columns at start
+
+- **Context.** Owner, after seeing a 100-column screen: "le 100 colonne sono
+  molto piu' leggibili", and asked that NESH start in that mode.
+- **Decision.** At start NESH switches to the narrowest text mode with at least
+  100 columns and 25 rows (the narrowest has the largest characters), when the
+  firmware has one and the console is narrower; the mode it found is put back
+  on every way out (end of the shell, `exit`, a script that ends it). Firmware
+  with only 80-column modes is left as it is; `mode` in `startup.nsb` still
+  selects any other size.
+- **Verified** with a QEMU screendump at 1920x1080: the firmware starts at
+  80x50, NESH at 100x31; a second NESH started after `mode 80 50` also switches
+  to 100x31 and, on `exit`, the first one is back at 80x50.
+
 ### D17. English for the product, Italian for the discussion
 
 - Messages, help texts, code comments and the manuals are in English (the
@@ -356,6 +370,7 @@ All work took place in one long working session (2026-09-19), in phases.
 | **9. Console** | Paging of long output (D16c), after the owner noticed that a long `help` scrolls away and cannot be read back. |
 | **10. Secure Boot** | Tested for real in QEMU with own test keys enrolled in OVMF (`make qemu-sbtest`, part of CI): unsigned images refused by the firmware, hardware writes refused, clock/serial allowed, keys unchangeable. One defect found and fixed: refusals were reported as a bare "access denied". |
 | **11. Publication** | Repository published on GitHub as `NG-EFI_SHELL`, public (owner's request); provisional all-rights-reserved license; manuals online with GitHub Pages; GitHub Actions builds and tests every push and publishes a Release with `nesh.efi` for each version tag (binaries are distributed as Releases, not committed to the repository). |
+| **12. Readability** | NESH starts in a text mode of 100 columns when the firmware has one, and restores the previous mode on leaving (D16d). |
 
 ### The original plan and what came of it
 

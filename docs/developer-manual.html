@@ -89,7 +89,7 @@ explained where they are needed, and the <a href="#glossary">glossary</a> summar
     <tr><td>UEFI modules</td><td><code>src/platform/efi</code></td><td>10,215</td><td>shell protocol, variables, boot, drivers, disks, hardware, network</td></tr>
     <tr><td>Partition manager</td><td><code>src/partmgr</code></td><td>1,363</td><td><code>partmgr.efi</code>, in progress: reading, changing and writing partition tables</td></tr>
     <tr><td>UEFI definitions</td><td><code>include</code></td><td>724</td><td>UEFI types and protocols used by NESH</td></tr>
-    <tr><td>Tools and tests</td><td><code>tools</code>, <code>tests</code></td><td>3,968</td><td>ELF→PE converter, QEMU runner, doc generators, test scripts</td></tr>
+    <tr><td>Tools and tests</td><td><code>tools</code>, <code>tests</code></td><td>3,970</td><td>ELF→PE converter, QEMU runner, doc generators, test scripts</td></tr>
   </tbody>
 </table>
 <p>The resulting <code>nesh.efi</code> is about 360 KB. The line counts here and in the
@@ -1147,7 +1147,7 @@ captured.</p>
     <tr><td><code>src/platform/host.c</code></td><td>122</td><td>Platform-specific commands for the Linux test build: firmware features are not available, so only a minimal set is provided</td></tr>
     <tr><td><code>tests/apps/shelltest.c</code></td><td>293</td><td>Test application for NESH's EFI_SHELL_PROTOCOL implementation</td></tr>
     <tr><td><code>tests/partmgr/pttool.c</code></td><td>208</td><td>Drives partmgr's table code on a disk image file: reads, changes, writes, backs up, restores (Linux only)</td></tr>
-    <tr><td><code>tests/partmgr/run-tests.py</code></td><td>655</td><td>Partition table tests: the reader and the writer compared with sfdisk and parted on disk images, damaged images, backups restored byte for byte</td></tr>
+    <tr><td><code>tests/partmgr/run-tests.py</code></td><td>657</td><td>Partition table tests: the reader and the writer compared with sfdisk and parted on disk images, damaged images, backups restored byte for byte</td></tr>
     <tr><td><code>tests/run-host-tests.sh</code></td><td>25</td><td>Runs tests/host/*.nsb with the host build and compares the output with the .out files</td></tr>
     <tr><td><code>tools/check-doc-examples.py</code></td><td>69</td><td>Runs the NESH BASIC examples of the user manual with the host build and compares their output with the output printed in the manual</td></tr>
     <tr><td><code>tools/efi.lds</code></td><td>26</td><td>Linker script for NESH: ELF image at base 0, page-aligned sections</td></tr>

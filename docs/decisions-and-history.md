@@ -411,6 +411,11 @@ From it came the working rules of the project:
   given by **start and size** (owner's choice over start and end): the start
   defaults to the beginning of the selected free space, the size to all of it,
   with 1 MiB alignment and sizes such as `512M` or `20G`.
+- **Professional and friendly.** Owner: "voglio che l'app abbia
+  un'interfaccia professionale ma user-friendly". Every operation that takes
+  time shows its progress; for the wipe a **progress bar is mandatory**, with
+  the pass (1 of 2 random data, 2 of 2 zeros), the percentage, the amount
+  written, the speed and the estimated time left. Esc asks before stopping.
 - **No command line.** `partmgr.efi` has only the full-screen interface, so it
   cannot be driven by scripts; a proposal for `list`/`backup`/`restore` on the
   command line was declined.

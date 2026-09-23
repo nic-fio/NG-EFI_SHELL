@@ -24,7 +24,18 @@ SFDISK = shutil.which("sfdisk") or next(
     (p for p in ("/sbin/sfdisk", "/usr/sbin/sfdisk") if os.path.exists(p)), None)
 WORK = tempfile.mkdtemp(prefix="ptest-")
 failures = []
+skipped = []
 count = 0
+
+
+def sector_opt(bsize):
+    """--sector-size exists only in newer sfdisk (not in util-linux 2.39); 512 is the default."""
+    return [] if bsize == 512 else ["--sector-size", str(bsize)]
+
+
+def sfdisk_knows_sector_size():
+    out = subprocess.run([SFDISK, "--help"], capture_output=True, text=True)
+    return "--sector-size" in out.stdout
 
 
 def image(name, size_mb, script=None, bsize=512):
@@ -32,7 +43,7 @@ def image(name, size_mb, script=None, bsize=512):
     with open(path, "wb") as f:
         f.truncate(size_mb * 1024 * 1024)
     if script is not None:
-        subprocess.run([SFDISK, "-q", "--sector-size", str(bsize), path], input=script.encode(),
+        subprocess.run([SFDISK, "-q"] + sector_opt(bsize) + [path], input=script.encode(),
                        check=True, stdout=subprocess.DEVNULL)
     return path
 
@@ -64,7 +75,7 @@ def ptdump(path, bsize=512):
 
 
 def sfdisk_json(path, bsize=512):
-    out = subprocess.run([SFDISK, "--json", "--sector-size", str(bsize), path],
+    out = subprocess.run([SFDISK, "--json"] + sector_opt(bsize) + [path],
                          capture_output=True, text=True, check=True)
     return json.loads(out.stdout)["partitiontable"]
 
@@ -164,8 +175,11 @@ try:
           str(names))
 
     # GPT with 4096-byte blocks and a longer entry array
-    g4 = image("gpt4k", 512, "label: gpt\ntable-length: 200\n" + GPT3.split("\n", 1)[1], bsize=4096)
-    same_as_sfdisk("gpt 4K", g4, 4096)
+    if sfdisk_knows_sector_size():
+        g4 = image("gpt4k", 512, "label: gpt\ntable-length: 200\n" + GPT3.split("\n", 1)[1], bsize=4096)
+        same_as_sfdisk("gpt 4K", g4, 4096)
+    else:
+        skipped.append("GPT with 4096-byte blocks (this sfdisk has no --sector-size)")
 
     # GPT with gaps between partitions and entries not in disk order
     gg = image("gptgaps", 256, "label: gpt\n3 : start=100MiB, size=20MiB, type=L\n"
@@ -316,5 +330,7 @@ finally:
 
 for f in failures:
     print("FAIL " + f)
+for s in skipped:
+    print("SKIPPED " + s)
 print("partmgr tests: %d checks, %d failed" % (count, len(failures)))
 sys.exit(1 if failures else 0)

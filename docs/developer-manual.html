@@ -89,7 +89,7 @@ explained where they are needed, and the <a href="#glossary">glossary</a> summar
     <tr><td>UEFI modules</td><td><code>src/platform/efi</code></td><td>10,215</td><td>shell protocol, variables, boot, drivers, disks, hardware, network</td></tr>
     <tr><td>Partition manager</td><td><code>src/partmgr</code></td><td>448</td><td><code>partmgr.efi</code>, in progress: the partition table reader</td></tr>
     <tr><td>UEFI definitions</td><td><code>include</code></td><td>724</td><td>UEFI types and protocols used by NESH</td></tr>
-    <tr><td>Tools and tests</td><td><code>tools</code>, <code>tests</code></td><td>3,503</td><td>ELF→PE converter, QEMU runner, doc generators, test scripts</td></tr>
+    <tr><td>Tools and tests</td><td><code>tools</code>, <code>tests</code></td><td>3,519</td><td>ELF→PE converter, QEMU runner, doc generators, test scripts</td></tr>
   </tbody>
 </table>
 <p>The resulting <code>nesh.efi</code> is about 360 KB. The line counts here and in the
@@ -919,7 +919,9 @@ compiled for Linux with AddressSanitizer and UBSan; it prints what it finds in a
 The script builds images with <code>sfdisk</code> and requires the reader to find exactly what <code>sfdisk --json</code>
 reports: table type, disk identifier, usable area, and for every partition its number, start, size, type, identifier,
 name, attributes and boot flag. The images cover GPT with 512- and 4096-byte blocks, gaps and entries out of disk order,
-MBR with primary, extended and logical partitions, and empty tables.</p>
+MBR with primary, extended and logical partitions, and empty tables. The 4096-byte case needs an <code>sfdisk</code> with
+<code>--sector-size</code> (not in util-linux 2.39, the version of Ubuntu 24.04 and of CI): an older one skips it and
+the script prints <code>SKIPPED</code> with the reason.</p>
 <p>Then the images are damaged on purpose and the reader must cope and say so in a note: a broken primary GPT header or
 entry array (the backup copy is used and gives the same partitions), a broken backup, both copies broken, a wiped
 protective MBR, a hybrid MBR, a disk enlarged after partitioning, a chain of logical partitions that loops, an extended
@@ -1128,7 +1130,7 @@ captured.</p>
     <tr><td><code>src/platform/host.c</code></td><td>122</td><td>Platform-specific commands for the Linux test build: firmware features are not available, so only a minimal set is provided</td></tr>
     <tr><td><code>tests/apps/shelltest.c</code></td><td>293</td><td>Test application for NESH's EFI_SHELL_PROTOCOL implementation</td></tr>
     <tr><td><code>tests/partmgr/ptdump.c</code></td><td>78</td><td>Prints what partmgr's table reader finds in a disk image file (Linux only)</td></tr>
-    <tr><td><code>tests/partmgr/run-tests.py</code></td><td>320</td><td>Partition table tests: images built with sfdisk, the reader compared with sfdisk --json, then damaged images</td></tr>
+    <tr><td><code>tests/partmgr/run-tests.py</code></td><td>336</td><td>Partition table tests: images built with sfdisk, the reader compared with sfdisk --json, then damaged images</td></tr>
     <tr><td><code>tests/run-host-tests.sh</code></td><td>25</td><td>Runs tests/host/*.nsb with the host build and compares the output with the .out files</td></tr>
     <tr><td><code>tools/check-doc-examples.py</code></td><td>69</td><td>Runs the NESH BASIC examples of the user manual with the host build and compares their output with the output printed in the manual</td></tr>
     <tr><td><code>tools/efi.lds</code></td><td>26</td><td>Linker script for NESH: ELF image at base 0, page-aligned sections</td></tr>

@@ -35,7 +35,7 @@ user brings them up. The reasoning for each is in
 | **`msr` stays out** | Reading MSRs hangs with #GP on the firmware; the user decided against it. |
 | **No legacy EDK1 shell interface** | User: *"lasciamo riposare in pace il vecchiume"*. |
 | **Secure Boot: reads yes, writes no** | Low-level hardware writes (`mm` on I/O and PCI config, `hexedit -m`) are refused while Secure Boot is active. The **clock and the serial port stay allowed** — the user ruled they are not a security risk. |
-| **Partition management is `partmgr.efi`**, not a NESH command | A separate full-screen utility in this repository, same release; `nesh.efi` stays one file. Designed in D21, not built yet. |
+| **Partition management is `partmgr.efi`**, not a NESH command | A separate full-screen utility in this repository, same release; `nesh.efi` stays one file. Designed in D21, being built in `src/partmgr`. |
 | **Light documentation only** | No dark themes, no dark-mode media queries, no theme toggle, no dark code blocks. |
 | **Apache 2.0 + Commons Clause** | Free to use and share, selling it needs a commercial licence, asked for by opening an issue. Not OSI open source, and the project says so up front. |
 
@@ -44,6 +44,7 @@ user brings them up. The reasoning for each is in
 | Where | What |
 |---|---|
 | `src/core`, `src/basic`, `src/cmd` | Shell core, the BASIC interpreter, the commands. |
+| `src/partmgr` | `partmgr.efi`, the partition manager (D21): table code tested on Linux with disk images, the UEFI program around it. |
 | `src/pal`, `src/platform` | The platform layer: `pal_efi.c` for firmware, `pal_host.c` for the Linux test build. |
 | `tools/` | `elf2efi.py` (ELF &rarr; PE32+), `gen-docs.py`, `check-doc-examples.py`, `run-qemu.sh`, `mkusb.sh`, `record-demo.py`, `setup-dev.sh`. |
 | `tests/` | Host tests, QEMU scripts (`tests/efi/*.nsb`) and binary fixtures (EDK2 applications, network drivers). |
@@ -61,7 +62,8 @@ user brings them up. The reasoning for each is in
    counts of the developer manual from the files themselves (a new source file
    needs its row in the source map).
 2. `make qemu-test` when anything on the firmware side changed, and
-   `make qemu-nettest` / `make qemu-sbtest` for network or Secure Boot work.
+   `make qemu-nettest` / `make qemu-sbtest` for network or Secure Boot work,
+   `make qemu-partmgr` for `partmgr.efi`.
 3. Do not report success from a pipeline that hid a failure: check the exit
    status, and in the QEMU logs the run is only a pass with `failures:0`.
 4. Commits use the repository-local identity set by `tools/setup-dev.sh`, which
@@ -83,5 +85,5 @@ Secure Boot state were not recorded. Broader hardware coverage is still the
 main open item, and the reason for the announcement on the OSDev forum asking
 for reports. Also open:
 `find`, `crc32`, `sha256`, `efiinfo`, a `secureboot` key listing,
-`bootmgr scan`, `ON ERROR`, `partmgr.efi` (designed, D21); `https` and host
+`bootmgr scan`, `ON ERROR`, `partmgr.efi` (in progress, D21); `https` and host
 names in `http` are untested; ARM64 and IA32 builds do not exist yet.

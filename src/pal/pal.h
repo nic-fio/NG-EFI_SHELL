@@ -150,7 +150,11 @@ const char *pal_platform_name(void);
 extern int pal_argc;
 extern char **pal_argv;
 
-/* Portable entry point of the shell. */
-int nesh_main(int argc, char **argv);
+/* The program the platform layer starts: NESH (src/core/shell.c) or
+ * partmgr (src/partmgr/main.c). app_main is its portable entry point,
+ * app_name the name used in fatal-error messages and as argv[0] when the
+ * firmware gives none. */
+extern const char app_name[];
+int app_main(int argc, char **argv);
 
 #endif

@@ -40,7 +40,7 @@ void pal_free(void *p) { free(p); }
 
 void rt_fatal(const char *msg)
 {
-    fprintf(stderr, "\nnesh: fatal: %s\n", msg);
+    fprintf(stderr, "\n%s: fatal: %s\n", app_name, msg);
     exit(1);
 }
 
@@ -587,7 +587,7 @@ int main(int argc, char **argv)
     pal_argc = argc;
     pal_argv = argv;
     pal_volumes_refresh();
-    int rc = nesh_main(argc, argv);
+    int rc = app_main(argc, argv);
     pal_con_raw(false);
     return rc;
 }

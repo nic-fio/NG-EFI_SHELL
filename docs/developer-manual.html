@@ -82,14 +82,14 @@ explained where they are needed, and the <a href="#glossary">glossary</a> summar
   <thead><tr><th>Area</th><th>Directory</th><th>Lines</th><th>Content</th></tr></thead>
   <tbody>
     <tr><td>Runtime library</td><td><code>src/lib</code></td><td>1,562</td><td>libc subset, printf, string buffer, UTF-8, UEFI compression, CRC-32</td></tr>
-    <tr><td>Platform layer</td><td><code>src/pal</code></td><td>1,831</td><td>PAL interface, UEFI and Linux implementations</td></tr>
-    <tr><td>Shell core</td><td><code>src/core</code></td><td>2,782</td><td>command execution, console, environment, aliases, line editor, menus</td></tr>
+    <tr><td>Platform layer</td><td><code>src/pal</code></td><td>1,837</td><td>PAL interface, UEFI and Linux implementations</td></tr>
+    <tr><td>Shell core</td><td><code>src/core</code></td><td>2,784</td><td>command execution, console, environment, aliases, line editor, menus</td></tr>
     <tr><td>BASIC</td><td><code>src/basic</code></td><td>4,019</td><td>lexer, parser, interpreter, built-in functions</td></tr>
     <tr><td>Portable commands</td><td><code>src/cmd</code></td><td>3,336</td><td>files, text, utilities, editors</td></tr>
     <tr><td>UEFI modules</td><td><code>src/platform/efi</code></td><td>10,215</td><td>shell protocol, variables, boot, drivers, disks, hardware, network</td></tr>
-    <tr><td>Partition manager</td><td><code>src/partmgr</code></td><td>1,363</td><td><code>partmgr.efi</code>, in progress: reading, changing and writing partition tables</td></tr>
-    <tr><td>UEFI definitions</td><td><code>include</code></td><td>724</td><td>UEFI types and protocols used by NESH</td></tr>
-    <tr><td>Tools and tests</td><td><code>tools</code>, <code>tests</code></td><td>3,970</td><td>ELF→PE converter, QEMU runner, doc generators, test scripts</td></tr>
+    <tr><td>Partition manager</td><td><code>src/partmgr</code></td><td>1,840</td><td><code>partmgr.efi</code>, in progress: partition tables, the disks, the screens</td></tr>
+    <tr><td>UEFI definitions</td><td><code>include</code></td><td>734</td><td>UEFI types and protocols used by NESH</td></tr>
+    <tr><td>Tools and tests</td><td><code>tools</code>, <code>tests</code></td><td>4,141</td><td>ELF→PE converter, QEMU runner, doc generators, test scripts</td></tr>
   </tbody>
 </table>
 <p>The resulting <code>nesh.efi</code> is about 360 KB. The line counts here and in the
@@ -110,18 +110,19 @@ without a row in the map fails as well.</p>
         <code>util.c</code> (Sbuf, UTF-8, glob, parse_int), <code>eficomp.c</code> (UEFI compression), <code>crc32.c</code>.</td></tr>
     <tr><td><code>src/pal/</code></td><td><code>pal.h</code> (the platform interface), <code>pal_efi.c</code>, <code>pal_host.c</code>, <code>pal_common.c</code>,
         <code>efi_glue.h</code> (UEFI globals for EFI-only modules).</td></tr>
-    <tr><td><code>src/core/</code></td><td><code>shell.c</code> (registry, execution, paths, REPL, <code>nesh_main</code>), <code>con.c</code> (output sinks, keys),
+    <tr><td><code>src/core/</code></td><td><code>shell.c</code> (registry, execution, paths, REPL, <code>app_main</code>), <code>con.c</code> (output sinks, keys),
         <code>env.c</code>, <code>alias.c</code>, <code>lineedit.c</code>, <code>ui.c</code> (menu).</td></tr>
     <tr><td><code>src/basic/</code></td><td><code>lexer.c</code>, <code>parser.c</code>, <code>interp.c</code>, <code>bfuncs.c</code>, <code>basic.h</code>, <code>interp_int.h</code>.</td></tr>
     <tr><td><code>src/cmd/</code></td><td>Portable commands: <code>cmd_core.c</code> (help, ver, echo…), <code>cmd_fs.c</code> (files, map…), <code>cmd_text.c</code>,
         <code>cmd_util.c</code>, <code>cmd_edit.c</code> (edit, hexedit).</td></tr>
     <tr><td><code>src/partmgr/</code></td><td><code>partmgr.efi</code>, the partition manager (in progress, <a href="https://github.com/nic-fio/NG-EFI_SHELL/blob/main/docs/decisions-and-history.md">decision D21</a>):
         <code>ptable.c</code> reads GPT and MBR tables, <code>ptedit.c</code> changes them in memory, <code>ptwrite.c</code> writes them and
-        makes and restores backups. Not part of <code>nesh.efi</code>.</td></tr>
+        makes and restores backups; <code>disks_efi.c</code> finds the disks, <code>main.c</code> draws the screens. Built into its own
+        <code>build/partmgr.efi</code> with the same platform layer as NESH; not part of <code>nesh.efi</code>.</td></tr>
     <tr><td><code>src/platform/efi/</code></td><td>UEFI-only modules (see <a href="#efi-modules">UEFI modules</a>).</td></tr>
     <tr><td><code>src/platform/host.c</code></td><td>Stubs of the platform hooks for the Linux build.</td></tr>
     <tr><td><code>tools/</code></td><td><code>efi.lds</code>, <code>elf2efi.py</code>, <code>run-qemu.sh</code>, <code>gen-docs.py</code>, <code>check-doc-examples.py</code>, <code>mkusb.sh</code>, <code>record-demo.py</code>, <code>setup-dev.sh</code>, <code>backup.sh</code>.</td></tr>
-    <tr><td><code>tests/</code></td><td><code>host/*.nsb</code> + <code>.out</code> (Linux tests), <code>efi/*.nsb</code> (QEMU tests), <code>apps/shelltest.c</code>, <code>partmgr/</code> (partition table tests),
+    <tr><td><code>tests/</code></td><td><code>host/*.nsb</code> + <code>.out</code> (Linux tests), <code>efi/*.nsb</code> (QEMU tests), <code>apps/shelltest.c</code>, <code>partmgr/</code> (partmgr tests, on Linux and in QEMU),
         <code>fixtures/</code> (EDK2 test binaries).</td></tr>
     <tr><td><code>examples/</code></td><td>Example scripts shipped with NESH.</td></tr>
     <tr><td><code>docs/</code></td><td>This manual, the user manual, <code>decisions-and-history.md</code>, <code>assets/</code> (CSS, JS, Mermaid).</td></tr>
@@ -144,12 +145,13 @@ without a row in the map fails as well.</p>
 <table>
   <thead><tr><th>Target</th><th>Does</th></tr></thead>
   <tbody>
-    <tr><td><code>make</code></td><td>Builds <code>build/nesh.efi</code> and <code>build/nesh-host</code> (Linux build with AddressSanitizer and UBSan).</td></tr>
+    <tr><td><code>make</code></td><td>Builds <code>build/nesh.efi</code>, <code>build/partmgr.efi</code> and <code>build/nesh-host</code> (Linux build with AddressSanitizer and UBSan).</td></tr>
     <tr><td><code>make test</code></td><td>Host tests, partition table tests, documentation consistency check, manual examples.</td></tr>
     <tr><td><code>make qemu</code></td><td>Boots NESH in QEMU with a serial console, interactively.</td></tr>
     <tr><td><code>make qemu-test</code></td><td>Runs <code>tests/efi/run.nsb</code> inside QEMU and checks the result.</td></tr>
     <tr><td><code>make qemu-nettest</code></td><td>Network tests (IPv4 and IPv6) inside QEMU with user networking.</td></tr>
     <tr><td><code>make qemu-sbtest</code></td><td>Secure Boot tests inside QEMU with test keys (see <a href="#sbtest">Secure Boot tests</a>).</td></tr>
+    <tr><td><code>make qemu-partmgr</code></td><td><code>partmgr.efi</code> started from NESH inside QEMU on test disks (see <a href="#partmgr-tests">partmgr tests</a>).</td></tr>
     <tr><td><code>make docs</code></td><td>Regenerates the command reference of the user manual from the help texts.</td></tr>
     <tr><td><code>make clean</code></td><td>Removes <code>build/</code>.</td></tr>
   </tbody>
@@ -211,12 +213,12 @@ flowchart TB
 sequenceDiagram
   participant FW as UEFI firmware
   participant EM as efi_main (pal_efi.c)
-  participant NM as nesh_main (shell.c)
+  participant NM as app_main (shell.c)
   participant PC as platform_cmds_init
   FW->>EM: StartImage(nesh.efi)
   EM->>EM: globals gST/gBS/gRT, watchdog off,&lt;br/&gt;TSC calibration, volumes, arguments
   EM->>EM: allocate a 1 MiB stack and switch to it
-  EM->>NM: nesh_main(argc, argv)
+  EM->>NM: app_main(argc, argv)
   NM->>NM: register BASIC functions and portable commands
   NM->>PC: platform_cmds_init()
   PC->>PC: install EFI_SHELL_PROTOCOL,&lt;br/&gt;register UEFI commands and functions
@@ -230,9 +232,12 @@ sequenceDiagram
 <figcaption>From the firmware to the prompt</figcaption>
 </figure>
 <p>Two details matter. First, UEFI only guarantees 128 KiB of stack and the interpreter is recursive, so
-<code>efi_main</code> allocates 1 MiB of pages and calls <code>nesh_main</code> on that stack (<code>call_on_stack</code>).
+<code>efi_main</code> allocates 1 MiB of pages and calls <code>app_main</code> on that stack (<code>call_on_stack</code>).
 Second, when NESH exits nothing may keep pointing into its image: <code>efi_exit_hook</code> uninstalls (or restores) the
 shell protocol.</p>
+<p>The platform layer does not know which program it starts: it calls <code>app_main</code> and names the program
+<code>app_name</code> in fatal errors. NESH defines both in <code>src/core/shell.c</code>; <code>partmgr.efi</code>, linked with
+the same <code>pal_efi.c</code>, defines its own in <code>src/partmgr/main.c</code>.</p>
 <pre class="code" data-lang="c" data-title="src/pal/pal_efi.c">EFI_STATUS EFIAPI efi_main(EFI_HANDLE image, EFI_SYSTEM_TABLE *st)
 {
     gImage = image;
@@ -824,7 +829,7 @@ void cmds_sum_init(void)
       last.</li>
 </ul>
 <p><strong>2. Register it.</strong> Declare the init function in <code>src/core/shell.h</code> next to the others
-(<code>void cmds_sum_init(void);</code>), call it from <code>nesh_main</code> in <code>src/core/shell.c</code> after
+(<code>void cmds_sum_init(void);</code>), call it from <code>app_main</code> in <code>src/core/shell.c</code> after
 <code>cmds_edit_init()</code>, and add <code>src/cmd/cmd_sum.c</code> to <code>COMMON_SRC</code> in the <code>Makefile</code>. (A UEFI-only
 command goes in <code>src/platform/efi</code> instead: add its table to one of the modules or register it from
 <code>platform_cmds_init</code>.)</p>
@@ -900,6 +905,9 @@ flowchart LR
     Q["tests/efi/run.nsb&lt;br/&gt;in OVMF"]
     SA["shelltest.efi&lt;br/&gt;EDK2 apps"]
   end
+  subgraph T4["make qemu-partmgr"]
+    PM["partmgr.efi&lt;br/&gt;on test disks"]
+  end
   subgraph T3["make qemu-nettest"]
     N["tests/efi/net.nsb&lt;br/&gt;IPv4 + IPv6"]
   end
@@ -913,7 +921,7 @@ flowchart LR
 <code>NAME.out</code>. <code>UPDATE=1</code> rewrites the <code>.out</code> files — review the diff before committing. The host build uses
 AddressSanitizer and UBSan, so memory errors and undefined behavior make tests fail loudly.</p>
 
-<h3 id="partmgr-tests">Partition table tests</h3>
+<h3 id="partmgr-tests">partmgr tests</h3>
 <p><code>tests/partmgr/run-tests.py</code> checks the partition table code of <code>partmgr.efi</code> (<code>src/partmgr</code>) on
 Linux, with disk image files instead of disks. <code>build/tests/pttool</code> is that code compiled for Linux with
 AddressSanitizer and UBSan: it reads the table of an image, runs commands on it (<code>new</code>, <code>add</code>,
@@ -942,6 +950,12 @@ are refused.</p>
 backup GPT checksum, the links and CHS fields of the MBR chain): each break makes them fail. The 4096-byte cases compared
 with <code>sfdisk</code> need an <code>sfdisk</code> with <code>--sector-size</code> (not in util-linux 2.39, the version of
 Ubuntu 24.04 and of CI): an older one skips them and the script prints <code>SKIPPED</code> with the reason.</p>
+<p><strong>In QEMU.</strong> <code>make qemu-partmgr</code> runs <code>tests/partmgr/qemu-test.py</code>: it boots NESH in
+QEMU/OVMF from a virtual FAT disk that also holds <code>partmgr.efi</code>, attaches a GPT disk and an MBR disk with logical
+partitions made by <code>sfdisk</code>, starts <code>partmgr</code> from the prompt and drives it with keys sent through the
+QEMU monitor. What partmgr draws also reaches the serial console, where the test waits for the lines it expects: the disks
+numbered as NESH's <code>map</code> numbers them, the disk partmgr was started from marked read-only, every partition and free
+area of both disks, and the NESH prompt after quitting. The test disks must come out identical, byte for byte.</p>
 
 <h3 id="qemu-tests">QEMU tests</h3>
 <p><code>tools/run-qemu.sh --test</code> builds a virtual FAT disk (<code>build/esp</code>, read-only, becomes <code>fs0:</code>) with
@@ -1093,7 +1107,7 @@ captured.</p>
 <table>
   <thead><tr><th>File</th><th>Lines</th><th>Purpose</th></tr></thead>
   <tbody>
-    <tr><td><code>include/efi.h</code></td><td>569</td><td>Minimal UEFI definitions (UEFI Specification 2.10), written for NESH</td></tr>
+    <tr><td><code>include/efi.h</code></td><td>579</td><td>Minimal UEFI definitions (UEFI Specification 2.10), written for NESH</td></tr>
     <tr><td><code>include/efi_shell.h</code></td><td>155</td><td>UEFI Shell 2.2 protocols (from the UEFI Shell Specification), plus the few extra UEFI protocols the shell implementation needs</td></tr>
     <tr><td><code>src/basic/basic.h</code></td><td>187</td><td>NESH BASIC: lexer, parser (AST) and tree-walking interpreter</td></tr>
     <tr><td><code>src/basic/bfuncs.c</code></td><td>816</td><td>Core built-in functions of NESH BASIC (portable)</td></tr>
@@ -1111,7 +1125,7 @@ captured.</p>
     <tr><td><code>src/core/con.h</code></td><td>50</td><td>Console services used by the whole shell: output sinks (console, capture buffer, file), colors, key input with type-ahead buffer, Ctrl-C handling</td></tr>
     <tr><td><code>src/core/env.c</code></td><td>269</td><td>Shell environment variables (separate from BASIC variables)</td></tr>
     <tr><td><code>src/core/lineedit.c</code></td><td>644</td><td>Line editor: cursor movement, history (persistent), Ctrl-R search, Tab completion</td></tr>
-    <tr><td><code>src/core/shell.c</code></td><td>1034</td><td>Shell core: command registry, option parsing, canonical paths and wildcards, file helpers, command-line splitting and execution, the prompt (REPL) and nesh_main, the portable entry point</td></tr>
+    <tr><td><code>src/core/shell.c</code></td><td>1036</td><td>Shell core: command registry, option parsing, canonical paths and wildcards, file helpers, command-line splitting and execution, the prompt (REPL) and app_main, the portable entry point</td></tr>
     <tr><td><code>src/core/shell.h</code></td><td>135</td><td>Shell core: command registry, execution, paths, file helpers</td></tr>
     <tr><td><code>src/core/ui.c</code></td><td>109</td><td>Interactive selection menu (MENU function)</td></tr>
     <tr><td><code>src/lib/crc32.c</code></td><td>29</td><td>CRC-32 (IEEE 802.3), the checksum of GPT headers and entry arrays</td></tr>
@@ -1123,10 +1137,13 @@ captured.</p>
     <tr><td><code>src/lib/rt.h</code></td><td>115</td><td>NESH runtime: standard C subset + shared helpers</td></tr>
     <tr><td><code>src/lib/util.c</code></td><td>337</td><td>Shared helpers: allocation wrappers, string buffer, UTF-8, globbing</td></tr>
     <tr><td><code>src/pal/efi_glue.h</code></td><td>38</td><td>Access to UEFI services for EFI-only modules</td></tr>
-    <tr><td><code>src/pal/pal.h</code></td><td>156</td><td>Platform abstraction layer: everything the portable core needs from the machine</td></tr>
+    <tr><td><code>src/pal/pal.h</code></td><td>160</td><td>Platform abstraction layer: everything the portable core needs from the machine</td></tr>
     <tr><td><code>src/pal/pal_common.c</code></td><td>25</td><td>Parts of the platform layer shared by the UEFI and Linux builds: error names</td></tr>
-    <tr><td><code>src/pal/pal_efi.c</code></td><td>1019</td><td>Platform layer for UEFI</td></tr>
+    <tr><td><code>src/pal/pal_efi.c</code></td><td>1021</td><td>Platform layer for UEFI</td></tr>
     <tr><td><code>src/pal/pal_host.c</code></td><td>593</td><td>Platform layer for Linux: used for fast development and automated tests</td></tr>
+    <tr><td><code>src/partmgr/disks.h</code></td><td>23</td><td>partmgr: a disk as the table code sees it (name, kind, size, boot disk, read and write functions)</td></tr>
+    <tr><td><code>src/partmgr/disks_efi.c</code></td><td>173</td><td>partmgr: finds the whole disks through block I/O, numbered as NESH's map; recognises the disk partmgr was started from; random numbers from EFI_RNG_PROTOCOL</td></tr>
+    <tr><td><code>src/partmgr/main.c</code></td><td>281</td><td>partmgr.efi: app_main and the screens (disk list, one disk's partitions and free space)</td></tr>
     <tr><td><code>src/partmgr/ptable.c</code></td><td>384</td><td>partmgr: reads GPT (both copies checked, the backup used when the primary is damaged) and MBR tables, extended and logical partitions included; partition type names</td></tr>
     <tr><td><code>src/partmgr/ptedit.c</code></td><td>420</td><td>partmgr: changes to a table in memory (new table, add, delete, type, name, active flag) and the free areas, with the rules for logical partitions and their boot records</td></tr>
     <tr><td><code>src/partmgr/ptint.h</code></td><td>22</td><td>partmgr internals: little-endian fields, extended partition types</td></tr>
@@ -1147,6 +1164,7 @@ captured.</p>
     <tr><td><code>src/platform/host.c</code></td><td>122</td><td>Platform-specific commands for the Linux test build: firmware features are not available, so only a minimal set is provided</td></tr>
     <tr><td><code>tests/apps/shelltest.c</code></td><td>293</td><td>Test application for NESH's EFI_SHELL_PROTOCOL implementation</td></tr>
     <tr><td><code>tests/partmgr/pttool.c</code></td><td>208</td><td>Drives partmgr's table code on a disk image file: reads, changes, writes, backs up, restores (Linux only)</td></tr>
+    <tr><td><code>tests/partmgr/qemu-test.py</code></td><td>171</td><td>partmgr.efi in QEMU/OVMF: started from NESH, driven with keys, checked on the serial console</td></tr>
     <tr><td><code>tests/partmgr/run-tests.py</code></td><td>657</td><td>Partition table tests: the reader and the writer compared with sfdisk and parted on disk images, damaged images, backups restored byte for byte</td></tr>
     <tr><td><code>tests/run-host-tests.sh</code></td><td>25</td><td>Runs tests/host/*.nsb with the host build and compares the output with the .out files</td></tr>
     <tr><td><code>tools/check-doc-examples.py</code></td><td>69</td><td>Runs the NESH BASIC examples of the user manual with the host build and compares their output with the output printed in the manual</td></tr>

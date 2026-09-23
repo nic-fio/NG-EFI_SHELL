@@ -515,6 +515,14 @@ typedef struct EFI_BLOCK_IO_PROTOCOL {
     void *FlushBlocks;
 } EFI_BLOCK_IO_PROTOCOL;
 
+/* ---- Random numbers (UEFI Specification 2.10, 37.5) ---- */
+
+typedef struct EFI_RNG_PROTOCOL {
+    void *GetInfo;
+    EFI_STATUS(EFIAPI *GetRNG)(struct EFI_RNG_PROTOCOL *This, EFI_GUID *Algorithm, UINTN ValueLength,
+                               UINT8 *Value); /* Algorithm NULL: the default one */
+} EFI_RNG_PROTOCOL;
+
 /* ---- Shell parameters (for compatibility with UEFI Shell applications) ---- */
 
 typedef void *SHELL_FILE_HANDLE;
@@ -551,6 +559,8 @@ typedef struct {
     { 0xDD9E7534, 0x7762, 0x4698, { 0x8C, 0x14, 0xF5, 0x85, 0x17, 0x3F, 0x5A, 0x7A } }
 #define EFI_BLOCK_IO_PROTOCOL_GUID \
     { 0x964E5B21, 0x6459, 0x11D2, { 0x8E, 0x39, 0x00, 0xA0, 0xC9, 0x69, 0x72, 0x3B } }
+#define EFI_RNG_PROTOCOL_GUID \
+    { 0x3152BCA5, 0xEADE, 0x433D, { 0x86, 0x2E, 0xC0, 0x1C, 0xDC, 0x29, 0x1F, 0x44 } }
 #define EFI_SHELL_PARAMETERS_PROTOCOL_GUID \
     { 0x752F3136, 0x4E16, 0x4FDC, { 0xA2, 0x2A, 0xE5, 0xF4, 0x68, 0x12, 0xF4, 0xCA } }
 #define EFI_GLOBAL_VARIABLE_GUID \

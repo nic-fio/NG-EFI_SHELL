@@ -47,6 +47,9 @@ jobs:
       - name: Secure Boot tests (QEMU/OVMF, own test keys)
         run: make qemu-sbtest
 
+      - name: partmgr.efi tests (QEMU/OVMF)
+        run: make qemu-partmgr
+
       - name: Keep the test logs
         if: always()
         uses: actions/upload-artifact@v4
@@ -60,6 +63,12 @@ jobs:
         with:
           name: nesh.efi
           path: build/nesh.efi
+
+      - name: Keep partmgr.efi
+        uses: actions/upload-artifact@v4
+        with:
+          name: partmgr.efi
+          path: build/partmgr.efi
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')

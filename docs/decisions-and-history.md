@@ -339,7 +339,7 @@ From it came the working rules of the project:
 
 ### D21. Partition management: a separate `partmgr.efi`, not a NESH command
 
-*Status: designed, not implemented.*
+*Status: accepted, being implemented (see Open questions).*
 
 - **Context.** The owner proposed adding "un paio di funzioni utili, come un
   partition manager". The EDK2 shell has nothing for it; people who prepare
@@ -459,5 +459,5 @@ listing), `bootmgr scan`, and the language's `ON ERROR`.
 | `https` | Needs a TLS driver in the firmware; untested. Host names in `http` URLs (DNS) are untested. |
 | UEFI Shell options not supported | `time -tz/-d`; `-l LANG` of `devices`/`devtree` is accepted and ignored. |
 | Not implemented | See "The original plan" above. |
-| `partmgr.efi` | Designed (D21), not implemented yet. |
+| `partmgr.efi` | In progress (D21). Done and tested: reading, changing and writing GPT and MBR tables, backup and restore (on Linux with disk images, compared with sfdisk and parted), and a first `partmgr.efi` that lists the disks and shows their partitions, tested in QEMU. Still to do: the changes in the interface, Write, the wipe, the user manual, shipping it in the release. |
 | License | Settled: Apache 2.0 with the Commons Clause (see D20). Not "open source" by the OSI definition, so some distributions and catalogues will not accept the project. Commercial licences are granted on request. |

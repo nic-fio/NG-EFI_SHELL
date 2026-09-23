@@ -81,14 +81,15 @@ explained where they are needed, and the <a href="#glossary">glossary</a> summar
 <table>
   <thead><tr><th>Area</th><th>Directory</th><th>Lines</th><th>Content</th></tr></thead>
   <tbody>
-    <tr><td>Runtime library</td><td><code>src/lib</code></td><td>1,523</td><td>libc subset, printf, string buffer, UTF-8, UEFI compression</td></tr>
+    <tr><td>Runtime library</td><td><code>src/lib</code></td><td>1,562</td><td>libc subset, printf, string buffer, UTF-8, UEFI compression, CRC-32</td></tr>
     <tr><td>Platform layer</td><td><code>src/pal</code></td><td>1,831</td><td>PAL interface, UEFI and Linux implementations</td></tr>
     <tr><td>Shell core</td><td><code>src/core</code></td><td>2,782</td><td>command execution, console, environment, aliases, line editor, menus</td></tr>
     <tr><td>BASIC</td><td><code>src/basic</code></td><td>4,019</td><td>lexer, parser, interpreter, built-in functions</td></tr>
     <tr><td>Portable commands</td><td><code>src/cmd</code></td><td>3,336</td><td>files, text, utilities, editors</td></tr>
     <tr><td>UEFI modules</td><td><code>src/platform/efi</code></td><td>10,215</td><td>shell protocol, variables, boot, drivers, disks, hardware, network</td></tr>
+    <tr><td>Partition manager</td><td><code>src/partmgr</code></td><td>448</td><td><code>partmgr.efi</code>, in progress: the partition table reader</td></tr>
     <tr><td>UEFI definitions</td><td><code>include</code></td><td>724</td><td>UEFI types and protocols used by NESH</td></tr>
-    <tr><td>Tools and tests</td><td><code>tools</code>, <code>tests</code></td><td>3,104</td><td>ELF→PE converter, QEMU runner, doc generators, test scripts</td></tr>
+    <tr><td>Tools and tests</td><td><code>tools</code>, <code>tests</code></td><td>3,503</td><td>ELF→PE converter, QEMU runner, doc generators, test scripts</td></tr>
   </tbody>
 </table>
 <p>The resulting <code>nesh.efi</code> is about 360 KB. The line counts here and in the
@@ -106,7 +107,7 @@ without a row in the map fails as well.</p>
     <tr><td><code>Makefile</code></td><td>All build and test targets.</td></tr>
     <tr><td><code>include/efi.h</code>, <code>include/efi_shell.h</code></td><td>UEFI types, services and protocols (written for NESH), EFI_SHELL_PROTOCOL.</td></tr>
     <tr><td><code>src/lib/</code></td><td>Runtime: <code>rt.h</code> (the C subset every module includes), <code>libc.c</code>, <code>fmt.c</code> (vsnprintf),
-        <code>util.c</code> (Sbuf, UTF-8, glob, parse_int), <code>eficomp.c</code> (UEFI compression).</td></tr>
+        <code>util.c</code> (Sbuf, UTF-8, glob, parse_int), <code>eficomp.c</code> (UEFI compression), <code>crc32.c</code>.</td></tr>
     <tr><td><code>src/pal/</code></td><td><code>pal.h</code> (the platform interface), <code>pal_efi.c</code>, <code>pal_host.c</code>, <code>pal_common.c</code>,
         <code>efi_glue.h</code> (UEFI globals for EFI-only modules).</td></tr>
     <tr><td><code>src/core/</code></td><td><code>shell.c</code> (registry, execution, paths, REPL, <code>nesh_main</code>), <code>con.c</code> (output sinks, keys),
@@ -114,10 +115,12 @@ without a row in the map fails as well.</p>
     <tr><td><code>src/basic/</code></td><td><code>lexer.c</code>, <code>parser.c</code>, <code>interp.c</code>, <code>bfuncs.c</code>, <code>basic.h</code>, <code>interp_int.h</code>.</td></tr>
     <tr><td><code>src/cmd/</code></td><td>Portable commands: <code>cmd_core.c</code> (help, ver, echo…), <code>cmd_fs.c</code> (files, map…), <code>cmd_text.c</code>,
         <code>cmd_util.c</code>, <code>cmd_edit.c</code> (edit, hexedit).</td></tr>
+    <tr><td><code>src/partmgr/</code></td><td><code>partmgr.efi</code>, the partition manager (in progress, <a href="https://github.com/nic-fio/NG-EFI_SHELL/blob/main/docs/decisions-and-history.md">decision D21</a>):
+        <code>ptable.c</code> reads GPT and MBR tables. Not part of <code>nesh.efi</code>.</td></tr>
     <tr><td><code>src/platform/efi/</code></td><td>UEFI-only modules (see <a href="#efi-modules">UEFI modules</a>).</td></tr>
     <tr><td><code>src/platform/host.c</code></td><td>Stubs of the platform hooks for the Linux build.</td></tr>
     <tr><td><code>tools/</code></td><td><code>efi.lds</code>, <code>elf2efi.py</code>, <code>run-qemu.sh</code>, <code>gen-docs.py</code>, <code>check-doc-examples.py</code>, <code>mkusb.sh</code>, <code>record-demo.py</code>, <code>setup-dev.sh</code>, <code>backup.sh</code>.</td></tr>
-    <tr><td><code>tests/</code></td><td><code>host/*.nsb</code> + <code>.out</code> (Linux tests), <code>efi/*.nsb</code> (QEMU tests), <code>apps/shelltest.c</code>,
+    <tr><td><code>tests/</code></td><td><code>host/*.nsb</code> + <code>.out</code> (Linux tests), <code>efi/*.nsb</code> (QEMU tests), <code>apps/shelltest.c</code>, <code>partmgr/</code> (partition table tests),
         <code>fixtures/</code> (EDK2 test binaries).</td></tr>
     <tr><td><code>examples/</code></td><td>Example scripts shipped with NESH.</td></tr>
     <tr><td><code>docs/</code></td><td>This manual, the user manual, <code>decisions-and-history.md</code>, <code>assets/</code> (CSS, JS, Mermaid).</td></tr>
@@ -132,6 +135,7 @@ without a row in the map fails as well.</p>
     <tr><td>Python 3</td><td><code>elf2efi.py</code> and the documentation tools.</td></tr>
     <tr><td>QEMU (<code>qemu-system-x86_64</code>) and OVMF</td><td>UEFI tests. <code>OVMF=</code> selects the firmware image, a single-file <code>OVMF.fd</code> (default: the first of <code>/usr/share/ovmf/OVMF.fd</code> and <code>/usr/share/OVMF/OVMF.fd</code> that exists).</td></tr>
     <tr><td><code>mkfs.fat</code> (dosfstools)</td><td>The writable test disk of the QEMU runs.</td></tr>
+    <tr><td><code>sfdisk</code> (fdisk)</td><td>The partition table tests: it builds the disk images and is the reference the reader is compared with.</td></tr>
   </tbody>
 </table>
 
@@ -140,7 +144,7 @@ without a row in the map fails as well.</p>
   <thead><tr><th>Target</th><th>Does</th></tr></thead>
   <tbody>
     <tr><td><code>make</code></td><td>Builds <code>build/nesh.efi</code> and <code>build/nesh-host</code> (Linux build with AddressSanitizer and UBSan).</td></tr>
-    <tr><td><code>make test</code></td><td>Host tests, documentation consistency check, manual examples.</td></tr>
+    <tr><td><code>make test</code></td><td>Host tests, partition table tests, documentation consistency check, manual examples.</td></tr>
     <tr><td><code>make qemu</code></td><td>Boots NESH in QEMU with a serial console, interactively.</td></tr>
     <tr><td><code>make qemu-test</code></td><td>Runs <code>tests/efi/run.nsb</code> inside QEMU and checks the result.</td></tr>
     <tr><td><code>make qemu-nettest</code></td><td>Network tests (IPv4 and IPv6) inside QEMU with user networking.</td></tr>
@@ -887,6 +891,7 @@ documentation checks, and QEMU tests for everything that needs firmware.</p>
 flowchart LR
   subgraph T1["make test (seconds)"]
     H["tests/host/*.nsb&lt;br/&gt;vs *.out"]
+    P["tests/partmgr&lt;br/&gt;vs sfdisk"]
     G["gen-docs.py --check"]
     X["check-doc-examples.py"]
   end
@@ -906,6 +911,21 @@ flowchart LR
 <code>NESH_FS=.</code> and the arguments <code>arg1 "arg two"</code>, and compares stdout+stderr and the exit code with
 <code>NAME.out</code>. <code>UPDATE=1</code> rewrites the <code>.out</code> files — review the diff before committing. The host build uses
 AddressSanitizer and UBSan, so memory errors and undefined behavior make tests fail loudly.</p>
+
+<h3 id="partmgr-tests">Partition table tests</h3>
+<p><code>tests/partmgr/run-tests.py</code> checks the partition table reader of <code>partmgr.efi</code>
+(<code>src/partmgr/ptable.c</code>) on Linux, with disk image files instead of disks. <code>build/tests/ptdump</code> is the reader
+compiled for Linux with AddressSanitizer and UBSan; it prints what it finds in an image as <code>key=value</code> lines.
+The script builds images with <code>sfdisk</code> and requires the reader to find exactly what <code>sfdisk --json</code>
+reports: table type, disk identifier, usable area, and for every partition its number, start, size, type, identifier,
+name, attributes and boot flag. The images cover GPT with 512- and 4096-byte blocks, gaps and entries out of disk order,
+MBR with primary, extended and logical partitions, and empty tables.</p>
+<p>Then the images are damaged on purpose and the reader must cope and say so in a note: a broken primary GPT header or
+entry array (the backup copy is used and gives the same partitions), a broken backup, both copies broken, a wiped
+protective MBR, a hybrid MBR, a disk enlarged after partitioning, a chain of logical partitions that loops, an extended
+boot record without its signature, a partition beyond the end of the disk, a FAT file system on the whole disk, and
+invalid MBR entries. The tests were checked by breaking the reader on purpose (logical numbering, GPT sizes off by one,
+the boot flag): each break makes them fail.</p>
 
 <h3 id="qemu-tests">QEMU tests</h3>
 <p><code>tools/run-qemu.sh --test</code> builds a virtual FAT disk (<code>build/esp</code>, read-only, becomes <code>fs0:</code>) with
@@ -1078,6 +1098,8 @@ captured.</p>
     <tr><td><code>src/core/shell.c</code></td><td>1034</td><td>Shell core: command registry, option parsing, canonical paths and wildcards, file helpers, command-line splitting and execution, the prompt (REPL) and nesh_main, the portable entry point</td></tr>
     <tr><td><code>src/core/shell.h</code></td><td>135</td><td>Shell core: command registry, execution, paths, file helpers</td></tr>
     <tr><td><code>src/core/ui.c</code></td><td>109</td><td>Interactive selection menu (MENU function)</td></tr>
+    <tr><td><code>src/lib/crc32.c</code></td><td>29</td><td>CRC-32 (IEEE 802.3), the checksum of GPT headers and entry arrays</td></tr>
+    <tr><td><code>src/lib/crc32.h</code></td><td>10</td><td>CRC-32 (IEEE 802.3)</td></tr>
     <tr><td><code>src/lib/eficomp.c</code></td><td>547</td><td>UEFI compression format (EFI 1.1 / "version 1"): LZ77 with an 8 KiB window and canonical Huffman codes, as decoded by EFI_DECOMPRESS_PROTOCOL</td></tr>
     <tr><td><code>src/lib/eficomp.h</code></td><td>12</td><td>UEFI (EFI 1.1) compression format</td></tr>
     <tr><td><code>src/lib/fmt.c</code></td><td>192</td><td>vsnprintf for the EFI build: %d %i %u %x %X %o %c %s %p %%, flags '-' '0' '+' ' ', width/precision (also '*'), length hh h l ll z j t</td></tr>
@@ -1089,6 +1111,8 @@ captured.</p>
     <tr><td><code>src/pal/pal_common.c</code></td><td>25</td><td>Parts of the platform layer shared by the UEFI and Linux builds: error names</td></tr>
     <tr><td><code>src/pal/pal_efi.c</code></td><td>1019</td><td>Platform layer for UEFI</td></tr>
     <tr><td><code>src/pal/pal_host.c</code></td><td>593</td><td>Platform layer for Linux: used for fast development and automated tests</td></tr>
+    <tr><td><code>src/partmgr/ptable.c</code></td><td>377</td><td>partmgr: reads GPT (both copies checked, the backup used when the primary is damaged) and MBR tables, extended and logical partitions included; partition type names</td></tr>
+    <tr><td><code>src/partmgr/ptable.h</code></td><td>71</td><td>partmgr: the description of a disk's partition table, read through a function so that disks and image files work alike</td></tr>
     <tr><td><code>src/platform/efi/efi_boot.c</code></td><td>1572</td><td>Boot manager: Boot#### / BootOrder / BootNext / Timeout</td></tr>
     <tr><td><code>src/platform/efi/efi_cmds.h</code></td><td>48</td><td>Shared declarations of the EFI-only command modules</td></tr>
     <tr><td><code>src/platform/efi/efi_disk.c</code></td><td>449</td><td>Block devices and disk-level commands: blkN: names, dblk, timezone, getmtc</td></tr>
@@ -1103,6 +1127,8 @@ captured.</p>
     <tr><td><code>src/platform/efi/efi_var.c</code></td><td>1268</td><td>UEFI variables: the "var" command and the BASIC functions VAR$, VAREXISTS</td></tr>
     <tr><td><code>src/platform/host.c</code></td><td>122</td><td>Platform-specific commands for the Linux test build: firmware features are not available, so only a minimal set is provided</td></tr>
     <tr><td><code>tests/apps/shelltest.c</code></td><td>293</td><td>Test application for NESH's EFI_SHELL_PROTOCOL implementation</td></tr>
+    <tr><td><code>tests/partmgr/ptdump.c</code></td><td>78</td><td>Prints what partmgr's table reader finds in a disk image file (Linux only)</td></tr>
+    <tr><td><code>tests/partmgr/run-tests.py</code></td><td>320</td><td>Partition table tests: images built with sfdisk, the reader compared with sfdisk --json, then damaged images</td></tr>
     <tr><td><code>tests/run-host-tests.sh</code></td><td>25</td><td>Runs tests/host/*.nsb with the host build and compares the output with the .out files</td></tr>
     <tr><td><code>tools/check-doc-examples.py</code></td><td>69</td><td>Runs the NESH BASIC examples of the user manual with the host build and compares their output with the output printed in the manual</td></tr>
     <tr><td><code>tools/efi.lds</code></td><td>26</td><td>Linker script for NESH: ELF image at base 0, page-aligned sections</td></tr>
@@ -1111,7 +1137,7 @@ captured.</p>
     <tr><td><code>tools/mkusb.sh</code></td><td>102</td><td>Builds build/nesh-usb.img, a bootable disk image (GPT + EFI system partition) with NESH, the examples, the licence (LICENSE.txt and NOTICE.txt) and a README on it</td></tr>
     <tr><td><code>tools/record-demo.py</code></td><td>188</td><td>Records the animation of the README: drives a QEMU session through the monitor (sendkey/screendump) and turns the frames into a GIF</td></tr>
     <tr><td><code>tools/backup.sh</code></td><td>32</td><td>Packs the repository into one git bundle, with every branch, tag and commit, for a restore without a network</td></tr>
-    <tr><td><code>tools/setup-dev.sh</code></td><td>89</td><td>Checks (or installs) the packages a clone needs and sets the git identity of the working copy, which is not cloned</td></tr>
+    <tr><td><code>tools/setup-dev.sh</code></td><td>90</td><td>Checks (or installs) the packages a clone needs and sets the git identity of the working copy, which is not cloned</td></tr>
     <tr><td><code>tools/run-qemu.sh</code></td><td>158</td><td>Boots nesh.efi in QEMU/OVMF: interactive, --test and --nettest modes</td></tr>
     <tr><td><code>tools/make-previews.py</code></td><td>636</td><td>Builds docs-preview/: the ten design proposals the look of the manuals was chosen from</td></tr>
   </tbody>

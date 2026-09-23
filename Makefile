@@ -1,7 +1,8 @@
 # NESH - New EFI Shell
 #
 #   make            build build/nesh.efi (UEFI x86_64) and build/nesh-host (Linux test build)
-#   make test       run the language/command tests with the host build, check the docs
+#   make test       run the language/command tests with the host build, the partition
+#                   table tests, check the docs
 #   make docs       regenerate the command reference of docs/user-manual.html
 #   make usb        build/nesh-usb.img, a bootable disk image (dd it to a USB stick)
 #   make qemu       boot build/nesh.efi in QEMU/OVMF (interactive, serial console)
@@ -28,6 +29,9 @@ EFI_SRC := $(COMMON_SRC) src/lib/libc.c src/lib/fmt.c src/pal/pal_efi.c \
 	$(wildcard src/platform/efi/*.c)
 
 HOST_SRC := $(COMMON_SRC) src/pal/pal_host.c src/platform/host.c
+
+# partmgr.efi (in progress): the partition table code, tested on Linux with disk images
+PARTMGR_SRC := src/partmgr/ptable.c src/lib/crc32.c src/lib/util.c
 
 WARN := -Wall -Wextra -Wno-unused-parameter -Wno-missing-field-initializers
 
@@ -63,8 +67,14 @@ $(BUILD)/nesh.efi: $(BUILD)/nesh.so tools/elf2efi.py
 $(BUILD)/nesh-host: $(HOST_OBJ)
 	$(CC) $(HOST_CFLAGS) $(HOST_OBJ) -o $@
 
-test: $(BUILD)/nesh-host
+# reads a disk image with partmgr's table code (tests/partmgr/run-tests.py)
+$(BUILD)/tests/ptdump: tests/partmgr/ptdump.c $(PARTMGR_SRC) src/partmgr/ptable.h src/lib/crc32.h
+	@mkdir -p $(dir $@)
+	$(CC) $(HOST_CFLAGS) -D_FILE_OFFSET_BITS=64 tests/partmgr/ptdump.c $(PARTMGR_SRC) -o $@
+
+test: $(BUILD)/nesh-host $(BUILD)/tests/ptdump
 	@tests/run-host-tests.sh $(BUILD)/nesh-host
+	@$(PYTHON) tests/partmgr/run-tests.py $(BUILD)/tests/ptdump
 	@$(PYTHON) tools/gen-docs.py --check
 	@$(PYTHON) tools/check-doc-examples.py $(BUILD)/nesh-host
 

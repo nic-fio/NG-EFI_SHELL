@@ -3,7 +3,7 @@
  * name, active flag, new table, delete table - is made on the table in
  * memory only: the screen shows the table as it will be, with * on what
  * changed, until Write writes it (decision D21). Backup reads the disk as it
- * is; restore writes it at once, after its own warning, as wipe will. The
+ * is; restore and wipe write it at once, after their own warning. The
  * disk partmgr was started from, or a write-protected one, can only be
  * looked at and backed up. */
 #include "partmgr.h"
@@ -171,8 +171,8 @@ static void draw(View *v)
     const PtPart *p = selected_part(v);
     char keys[200];
     if (p)
-        snprintf(keys, sizeof(keys), " D Delete  T Type%s%s", gpt ? "  R Rename" : "",
-                 !gpt && p->role != PT_EXTENDED ? "  A Active" : "");
+        snprintf(keys, sizeof(keys), " D Delete  T Type%s%s%s", gpt ? "  R Rename" : "",
+                 !gpt && p->role != PT_EXTENDED ? "  A Active" : "", p->role != PT_EXTENDED ? "  W Wipe" : "");
     else if (v->nrows && v->rows[v->sel].free)
         snprintf(keys, sizeof(keys), " N New partition");
     else
@@ -453,14 +453,13 @@ static void delete_table(View *v)
 /* ---- writing ---- */
 
 /* The big red warning of every operation that destroys data; the disk name
- * must be typed to go on. */
-static bool confirm_destroy(View *v, const char *title, const char *what)
+ * must be typed to go on. HINT follows the warning. */
+#define BACKUP_HINT "There is no automatic copy: to keep one, press Esc and use B Backup first."
+
+static bool confirm_destroy(View *v, const char *title, const char *what, const char *hint)
 {
-    char text[700], buf[32] = "";
-    snprintf(text, sizeof(text),
-             "%s\n\nThere is no automatic copy: to keep one, press Esc and use B Backup first.\n\n"
-             "Type %s and press Enter to go on:",
-             what, v->d->name);
+    char text[900], buf[32] = "";
+    snprintf(text, sizeof(text), "%s\n\n%s\n\nType %s and press Enter to go on:", what, hint, v->d->name);
     draw(v);
     if (!ui_input(true, title, text, buf, sizeof(buf)))
         return false;
@@ -488,7 +487,7 @@ static void write_table(View *v)
         snprintf(what, sizeof(what), "WARNING: the partition table of %s (%s, %s) will be replaced by the one on "
                                      "the screen. Partitions deleted or changed lose access to their data.",
                  v->d->name, v->d->kind, size);
-    if (!confirm_destroy(v, "Write the partition table", what))
+    if (!confirm_destroy(v, "Write the partition table", what, BACKUP_HINT))
         return;
     int rc = pt_write(&v->d->dev, &v->t);
     if (rc) {
@@ -498,6 +497,113 @@ static void write_table(View *v)
     }
     load(v);
     say(v, false, "Written.");
+}
+
+/* ---- wipe ---- */
+
+typedef struct {
+    View *v;
+    int num;
+    uint64_t bytes;     /* of the partition */
+    uint64_t t0, drawn; /* ms */
+    int pass;
+} WipeUi;
+
+static void fmt_time(char *out, size_t n, uint64_t s)
+{
+    if (s >= 3600)
+        snprintf(out, n, "about %llu h %llu min left", (unsigned long long)(s / 3600),
+                 (unsigned long long)(s % 3600 / 60));
+    else if (s >= 60)
+        snprintf(out, n, "about %llu min %llu s left", (unsigned long long)(s / 60), (unsigned long long)(s % 60));
+    else
+        snprintf(out, n, "about %llu s left", (unsigned long long)s);
+}
+
+/* The progress box: pass, bar, percentage, amount, speed, time left. */
+static void draw_wipe(WipeUi *w, int pass, uint64_t done, uint64_t total)
+{
+    int bw = MIN(ui_cols - 4, 64), col = (ui_cols - bw) / 2, row = MAX(1, (ui_rows - 8) / 2);
+    uint64_t bs = w->v->d->dev.bsize, now = pal_ticks_ms(), ms = now - w->t0;
+    char size[32], title[120], line[200], amount[32], speed[32], left[48];
+    pm_fmt_size(size, sizeof(size), w->bytes);
+    snprintf(title, sizeof(title), " Wiping %s partition %d  (%s)", w->v->d->name, w->num, size);
+    ui_text(col, row, bw, YELLOW, RED, title);
+    ui_text(col, row + 1, bw, WHITE, RED, "");
+    ui_textf(col, row + 2, bw, WHITE, RED, "  Pass %d of 2: %s", pass, pass == 1 ? "random data" : "zeros");
+    int barw = bw - 12, pct = total ? (int)(done * 100 / total) : 100, full = total ? (int)(done * barw / total) : barw;
+    Sbuf b;
+    sb_init(&b);
+    sb_adds(&b, "  [");
+    for (int i = 0; i < barw; i++)
+        sb_adds(&b, i < full ? "\u2588" : "\u2591");
+    sb_printf(&b, "] %3d%%", pct);
+    ui_text(col, row + 3, bw, WHITE, RED, b.s);
+    sb_free(&b);
+    /* both passes count for the speed and the time left */
+    uint64_t written = ((uint64_t)(pass - 1) * total + done) * bs, remaining = (2 * total) * bs - written;
+    pm_fmt_size(amount, sizeof(amount), done * bs);
+    if (ms >= 500 && written) {
+        uint64_t rate = written * 1000 / ms; /* bytes per second */
+        pm_fmt_size(speed, sizeof(speed), rate);
+        fmt_time(left, sizeof(left), rate ? remaining / rate : 0);
+        snprintf(line, sizeof(line), "  %s of %s   %s/s   %s", amount, size, speed, left);
+    } else
+        snprintf(line, sizeof(line), "  %s of %s   estimating the time...", amount, size);
+    ui_text(col, row + 4, bw, WHITE, RED, line);
+    ui_text(col, row + 5, bw, WHITE, RED, "");
+    ui_text(col, row + 6, bw, WHITE, RED, "  Esc: stop");
+    w->drawn = now;
+}
+
+static bool wipe_progress(void *ctx, int pass, uint64_t done, uint64_t total)
+{
+    WipeUi *w = ctx;
+    PalKey k;
+    if (pal_con_read_key(&k, 0) && ui_is_esc(&k)) {
+        if (ui_yesno(true, "Stop the wipe", "The partition is partly overwritten already: its old data is "
+                                            "damaged either way. Stop now?"))
+            return false;
+        w->drawn = 0; /* the box is drawn again below */
+    }
+    /* every pass start and end, else five times a second */
+    if (done == 0 || done == total || pass != w->pass || pal_ticks_ms() - w->drawn >= 200)
+        draw_wipe(w, pass, done, total);
+    w->pass = pass;
+    return true;
+}
+
+static void wipe_partition(View *v, PtPart *p)
+{
+    if (!may_change(v))
+        return;
+    const char *err = pt_can_wipe(&v->t, p->num);
+    if (err) {
+        ui_message(false, "Wipe", err);
+        return;
+    }
+    char size[32], type[48], what[700];
+    pm_fmt_size(size, sizeof(size), p->size * bs(v));
+    type_text(v, p, type, sizeof(type));
+    snprintf(what, sizeof(what),
+             "WARNING: every byte of partition %d of %s (%s, %s%s%s%s) will be overwritten now, first with random "
+             "data and then with zeros. Its data cannot be recovered.",
+             p->num, v->d->name, type, size, p->name[0] ? ", \"" : "", p->name, p->name[0] ? "\"" : "");
+    if (!confirm_destroy(v, "Wipe partition", what,
+                         "On SSD, NVMe and USB flash drives overwriting does not guarantee that every copy of the "
+                         "old data is gone."))
+        return;
+    WipeUi w = { v, p->num, p->size * bs(v), pal_ticks_ms(), 0, 0 };
+    draw(v);
+    int rc = pt_wipe(&v->d->dev, p->start, p->size, wipe_progress, &w);
+    uint64_t secs = (pal_ticks_ms() - w.t0 + 500) / 1000;
+    if (rc == PAL_EABORT)
+        say(v, true, "The wipe of partition %d was stopped during pass %d: the partition is partly overwritten.",
+            w.num, w.pass);
+    else if (rc)
+        say(v, true, "The wipe of partition %d failed: %s.", w.num, pal_strerror(rc));
+    else
+        say(v, false, "Partition %d wiped: %s overwritten twice in %llu s.", w.num, size, (unsigned long long)secs);
 }
 
 /* ---- backup and restore ---- */
@@ -652,7 +758,7 @@ static void restore(View *v)
     char what[400];
     snprintf(what, sizeof(what), "WARNING: the partition table of %s will be replaced now by the one saved in %s.%s",
              v->d->name, path, v->t.changed ? " The changes not written yet are lost." : "");
-    if (confirm_destroy(v, "Restore the partition table", what)) {
+    if (confirm_destroy(v, "Restore the partition table", what, BACKUP_HINT)) {
         const char *err = pt_restore(&v->d->dev, data, st.size);
         if (err)
             ui_message(true, "Restore", err);
@@ -710,6 +816,8 @@ void pm_disk_screen(PmDisk *d)
             rename_partition(&v, p);
         else if (ch == 'A' && p)
             toggle_active(&v, p);
+        else if (ch == 'W' && p)
+            wipe_partition(&v, p);
         else if (ch == 'Z')
             new_table(&v);
         else if (ch == 'X')

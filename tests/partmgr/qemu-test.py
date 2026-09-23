@@ -13,11 +13,15 @@ waits there for the lines it expects.
    byte.
 2. Changing: the boot disk refuses changes; on the GPT disk a new partition,
    a rename and a delete, leaving with changes asks first, Write asks for the
-   disk name; on the MBR disk a logical partition and the active flag, a
-   backup to a file on a writable FAT disk, Write, delete the table, restore.
-   Afterwards sfdisk, outside QEMU, must find exactly the result: the GPT
+   disk name; then the new partition is wiped, and the wipe of a bigger one is
+   stopped with Esc (the GPT disk's writes are slowed down so that there is
+   time); on the MBR disk a logical partition and the active flag, a backup
+   to a file on a writable FAT disk, Write, delete the table, restore.
+   Afterwards, outside QEMU, sfdisk must find exactly the result - the GPT
    disk changed as asked, the MBR disk as it was before (the backup was taken
-   before anything was written).
+   before anything was written) - and the data must be right: the wiped
+   partition all zeros, the stopped one overwritten only at its start, the
+   others untouched.
 
     tests/partmgr/qemu-test.py OVMF.fd build/nesh.efi build/partmgr.efi
 """
@@ -73,7 +77,7 @@ def disk(name, mb, script):
 
 
 class Qemu:
-    def __init__(self, name, disks):
+    def __init__(self, name, disks, slow=()):
         esp = os.path.join(WORK, name)
         os.makedirs(os.path.join(esp, "EFI", "BOOT"))
         shutil.copy(NESH, os.path.join(esp, "EFI", "BOOT", "BOOTX64.EFI"))
@@ -82,7 +86,8 @@ class Qemu:
         mon = os.path.join(WORK, name + ".monitor")
         drives = ["-drive", "if=virtio,format=raw,readonly=on,file=fat:" + esp]
         for d in disks:
-            drives += ["-drive", "if=virtio,format=raw,file=" + d]
+            drives += ["-drive", "if=virtio,format=raw,file=" + d +
+                       (",throttling.bps-write=60000000" if d in slow else "")]
         kvm = ["-accel", "kvm"] if os.access("/dev/kvm", os.W_OK) else []
         self.proc = subprocess.Popen(
             ["qemu-system-x86_64"] + kvm + ["-m", "512", "-machine", "q35", "-bios", OVMF] + drives +
@@ -192,7 +197,14 @@ try:
     work = os.path.join(WORK, "work.img")          # a writable FAT volume for the backup file
     mkfs = shutil.which("mkfs.fat") or "/sbin/mkfs.fat"
     subprocess.run([mkfs, "-C", "-n", "WORK", work, "65536"], check=True, stdout=subprocess.DEVNULL)
-    q = Qemu("change", [gpt, mbr, work])
+    # patterns in the data of the GPT disk: partition 1, partition 3, and the free
+    # space where the new partition 4 will be
+    P1, P3, P4 = (2048, 204800), (239616, 409600), (649216, 40960)
+    for (first, blocks_n), byte in ((P1, 0x11), (P3, 0x33), (P4, 0x44)):
+        with open(gpt, "r+b") as f:
+            f.seek(first * 512)
+            f.write(bytes([byte]) * (blocks_n * 512))
+    q = Qemu("change", [gpt, mbr, work], slow=(gpt,))
     try:
         check("NESH starts again", q.wait(r"New EFI Shell", 90), "")
         q.type("\nfs0:\\partmgr.efi\n")
@@ -245,6 +257,28 @@ try:
         check("write asks again", q.wait(r"Type blk3 and press Enter"), "")
         q.type("blk3\n")
         check("written", q.wait(r"Written\."), "")
+        # wipe partition 4 (rows: 1, free, 3, 4, free)
+        q.key("home")
+        for _ in range(3):
+            q.key("down")
+        q.key("w")
+        check("wipe warns", q.wait(r"every byte of partition 4 of blk3"), "")
+        check("wipe warns about flash", q.wait(r"does not guarantee"), "")
+        q.type("blk3\n")
+        check("pass 1 shown", q.wait(r"Pass 1 of 2: random data"), "")
+        check("pass 2 shown", q.wait(r"Pass 2 of 2: zeros"), "")
+        check("progress shown", q.wait(r"\d+\.\d MiB of 20\.0 MiB"), "")
+        check("wiped", q.wait(r"Partition 4 wiped: 20\.0 MiB overwritten twice"), "")
+        # wipe partition 3 (200 MiB) and stop it with Esc
+        q.key("up")
+        q.key("w")
+        check("second wipe warns", q.wait(r"every byte of partition 3 of blk3"), "")
+        q.type("blk3\n")
+        check("second wipe runs", q.wait(r"Pass 1 of 2: random data"), "")
+        q.key("esc")
+        check("stop asks", q.wait(r"Stop the wipe"), "")
+        q.key("y")
+        check("stopped", q.wait(r"wipe of partition 3 was stopped during pass 1"), "")
         q.key("esc")
         # MBR disk: a logical partition in the free space after partition 5
         check("list again", q.wait(r"Select a disk"), "")
@@ -305,6 +339,16 @@ try:
         out = subprocess.run([SFDISK, "--verify", d], capture_output=True, text=True)
         check("verify " + os.path.basename(d), out.returncode == 0 and "No errors detected" in out.stdout,
               out.stdout + out.stderr)
+    # the data: partition 4 all zeros, partition 3 overwritten only at its start, partition 1 untouched
+    def blocks(first, blocks_n):
+        with open(gpt, "rb") as f:
+            f.seek(first * 512)
+            return f.read(blocks_n * 512)
+    check("wiped partition is zeros", blocks(*P4) == bytes(P4[1] * 512), "partition 4 is not all zeros")
+    head, tail = blocks(P3[0], 2048), blocks(P3[0] + P3[1] - 2048, 2048)
+    check("stopped wipe: start overwritten", head != bytes([0x33]) * len(head), "partition 3 was not touched")
+    check("stopped wipe: end untouched", tail == bytes([0x33]) * len(tail), "the wipe was not stopped")
+    check("other partition untouched", blocks(*P1) == bytes([0x11]) * (P1[1] * 512), "partition 1 changed")
     # the MBR disk as it was: the backup was made before writing
     after = sfdisk_json(mbr)
     check("mbr restored", after == mbr_before, "\n%s\n%s" % (mbr_before, after))

@@ -116,6 +116,10 @@ const char *pt_set_type(PtTable *t, int num, uint8_t mbr_type, const uint8_t typ
 const char *pt_set_name(PtTable *t, int num, const char *name); /* GPT */
 const char *pt_set_active(PtTable *t, int num, bool on);      /* MBR: at most one */
 PtPart *pt_find(PtTable *t, int num);
+/* Whether partition NUM may be wiped now: not the extended one (its logical
+ * partitions and their records are inside), and only while the table on the
+ * screen is the one on the disk. NULL or the reason. */
+const char *pt_can_wipe(PtTable *t, int num);
 
 /* ---- writing (ptwrite.c) ---- */
 
@@ -129,5 +133,13 @@ int pt_write(const PtDev *dev, const PtTable *t);
  * disk and writes it back. */
 int pt_backup(const PtDev *dev, const PtTable *t, uint8_t **data, size_t *len);
 const char *pt_restore(const PtDev *dev, const uint8_t *data, size_t len);
+
+/* Wipe: overwrites COUNT blocks from START twice, with random data and then
+ * with zeros. PROGRESS is called before the first chunk of each pass and
+ * after every chunk, with the pass (1 or 2) and the blocks done in it; when
+ * it returns false the wipe stops. Returns 0, PAL_EABORT when stopped, or
+ * the error of the write that failed. */
+typedef bool (*PtProgressFn)(void *ctx, int pass, uint64_t done, uint64_t total);
+int pt_wipe(const PtDev *dev, uint64_t start, uint64_t count, PtProgressFn progress, void *ctx);
 
 #endif

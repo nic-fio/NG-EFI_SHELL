@@ -70,11 +70,11 @@ the platform layer.</p>
       (<code>PtDev</code>). The same code runs on a UEFI block device and, in the tests, on a disk image file, where
       <code>sfdisk</code> and <code>parted</code> check every table it writes.</li>
   <li><strong>Nothing is written until Write.</strong> Every change is made on a <code>PtTable</code> in memory; only
-      <code>pt_write</code> and <code>pt_restore</code> write to a disk (decision D21).</li>
+      <code>pt_write</code>, <code>pt_restore</code> and <code>pt_wipe</code> write to a disk (decision D21).</li>
   <li><strong>Protection at the lowest level.</strong> The disk partmgr was started from, and a write-protected one, get
       no write function at all: no mistake in the interface can write them.</li>
-  <li><strong>Only the table.</strong> partmgr never writes inside a partition. The blocks it writes are the MBR, the
-      extended boot records and the GPT headers and arrays.</li>
+  <li><strong>Only the table — or a wipe.</strong> The blocks partmgr writes are the MBR, the extended boot records and
+      the GPT headers and arrays. The only write inside a partition is a wipe, of exactly that partition's blocks.</li>
   <li><strong>Damage is shown, not hidden.</strong> A damaged table is read as far as possible and explained with
       <em>notes</em>; writing a table always writes a clean and complete one.</li>
   <li><strong>One project with NESH.</strong> Same repository, same release, same platform layer, same disk names; no
@@ -85,8 +85,8 @@ the platform layer.</p>
 <table>
   <thead><tr><th>Area</th><th>Directory</th><th>Lines</th><th>Content</th></tr></thead>
   <tbody>
-    <tr><td>partmgr</td><td><code>src/partmgr</code></td><td>2,841</td><td>table code, the UEFI program, the screens</td></tr>
-    <tr><td>Tests</td><td><code>tests/partmgr</code></td><td>1,229</td><td>the Linux test tool, the table tests, the QEMU test</td></tr>
+    <tr><td>partmgr</td><td><code>src/partmgr</code></td><td>3,034</td><td>table code, the UEFI program, the screens</td></tr>
+    <tr><td>Tests</td><td><code>tests/partmgr</code></td><td>1,397</td><td>the Linux test tool, the table tests, the QEMU test</td></tr>
   </tbody>
 </table>
 <p><code>partmgr.efi</code> is about 67 KB. As in the NESH manual, the line counts here and in the
@@ -102,7 +102,7 @@ the platform layer.</p>
     <tr><td><code>src/partmgr/ptable.h</code>, <code>ptint.h</code></td><td>The interface of the table code; little-endian helpers.</td></tr>
     <tr><td><code>src/partmgr/ptable.c</code></td><td>Reading GPT and MBR; type names.</td></tr>
     <tr><td><code>src/partmgr/ptedit.c</code></td><td>Changes in memory and free space.</td></tr>
-    <tr><td><code>src/partmgr/ptwrite.c</code></td><td>Writing tables; backup and restore.</td></tr>
+    <tr><td><code>src/partmgr/ptwrite.c</code></td><td>Writing tables; backup and restore; wipe.</td></tr>
     <tr><td><code>src/partmgr/units.c</code></td><td>Sizes as the user writes and reads them.</td></tr>
     <tr><td><code>src/partmgr/disks_efi.c</code>, <code>disks.h</code></td><td>The disks of the machine through block I/O.</td></tr>
     <tr><td><code>src/partmgr/ui.c</code>, <code>ui.h</code></td><td>Drawing and dialogs.</td></tr>
@@ -415,6 +415,38 @@ no data left over. It reads the current table, writes the extents, and — when 
 gives back the same blocks (the tests compare the images byte for byte).</p>
 
 <!-- ===================================================================== -->
+<h2 id="wipe">Wipe</h2>
+
+<h3 id="pt-wipe" data-index="pt_wipe;xoshiro256**">The engine: pt_wipe</h3>
+<pre class="code" data-lang="c" data-title="src/partmgr/ptable.h">typedef bool (*PtProgressFn)(void *ctx, int pass, uint64_t done, uint64_t total);
+int pt_wipe(const PtDev *dev, uint64_t start, uint64_t count, PtProgressFn progress, void *ctx);</pre>
+<p><code>pt_wipe</code> overwrites <code>count</code> blocks from <code>start</code> in two passes — random data, then zeros —
+in chunks of 4 MiB (the last one shorter). The random data comes from xoshiro256**, seeded with 32 bytes from
+<code>dev-&gt;random</code>: the aim is to overwrite every byte with data that has no relation to the old contents, not to be
+unpredictable, and a fast generator keeps the pass at disk speed. The buffer is filled again for every chunk, so no two
+chunks are alike.</p>
+<p>The progress function is called before the first chunk of each pass (<code>done</code> = 0) and after every chunk, with
+the pass and the blocks done in it. When it returns <code>false</code> the wipe stops and returns
+<code>PAL_EABORT</code>; a failed write stops it with that write's error. A disk without a write function gets
+<code>PAL_EROFS</code>, a range outside the disk <code>PAL_EINVAL</code>.</p>
+
+<h3 id="pt-can-wipe" data-index="pt_can_wipe">The rules: pt_can_wipe</h3>
+<p><code>pt_can_wipe</code> (in <code>ptedit.c</code>) refuses the extended partition of an MBR — its blocks hold the logical
+partitions and the chain of their records — and every partition while the table has unwritten changes, when the
+position on the screen may not be the one on the disk. A logical partition is wiped from its first block to its last:
+its record lies before it and is not touched.</p>
+
+<h3 id="wipe-ui" data-index="wipe_progress;draw_wipe">Progress on the screen</h3>
+<p><code>wipe_partition</code> in <code>diskview.c</code> checks <code>may_change</code> and <code>pt_can_wipe</code>, shows the
+red warning (with the note about flash drives instead of the backup hint) and calls <code>pt_wipe</code> with
+<code>wipe_progress</code>. That function polls the keyboard without waiting; <kbd>Esc</kbd> asks with
+<code>ui_yesno</code> and a yes returns <code>false</code>. It redraws the box at the start and end of each pass and at most
+five times a second in between (<code>draw_wipe</code>): pass, a bar of <code>&#9608;</code> and <code>&#9617;</code>, the
+percentage of the pass, the amount written in it, the speed over both passes so far and the time left for both
+(<code>fmt_time</code>), estimated after half a second. Nothing else is drawn during the wipe, so the console keeps up with
+the disk.</p>
+
+<!-- ===================================================================== -->
 <h2 id="program">The UEFI program</h2>
 
 <h3 id="disks" data-index="pm_disks;boot disk;blkN">Finding the disks: disks_efi.c</h3>
@@ -441,8 +473,8 @@ white on red: every operation that destroys data uses them.</p>
 selection and the message line. Every action follows the same pattern: <code>may_change</code> refuses on the boot disk
 and read-only media; dialogs collect the input; one <code>pt_*</code> call changes the table and returns a message on
 refusal; <code>build_rows</code> and <code>say</code> update the screen. Only three functions reach the disk:
-<code>write_table</code> (Write), <code>restore</code> and <code>backup</code> (which only reads it); the first two go
-through <code>confirm_destroy</code>, the red warning that wants the disk name typed. After writing, the table is read
+<code>write_table</code> (Write), <code>restore</code>, <code>wipe_partition</code> and <code>backup</code> (which only reads it);
+the first three go through <code>confirm_destroy</code>, the red warning that wants the disk name typed. After writing, the table is read
 back from the disk, so the screen shows what the disk holds.</p>
 
 <h3 id="units" data-index="pm_parse_size;pm_fmt_size">Sizes: units.c</h3>
@@ -466,7 +498,9 @@ $ build/tests/pttool disk.img backup table.bin
 $ build/tests/pttool disk.img -b 4096 size 1.5G</pre>
 <p>Commands: <code>new gpt|mbr|none</code>, <code>add primary|logical START SIZE TYPE NAME</code>, <code>del</code>,
 <code>type</code>, <code>name</code>, <code>active</code>, <code>free</code>, <code>write</code>, <code>reread</code>,
-<code>backup</code>, <code>restore</code>, <code>size</code>. An error prints <code>error=MESSAGE</code> and exits with 1.</p>
+<code>backup</code>, <code>restore</code>, <code>size</code>, and <code>wipe N [PASS CALL]</code>, which wipes partition N and, with
+PASS and CALL, stops when the progress function is called for the CALL-th time in pass PASS — as if Esc had been
+pressed. An error prints <code>error=MESSAGE</code> and exits with 1.</p>
 
 <h3 id="table-tests" data-index="run-tests.py">The table tests</h3>
 <p><code>tests/partmgr/run-tests.py</code>, run by <code>make test</code>:</p>
@@ -486,9 +520,15 @@ $ build/tests/pttool disk.img -b 4096 size 1.5G</pre>
       chain, the link sizes) — and agrees with the MBRs sfdisk writes.</li>
   <li><strong>Backups</strong> are restored over a changed disk, which must equal the original byte for byte; backups
       of another disk, damaged ones, and disks without a table are refused.</li>
+  <li><strong>Wipe.</strong> Partitions hold known patterns; a wipe must leave its partition all zeros (also when its size
+      is not a whole number of chunks, and with 4096-byte blocks), the neighbours, the table and — for a logical
+      partition — the chain untouched, and call the progress function once per chunk in order. Stopped when pass 2
+      starts, the partition must hold random data everywhere (every block different, all byte values); stopped after
+      the first chunk, only that chunk may have changed. The extended partition and a table with changes are refused.</li>
 </ul>
 <p>The tests were checked by breaking the code on purpose — logical numbering, sizes off by one, the boot flag, the
-backup GPT's CRC, the link sizes of the chain, the CHS heads: each break fails them. Where <code>sfdisk</code> lacks
+backup GPT's CRC, the link sizes of the chain, the CHS heads, a wipe with one pass only or written one block off:
+each break fails them. Where <code>sfdisk</code> lacks
 <code>--sector-size</code> (util-linux 2.39, the version of Ubuntu 24.04 and of CI) the 4096-byte comparisons are skipped
 and the script says <code>SKIPPED</code>.</p>
 
@@ -503,9 +543,13 @@ message line under them.</p>
   <li><strong>Looking:</strong> the list (names as in NESH's map, the boot disk marked), every row of both disks, the
       return to NESH, and the disks identical byte for byte.</li>
   <li><strong>Changing:</strong> the boot disk refuses; on the GPT disk a new partition (start, size, type, name), a
-      rename, a delete, <kbd>Esc</kbd> asking, a wrong disk name refused, Write; on the MBR disk a logical partition
-      (renumbering the next one), the active flag, a backup to a writable FAT disk, Write, delete the table, restore.
-      Then, outside QEMU, sfdisk must find the GPT disk exactly as asked and the MBR disk exactly as before.</li>
+      rename, a delete, <kbd>Esc</kbd> asking, a wrong disk name refused, Write; a wipe of the new partition, with both
+      passes and the amount on the console, and a wipe of a bigger one stopped with <kbd>Esc</kbd> (the GPT disk's
+      writes are slowed to 60 MB/s with QEMU's <code>throttling.bps-write</code>, so that there is time to press it); on
+      the MBR disk a logical partition (renumbering the next one), the active flag, a backup to a writable FAT disk,
+      Write, delete the table, restore. Then, outside QEMU, sfdisk must find the GPT disk exactly as asked and the MBR
+      disk exactly as before, and the data must be right: the wiped partition all zeros, the stopped one changed at its
+      start and not at its end, the others untouched.</li>
 </ol>
 
 <!-- ===================================================================== -->
@@ -538,7 +582,8 @@ name matters.</p>
   <li>The code style, English texts and help rules of NESH apply (see the NESH developer manual).</li>
   <li><em>Delete</em> a partition: remove it from the table. <em>Wipe</em>: destroy its contents. The code, the texts and
       the manuals never use one for the other.</li>
-  <li>Blocks are written only in <code>ptwrite.c</code>, and only by <code>pt_write</code> and <code>pt_restore</code>.</li>
+  <li>Blocks are written only in <code>ptwrite.c</code>, and only by <code>pt_write</code>, <code>pt_restore</code> and
+      <code>pt_wipe</code>.</li>
   <li>Messages for the user are sentences without a capital or a full stop at the end when they come from the table code
       (<code>pt_add</code> and friends); the screen puts them in dialogs as they are.</li>
   <li>Line counts in this manual are generated: run <code>make docs</code> after changing a file.</li>
@@ -551,21 +596,21 @@ name matters.</p>
   <tbody>
     <tr><td><code>src/partmgr/disks.h</code></td><td>23</td><td>A disk as the table code sees it (name, kind, size, boot disk, read and write functions)</td></tr>
     <tr><td><code>src/partmgr/disks_efi.c</code></td><td>173</td><td>Finds the whole disks through block I/O, numbered as NESH's map; recognises the disk partmgr was started from; random numbers from EFI_RNG_PROTOCOL</td></tr>
-    <tr><td><code>src/partmgr/diskview.c</code></td><td>725</td><td>The screen of one disk: rows, keys, every action, Write, backup and restore</td></tr>
+    <tr><td><code>src/partmgr/diskview.c</code></td><td>833</td><td>The screen of one disk: rows, keys, every action, Write, backup and restore, the wipe and its progress</td></tr>
     <tr><td><code>src/partmgr/main.c</code></td><td>78</td><td>app_main and the list of disks</td></tr>
     <tr><td><code>src/partmgr/partmgr.h</code></td><td>17</td><td>What the screens share: version, table names, the disk screen</td></tr>
     <tr><td><code>src/partmgr/ptable.c</code></td><td>402</td><td>Reads GPT (both copies checked, the backup used when the primary is damaged) and MBR tables, extended and logical partitions included; partition type names and the list to choose from</td></tr>
-    <tr><td><code>src/partmgr/ptable.h</code></td><td>133</td><td>The description of a disk's partition table and the functions that read, change and write it</td></tr>
-    <tr><td><code>src/partmgr/ptedit.c</code></td><td>420</td><td>Changes to a table in memory (new table, add, delete, type, name, active flag) and the free areas, with the rules for logical partitions and their boot records</td></tr>
+    <tr><td><code>src/partmgr/ptable.h</code></td><td>145</td><td>The description of a disk's partition table and the functions that read, change and write it</td></tr>
+    <tr><td><code>src/partmgr/ptedit.c</code></td><td>432</td><td>Changes to a table in memory (new table, add, delete, type, name, active flag) and the free areas, with the rules for logical partitions and their boot records</td></tr>
     <tr><td><code>src/partmgr/ptint.h</code></td><td>22</td><td>Internals: little-endian fields, extended partition types</td></tr>
-    <tr><td><code>src/partmgr/ptwrite.c</code></td><td>408</td><td>Writing GPT (both copies, protective MBR) and MBR (chain of logical partitions, CHS fields), deleting a table, backup files and restore</td></tr>
+    <tr><td><code>src/partmgr/ptwrite.c</code></td><td>469</td><td>Writing GPT (both copies, protective MBR) and MBR (chain of logical partitions, CHS fields), deleting a table, backup files and restore, wipe</td></tr>
     <tr><td><code>src/partmgr/ui.c</code></td><td>280</td><td>Drawing on the text console and the dialogs: messages, questions, text fields, menus</td></tr>
     <tr><td><code>src/partmgr/ui.h</code></td><td>34</td><td>The drawing and dialog functions, the EFI colours</td></tr>
     <tr><td><code>src/partmgr/units.c</code></td><td>106</td><td>Sizes as the user writes and reads them</td></tr>
     <tr><td><code>src/partmgr/units.h</code></td><td>20</td><td>Size parsing and formatting</td></tr>
-    <tr><td><code>tests/partmgr/pttool.c</code></td><td>223</td><td>Drives the table code on a disk image file: reads, changes, writes, backs up, restores, parses sizes (Linux only)</td></tr>
-    <tr><td><code>tests/partmgr/qemu-test.py</code></td><td>317</td><td>partmgr.efi in QEMU/OVMF: started from NESH, driven with keys, checked on the serial console and with sfdisk afterwards</td></tr>
-    <tr><td><code>tests/partmgr/run-tests.py</code></td><td>689</td><td>The table tests: the reader and the writer compared with sfdisk and parted, damaged images, sizes, backups restored byte for byte</td></tr>
+    <tr><td><code>tests/partmgr/pttool.c</code></td><td>257</td><td>Drives the table code on a disk image file: reads, changes, writes, backs up, restores, parses sizes (Linux only)</td></tr>
+    <tr><td><code>tests/partmgr/qemu-test.py</code></td><td>361</td><td>partmgr.efi in QEMU/OVMF: started from NESH, driven with keys, checked on the serial console and with sfdisk afterwards</td></tr>
+    <tr><td><code>tests/partmgr/run-tests.py</code></td><td>779</td><td>The table tests: the reader and the writer compared with sfdisk and parted, damaged images, sizes, backups restored byte for byte</td></tr>
   </tbody>
 </table>
 

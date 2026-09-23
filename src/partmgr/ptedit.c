@@ -400,6 +400,18 @@ const char *pt_set_name(PtTable *t, int num, const char *name)
     return NULL;
 }
 
+const char *pt_can_wipe(PtTable *t, int num)
+{
+    PtPart *p = pt_find(t, num);
+    if (!p)
+        return "there is no such partition";
+    if (t->changed)
+        return "the table has changes not written: write them or leave the disk first";
+    if (p->role == PT_EXTENDED)
+        return "the extended partition holds the logical partitions: wipe them one by one";
+    return NULL;
+}
+
 const char *pt_set_active(PtTable *t, int num, bool on)
 {
     PtPart *p = pt_find(t, num);

@@ -15,6 +15,9 @@
  *     reread                        read the table again from the image
  *     backup FILE | restore FILE
  *     size TEXT                     how the screens read a size (units.c)
+ *     wipe N [STOP-PASS STOP-CALL]  wipe partition N; stop when the progress
+ *                                   function is called for the STOP-CALL-th
+ *                                   time in pass STOP-PASS (as if Esc)
  */
 #include "../../src/partmgr/ptable.h"
 #include "../../src/partmgr/units.h"
@@ -97,6 +100,25 @@ static void dump(const PtTable *t)
     }
     for (int i = 0; i < t->nnotes; i++)
         printf("note=%s\n", t->notes[i]);
+}
+
+typedef struct {
+    int stop_pass, stop_call, calls[3];
+    uint64_t last;
+    bool ordered;
+} Wipe;
+
+static bool wipe_progress(void *ctx, int pass, uint64_t done, uint64_t total)
+{
+    Wipe *w = ctx;
+    /* in each pass: 0 first, then growing up to total */
+    if (done == 0)
+        w->last = 0;
+    else if (done <= w->last || done > total)
+        w->ordered = false;
+    w->last = done;
+    w->calls[pass]++;
+    return !(pass == w->stop_pass && w->calls[pass] == w->stop_call);
 }
 
 static void type_arg(const PtTable *t, const char *s, uint8_t *mbr, uint8_t guid[16])
@@ -197,6 +219,18 @@ int main(int argc, char **argv)
                 printf("size bytes=%llu rest=%s fmt=%s exact=%s\n", (unsigned long long)bytes, rest ? "yes" : "no",
                        f, e);
             continue;
+        } else if (!strcmp(c, "wipe")) {
+            int n = atoi(ARG());
+            Wipe w = { 0, 0, { 0 }, 0, true };
+            if (a + 1 < argc && isdigit((unsigned char)argv[a][0]) && isdigit((unsigned char)argv[a + 1][0])) {
+                w.stop_pass = atoi(argv[a++]);
+                w.stop_call = atoi(argv[a++]);
+            }
+            check(pt_can_wipe(&t, n));
+            PtPart *p = pt_find(&t, n);
+            int rc = pt_wipe(&dev, p->start, p->size, wipe_progress, &w);
+            printf("wipe rc=%s pass1=%d pass2=%d ordered=%s\n", rc == PAL_EABORT ? "stopped" : rc ? "error" : "ok",
+                   w.calls[1], w.calls[2], w.ordered ? "yes" : "no");
         } else if (!strcmp(c, "restore")) {
             FILE *in = fopen(ARG(), "rb");
             if (!in)

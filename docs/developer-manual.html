@@ -88,7 +88,7 @@ explained where they are needed, and the <a href="#glossary">glossary</a> summar
     <tr><td>Portable commands</td><td><code>src/cmd</code></td><td>3,336</td><td>files, text, utilities, editors</td></tr>
     <tr><td>UEFI modules</td><td><code>src/platform/efi</code></td><td>10,215</td><td>shell protocol, variables, boot, drivers, disks, hardware, network</td></tr>
     <tr><td>UEFI definitions</td><td><code>include</code></td><td>734</td><td>UEFI types and protocols used by NESH</td></tr>
-    <tr><td>Tools and tests</td><td><code>tools</code>, <code>tests</code></td><td>4,351</td><td>ELF→PE converter, QEMU runner, doc generators, test scripts</td></tr>
+    <tr><td>Tools and tests</td><td><code>tools</code>, <code>tests</code></td><td>4,519</td><td>ELF→PE converter, QEMU runner, doc generators, test scripts</td></tr>
   </tbody>
 </table>
 <p>The resulting <code>nesh.efi</code> is about 360 KB. The line counts here and in the
@@ -114,12 +114,10 @@ without a row in the map fails as well.</p>
     <tr><td><code>src/basic/</code></td><td><code>lexer.c</code>, <code>parser.c</code>, <code>interp.c</code>, <code>bfuncs.c</code>, <code>basic.h</code>, <code>interp_int.h</code>.</td></tr>
     <tr><td><code>src/cmd/</code></td><td>Portable commands: <code>cmd_core.c</code> (help, ver, echo…), <code>cmd_fs.c</code> (files, map…), <code>cmd_text.c</code>,
         <code>cmd_util.c</code>, <code>cmd_edit.c</code> (edit, hexedit).</td></tr>
-    <tr><td><code>src/partmgr/</code></td><td><code>partmgr.efi</code>, the partition manager of the project (decision D21): a separate
-        program, described in its own <a href="partmgr-developer-manual.html">technical manual</a>.</td></tr>
     <tr><td><code>src/platform/efi/</code></td><td>UEFI-only modules (see <a href="#efi-modules">UEFI modules</a>).</td></tr>
     <tr><td><code>src/platform/host.c</code></td><td>Stubs of the platform hooks for the Linux build.</td></tr>
     <tr><td><code>tools/</code></td><td><code>efi.lds</code>, <code>elf2efi.py</code>, <code>run-qemu.sh</code>, <code>gen-docs.py</code>, <code>check-doc-examples.py</code>, <code>mkusb.sh</code>, <code>record-demo.py</code>, <code>setup-dev.sh</code>, <code>backup.sh</code>.</td></tr>
-    <tr><td><code>tests/</code></td><td><code>host/*.nsb</code> + <code>.out</code> (Linux tests), <code>efi/*.nsb</code> (QEMU tests), <code>apps/shelltest.c</code>, <code>partmgr/</code> (partmgr tests, on Linux and in QEMU),
+    <tr><td><code>tests/</code></td><td><code>host/*.nsb</code> + <code>.out</code> (Linux tests), <code>efi/*.nsb</code> (QEMU tests), <code>apps/shelltest.c</code>,
         <code>fixtures/</code> (EDK2 test binaries).</td></tr>
     <tr><td><code>examples/</code></td><td>Example scripts shipped with NESH.</td></tr>
     <tr><td><code>docs/</code></td><td>This manual, the user manual, <code>decisions-and-history.md</code>, <code>assets/</code> (CSS, JS, Mermaid).</td></tr>
@@ -134,7 +132,6 @@ without a row in the map fails as well.</p>
     <tr><td>Python 3</td><td><code>elf2efi.py</code> and the documentation tools.</td></tr>
     <tr><td>QEMU (<code>qemu-system-x86_64</code>) and OVMF</td><td>UEFI tests. <code>OVMF=</code> selects the firmware image, a single-file <code>OVMF.fd</code> (default: the first of <code>/usr/share/ovmf/OVMF.fd</code> and <code>/usr/share/OVMF/OVMF.fd</code> that exists).</td></tr>
     <tr><td><code>mkfs.fat</code> (dosfstools)</td><td>The writable test disk of the QEMU runs.</td></tr>
-    <tr><td><code>sfdisk</code> (fdisk)</td><td>The partition table tests: it builds the disk images and is the reference the reader is compared with.</td></tr>
   </tbody>
 </table>
 
@@ -142,13 +139,12 @@ without a row in the map fails as well.</p>
 <table>
   <thead><tr><th>Target</th><th>Does</th></tr></thead>
   <tbody>
-    <tr><td><code>make</code></td><td>Builds <code>build/nesh.efi</code>, <code>build/partmgr.efi</code> and <code>build/nesh-host</code> (Linux build with AddressSanitizer and UBSan).</td></tr>
-    <tr><td><code>make test</code></td><td>Host tests, partition table tests, documentation consistency check, manual examples.</td></tr>
+    <tr><td><code>make</code></td><td>Builds <code>build/nesh.efi</code> and <code>build/nesh-host</code> (Linux build with AddressSanitizer and UBSan).</td></tr>
+    <tr><td><code>make test</code></td><td>Host tests, documentation consistency check, manual examples.</td></tr>
     <tr><td><code>make qemu</code></td><td>Boots NESH in QEMU with a serial console, interactively.</td></tr>
     <tr><td><code>make qemu-test</code></td><td>Runs <code>tests/efi/run.nsb</code> inside QEMU and checks the result.</td></tr>
     <tr><td><code>make qemu-nettest</code></td><td>Network tests (IPv4 and IPv6) inside QEMU with user networking.</td></tr>
     <tr><td><code>make qemu-sbtest</code></td><td>Secure Boot tests inside QEMU with test keys (see <a href="#sbtest">Secure Boot tests</a>).</td></tr>
-    <tr><td><code>make qemu-partmgr</code></td><td><code>partmgr.efi</code> started from NESH inside QEMU on test disks (see <a href="#partmgr-tests">partmgr tests</a>).</td></tr>
     <tr><td><code>make docs</code></td><td>Regenerates the command reference of the user manual from the help texts.</td></tr>
     <tr><td><code>make clean</code></td><td>Removes <code>build/</code>.</td></tr>
   </tbody>
@@ -233,8 +229,8 @@ sequenceDiagram
 Second, when NESH exits nothing may keep pointing into its image: <code>efi_exit_hook</code> uninstalls (or restores) the
 shell protocol.</p>
 <p>The platform layer does not know which program it starts: it calls <code>app_main</code> and names the program
-<code>app_name</code> in fatal errors. NESH defines both in <code>src/core/shell.c</code>; <code>partmgr.efi</code>, linked with
-the same <code>pal_efi.c</code>, defines its own in <code>src/partmgr/main.c</code>.</p>
+<code>app_name</code> in fatal errors. NESH defines both in <code>src/core/shell.c</code>; any other program linked with
+<code>pal_efi.c</code> defines its own.</p>
 <pre class="code" data-lang="c" data-title="src/pal/pal_efi.c">EFI_STATUS EFIAPI efi_main(EFI_HANDLE image, EFI_SYSTEM_TABLE *st)
 {
     gImage = image;
@@ -894,16 +890,12 @@ documentation checks, and QEMU tests for everything that needs firmware.</p>
 flowchart LR
   subgraph T1["make test (seconds)"]
     H["tests/host/*.nsb&lt;br/&gt;vs *.out"]
-    P["tests/partmgr&lt;br/&gt;vs sfdisk, parted"]
     G["gen-docs.py --check"]
     X["check-doc-examples.py"]
   end
   subgraph T2["make qemu-test (~1 min)"]
     Q["tests/efi/run.nsb&lt;br/&gt;in OVMF"]
     SA["shelltest.efi&lt;br/&gt;EDK2 apps"]
-  end
-  subgraph T4["make qemu-partmgr"]
-    PM["partmgr.efi&lt;br/&gt;on test disks"]
   end
   subgraph T3["make qemu-nettest"]
     N["tests/efi/net.nsb&lt;br/&gt;IPv4 + IPv6"]
@@ -917,12 +909,6 @@ flowchart LR
 <code>NESH_FS=.</code> and the arguments <code>arg1 "arg two"</code>, and compares stdout+stderr and the exit code with
 <code>NAME.out</code>. <code>UPDATE=1</code> rewrites the <code>.out</code> files — review the diff before committing. The host build uses
 AddressSanitizer and UBSan, so memory errors and undefined behavior make tests fail loudly.</p>
-
-<h3 id="partmgr-tests">partmgr tests</h3>
-<p><code>make test</code> also runs the partition table tests of <code>partmgr.efi</code>
-(<code>tests/partmgr/run-tests.py</code>, against <code>sfdisk</code> and <code>parted</code>), and <code>make qemu-partmgr</code>
-runs partmgr inside QEMU. Both are described in the <a href="partmgr-developer-manual.html#testing">partmgr technical
-manual</a>.</p>
 
 <h3 id="qemu-tests">QEMU tests</h3>
 <p><code>tools/run-qemu.sh --test</code> builds a virtual FAT disk (<code>build/esp</code>, read-only, becomes <code>fs0:</code>) with

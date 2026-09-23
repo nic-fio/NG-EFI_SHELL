@@ -463,5 +463,5 @@ listing), `bootmgr scan`, and the language's `ON ERROR`.
 | `https` | Needs a TLS driver in the firmware; untested. Host names in `http` URLs (DNS) are untested. |
 | UEFI Shell options not supported | `time -tz/-d`; `-l LANG` of `devices`/`devtree` is accepted and ignored. |
 | Not implemented | See "The original plan" above. |
-| `partmgr.efi` | In progress (D21). Done and tested: reading, changing and writing GPT and MBR tables, backup and restore (on Linux with disk images, compared with sfdisk and parted), and a first `partmgr.efi` that lists the disks and shows their partitions, tested in QEMU. Still to do: the changes in the interface, Write, the wipe, the user manual, shipping it in the release. |
+| `partmgr.efi` | In progress (D21). Done and tested: reading, changing and writing GPT and MBR tables, backup and restore, the wipe with its progress bar (on Linux with disk images, compared with sfdisk and parted), and the full-screen program with every change, Write and the wipe, tested in QEMU; its user and technical manuals. Still to do: shipping it in the release and in `nesh-usb.img`, and trying it on real hardware. |
 | License | Settled: Apache 2.0 with the Commons Clause (see D20). Not "open source" by the OSI definition, so some distributions and catalogues will not accept the project. Commercial licences are granted on request. |

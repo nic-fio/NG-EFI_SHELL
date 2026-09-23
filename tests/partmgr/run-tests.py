@@ -459,6 +459,96 @@ try:
         r = size("%dB" % n)
         check("format %d" % n, r.get("fmt") == fmt and r.get("exact") == exact, str(r))
 
+    # ================================================================ wipe
+
+    def fill(path, start, count, byte, bsize=512):
+        with open(path, "r+b") as f:
+            f.seek(start * bsize)
+            f.write(bytes([byte]) * (count * bsize))
+
+    def region(path, start, count, bsize=512):
+        return read(path, start * bsize, count * bsize)
+
+    def wipe(path, *args, bsize=512):
+        out = subprocess.run([PTTOOL, path] + (["-b", str(bsize)] if bsize != 512 else []) + ["wipe"] +
+                             [str(x) for x in args], capture_output=True, text=True)
+        line = next((l for l in out.stdout.splitlines() if l.startswith(("wipe ", "error="))), "")
+        if line.startswith("error="):
+            return {"error": line[6:]}
+        return dict(kv.split("=") for kv in line[5:].split())
+
+    def chunks(blocks, bsize=512):
+        return -(-blocks * bsize // (4 * 1024 * 1024))
+
+    # a GPT disk whose partitions hold patterns; partition 2 is not a whole number of 4 MiB chunks
+    wp = image("wipe-gpt", 64, "label: gpt\nsize=10M, type=L\nsize=20483, type=L\ntype=L\n")
+    parts = {p["num"]: (int(p["start"]), int(p["size"])) for p in ptdump(wp)["parts"]}
+    for n, byte in (("1", 0x11), ("2", 0x22), ("3", 0x33)):
+        fill(wp, *parts[n], byte)
+    table = sfdisk_json(wp)
+    before = {n: region(wp, *parts[n]) for n in parts}
+    base = os.path.join(WORK, "wipe-base.img")
+    copy(wp, base)
+
+    r = wipe(wp, 2)
+    n2 = chunks(parts["2"][1])
+    check("wipe", r.get("rc") == "ok" and r.get("ordered") == "yes", str(r))
+    check("wipe progress", r.get("pass1") == str(n2 + 1) and r.get("pass2") == str(n2 + 1), str(r))
+    check("wipe zeros", region(wp, *parts["2"]) == bytes(parts["2"][1] * 512), "partition 2 is not all zeros")
+    check("wipe neighbours", region(wp, *parts["1"]) == before["1"] and region(wp, *parts["3"]) == before["3"],
+          "a neighbour changed")
+    check("wipe table", sfdisk_json(wp) == table, "the table changed")
+    sfdisk_verify("wipe", wp)
+
+    # stopped when pass 2 starts: partition 2 holds random data
+    copy(base, wp)
+    r = wipe(wp, 2, 2, 1)
+    data = region(wp, *parts["2"])
+    blocks = [data[i:i + 512] for i in range(0, len(data), 512)]
+    check("wipe stopped", r.get("rc") == "stopped" and r.get("pass2") == "1", str(r))
+    check("pass 1 is random", len(set(data)) == 256 and all(len(set(b)) > 100 for b in blocks) and
+          len(set(blocks)) == len(blocks), "pass 1 did not write random data everywhere")
+    check("pass 1 neighbours", region(wp, *parts["1"]) == before["1"] and region(wp, *parts["3"]) == before["3"], "")
+
+    # stopped after the first chunk of pass 1: only that chunk changed
+    copy(base, wp)
+    r = wipe(wp, 2, 1, 2)
+    per = 4 * 1024 * 1024 // 512
+    check("wipe stopped early", r.get("rc") == "stopped" and r.get("pass1") == "2", str(r))
+    check("first chunk written", b"\x22" * 512 not in region(wp, parts["2"][0], per), "")
+    check("rest untouched", region(wp, parts["2"][0] + per, parts["2"][1] - per) ==
+          bytes([0x22]) * ((parts["2"][1] - per) * 512), "blocks after the first chunk changed")
+
+    # refusals: changes not written, the extended partition
+    msg = subprocess.run([PTTOOL, wp, "name", "1", "x", "wipe", "1"], capture_output=True, text=True).stdout
+    check("refuse wipe with changes", "changes not written" in msg, msg)
+    wm2 = os.path.join(WORK, "wipe-mbr.img")
+    copy(me, wm2)
+    for p in ptdump(wm2)["parts"]:
+        fill(wm2, int(p["start"]) + (1 if p["role"] == "extended" else 0), 8, 0x44)  # something in each
+    mtable = sfdisk_json(wm2)
+    msg = wipe(wm2, 2).get("error", "")
+    check("refuse wipe of the extended partition", "extended partition" in msg, msg)
+
+    # a logical partition: its range only; the chain of records stays
+    log5 = next(p for p in ptdump(wm2)["parts"] if p["num"] == "5")
+    s5, n5 = int(log5["start"]), int(log5["size"])
+    after5 = region(wm2, s5 + n5, 2048)
+    r = wipe(wm2, 5)
+    check("wipe logical", r.get("rc") == "ok" and region(wm2, s5, n5) == bytes(n5 * 512), str(r))
+    check("wipe logical chain", sfdisk_json(wm2) == mtable and region(wm2, s5 + n5, 2048) == after5,
+          "the chain or the next blocks changed")
+    mbr_structure("wipe logical", wm2)
+
+    # 4096-byte blocks
+    w4k = image("wipe-4k", 64)
+    pttool(w4k, "new", "gpt", "add", "primary", 256, 2560, LNX, "-", "write", bsize=4096)
+    fill(w4k, 256, 2560, 0x55, bsize=4096)
+    r = wipe(w4k, 1, bsize=4096)
+    check("wipe 4K", r.get("rc") == "ok" and region(w4k, 256, 2560, bsize=4096) == bytes(2560 * 4096) and
+          r.get("pass1") == str(chunks(2560, 4096) + 1), str(r))
+    check("wipe 4K table", ptdump(w4k, bsize=4096)["primary"] == "ok", "")
+
     # ================================================================ writing
 
     # the independent MBR check agrees with sfdisk's own CHS fields and chains

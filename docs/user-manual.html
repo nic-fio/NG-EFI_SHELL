@@ -507,12 +507,6 @@ Volume fs0: QEMU VVFAT (ro)
      527351808 bytes available on disk
 fs0:\> vol fs1: -n BACKUP</pre>
 
-<h3 id="partitioning" data-index="partitions;partmgr">Partitioning disks: partmgr</h3>
-<p>NESH shows partitions (<code>map</code>, <code>dblk</code>) but does not change partition tables. That is the job of
-<strong>partmgr</strong>, a separate full-screen program of the same project: <code>partmgr.efi</code>, started from NESH like
-any EFI program. It uses the same <code>blkN</code> names as <code>map</code>. See the
-<a href="partmgr-user-manual.html">partmgr user manual</a>.</p>
-
 <h3 id="raw-blocks">Raw blocks: dblk and hexedit</h3>
 <p><code>dblk DEVICE LBA COUNT</code> shows raw disk blocks in hex and recognizes MBR partition tables, GPT headers and
 FAT boot sectors. <code>hexedit -d DEVICE LBA COUNT</code> opens blocks in the hex editor. Numbers are hexadecimal.</p>

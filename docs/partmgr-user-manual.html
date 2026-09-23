@@ -73,6 +73,8 @@ firmware boot menu. It offers:</p>
     <p>Changes are made on the screen; the disk changes only when you choose Write and type its name.</p></div>
   <div class="card"><div class="icon">&#8635;</div><h4>Backup and restore</h4>
     <p>The partition table of a disk saved to a file, and written back exactly as it was.</p></div>
+  <div class="card"><div class="icon">&#9618;</div><h4>Wipe</h4>
+    <p>A partition overwritten twice, random data then zeros, with a progress bar and the time left.</p></div>
   <div class="card"><div class="icon">&#9888;</div><h4>Safe by design</h4>
     <p>The disk partmgr was started from is never written; damaged tables are recognised and explained.</p></div>
   <div class="card"><div class="icon">&#8801;</div><h4>Readable</h4>
@@ -82,13 +84,11 @@ firmware boot menu. It offers:</p>
 </div>
 
 <h3 id="what-it-does-not">What partmgr does not do</h3>
-<p>partmgr works on <strong>partition tables only</strong>. It never touches the data inside a partition, so it does not
-<strong>format</strong> partitions (the firmware or the operating system does that), does not <strong>resize</strong> or
-<strong>move</strong> them, and does not install boot code. Deleting a partition removes it from the table; its data
-stays on the disk until something overwrites it.</p>
-<div class="callout"><span class="callout-title">Coming</span>
-<p><em>Wipe</em> — overwriting the contents of a partition to destroy the data in it, with a progress bar — is
-planned and not in this version.</p></div>
+<p>partmgr works on <strong>partition tables</strong>. It does not <strong>format</strong> partitions (the firmware or the
+operating system does that), does not <strong>resize</strong> or <strong>move</strong> them, and does not install boot code.
+Deleting a partition removes it from the table; its data stays on the disk until something overwrites it.</p>
+<p>The one thing partmgr writes inside a partition is a <a href="#wipe">wipe</a>, and only when asked: it overwrites the
+whole partition so that its data is gone.</p>
 
 <h3 id="partmgr-and-nesh">partmgr and NESH</h3>
 <p>partmgr is a separate program, not a NESH command: <code>nesh.efi</code> stays one file with the shell in it, and
@@ -209,7 +209,7 @@ when the area is inside the extended partition. Only areas of at least 1 MiB are
 Changed rows are yellow, and the title says <em>* = changes not written</em> as long as there is something to write.</p>
 <p>Under the list, <em>Note:</em> lines explain anything unusual partmgr found in the table (see <a href="#notes">What the
 notes mean</a>), and a green or red line reports the result of the last action. The two bars at the bottom show the keys;
-the first one changes with the selected row: <kbd>N</kbd> on free space, <kbd>D</kbd> <kbd>T</kbd> and
+the first one changes with the selected row: <kbd>N</kbd> on free space, <kbd>D</kbd> <kbd>T</kbd> <kbd>W</kbd> and
 <kbd>R</kbd> or <kbd>A</kbd> on a partition.</p>
 
 <figure class="demo">
@@ -341,7 +341,7 @@ says so and writes nothing. There is <strong>no automatic copy</strong> of the o
       no system finds the old GPT.</li>
   <li><strong>No table</strong> (after <kbd>X</kbd>): block 0 and both GPT headers are cleared.</li>
 </ul>
-<p>The data inside the partitions is never touched.</p>
+<p>Write never touches the data inside the partitions.</p>
 
 <h3 id="leaving" data-index="Esc;leaving with changes">Leaving without writing</h3>
 <p><kbd>Esc</kbd> goes back to the list of disks. If there are changes not written, partmgr asks <em>Throw them away?</em>:
@@ -377,6 +377,51 @@ what you wanted, <kbd>S</kbd> brings the old table back — and with it every pa
 data was never touched.</p></div>
 
 <!-- ===================================================================== -->
+<h2 id="wipe">Wiping a partition</h2>
+
+<p class="chapter-intro">Destroying the data of one partition, when the disk goes to someone else or the data must not
+come back.</p>
+
+<h3 id="wipe-how" data-index="W;wipe">Wipe</h3>
+<p>Select the partition and press <kbd>W</kbd>. partmgr shows a red warning with the partition's number, type, size and
+name, and wants the name of the disk typed, as for Write. The wipe then starts <strong>at once</strong>: it is not a
+change of the table, so it does not wait for Write.</p>
+<p>It makes <strong>two passes</strong> over every block of the partition: first <strong>random data</strong>, then
+<strong>zeros</strong>. The random pass leaves nothing of the old contents; the zeros make the partition read as empty
+to every tool afterwards, with no trace of the old file system. The partition stays in the table with its type and
+name: only its contents are gone.</p>
+
+<h3 id="wipe-progress" data-index="progress bar;Esc (wipe)">Progress, and stopping</h3>
+<figure class="demo">
+  <img src="assets/partmgr-wipe.png" width="816" height="608"
+       alt="Wiping blk3 partition 3 (1.0 GiB): pass 1 of 2, random data, the bar at 48 percent, 492.0 MiB of 1.0 GiB, 57.8 MiB/s, about 26 s left">
+  <figcaption>The progress of a wipe: pass, bar, amount, speed and time left.</figcaption>
+</figure>
+<p>While it runs, partmgr shows which pass it is in, a bar with the percentage of the pass, how much of the partition
+the pass has written, the speed, and the time left for both passes (estimated after the first half second). A
+large disk takes time: at 150 MiB/s, a 1 TiB partition takes about four hours for the two passes.</p>
+<p><kbd>Esc</kbd> asks whether to stop. Stopping leaves the partition partly overwritten — its old data is damaged
+either way — and the message line says in which pass it stopped. At the end the message line says how much was
+overwritten and how long it took.</p>
+
+<h3 id="wipe-rules" data-index="wipe rules">What can be wiped</h3>
+<ul>
+  <li>Any partition of a disk that can be changed — not the disk partmgr was started from, not a write-protected one.</li>
+  <li>Not the <strong>extended</strong> partition of an MBR disk: it holds the logical partitions and their tables.
+      Wipe the logical partitions one by one; each wipe covers exactly its partition, and the chain stays intact.</li>
+  <li>Not while the table has <strong>changes not written</strong>: the partition on the screen might not be where it is
+      on the disk yet. Write the changes, or leave the disk and open it again, first.</li>
+</ul>
+
+<h3 id="wipe-flash" data-index="SSD;NVMe;flash drives">SSDs, NVMe drives and USB sticks</h3>
+<div class="callout warning"><span class="callout-title">Overwriting is not enough on flash memory</span>
+<p>An SSD, an NVMe drive or a USB stick does not write new data over the old: to spread the wear, its controller puts it
+in other cells, and keeps spare cells no program can see. After a wipe, copies of the old data can remain inside the
+drive until it reuses those cells. On hard disks with platters a wipe is thorough.</p>
+<p>The complete way to clear a flash drive is its own erase command (ATA Secure Erase, NVMe Sanitize or Format), which
+works on the whole drive, never on one partition, and which partmgr does not issue.</p></div>
+
+<!-- ===================================================================== -->
 <h2 id="safety">Safety and limits</h2>
 
 <p class="chapter-intro">What partmgr refuses, what it cannot do, and why.</p>
@@ -393,7 +438,8 @@ refused with a message. To change the disk partmgr runs from, start partmgr from
     <tr><td>MBR: nothing beyond 2 TiB</td><td>An MBR stores positions in 32 bits. Use GPT.</td></tr>
     <tr><td>One extended partition</td><td>A second one is not part of the MBR scheme; partmgr reads only the first.</td></tr>
     <tr><td>GPT names: 36 characters</td><td>The size of the name field.</td></tr>
-    <tr><td>No resize, move, format</td><td>They change the data inside partitions, which partmgr never touches.</td></tr>
+    <tr><td>No resize, move, format</td><td>They change the data inside partitions, which partmgr touches only to wipe it.</td></tr>
+    <tr><td>Wipe: not the extended partition, not with changes pending</td><td>See <a href="#wipe-rules">What can be wiped</a>.</td></tr>
   </tbody>
 </table>
 
@@ -459,6 +505,7 @@ Write then writes a clean table — which is also how most of these are repaired
     <tr><td><kbd>T</kbd></td><td>disk, on a partition</td><td><a href="#change-type">Change its type</a>.</td></tr>
     <tr><td><kbd>R</kbd></td><td>disk, GPT partition</td><td><a href="#rename">Rename it</a>.</td></tr>
     <tr><td><kbd>A</kbd></td><td>disk, MBR partition</td><td><a href="#active">Active flag</a>.</td></tr>
+    <tr><td><kbd>W</kbd></td><td>disk, on a partition</td><td><a href="#wipe">Wipe it</a> (at once).</td></tr>
     <tr><td><kbd>Z</kbd></td><td>disk</td><td><a href="#new-table">New table</a> (GPT or MBR).</td></tr>
     <tr><td><kbd>X</kbd></td><td>disk</td><td><a href="#delete-table">Delete the table</a>.</td></tr>
     <tr><td><kbd>B</kbd></td><td>disk</td><td><a href="#backup">Backup</a> to a file.</td></tr>

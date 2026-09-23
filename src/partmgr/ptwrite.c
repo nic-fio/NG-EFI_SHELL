@@ -11,6 +11,10 @@
  * of the extended partition. A GPT signature left by an earlier table is
  * wiped, or firmware and Linux would still find the old GPT.
  *
+ * Wipe: two passes over a partition, random data then zeros, in chunks of
+ * 4 MiB. The random data comes from xoshiro256**, seeded from dev->random:
+ * the point is to overwrite every byte, not to be unpredictable.
+ *
  * Backup file: "PARTMGR1", version, block size, disk size, number of extents,
  * then for each extent its first block, its length and the blocks; a CRC-32
  * of everything before it closes the file. All numbers little-endian. */
@@ -405,4 +409,61 @@ const char *pt_restore(const PtDev *d, const uint8_t *data, size_t len)
     }
     pt_free(&cur);
     return err;
+}
+
+/* ---- wipe ---- */
+
+#define WIPE_CHUNK (4u * 1024 * 1024)
+
+static uint64_t rotl(uint64_t x, int k)
+{
+    return (x << k) | (x >> (64 - k));
+}
+
+/* xoshiro256** (Blackman and Vigna) */
+static uint64_t next_random(uint64_t s[4])
+{
+    uint64_t r = rotl(s[1] * 5, 7) * 9, t = s[1] << 17;
+    s[2] ^= s[0];
+    s[3] ^= s[1];
+    s[1] ^= s[2];
+    s[0] ^= s[3];
+    s[2] ^= t;
+    s[3] = rotl(s[3], 45);
+    return r;
+}
+
+int pt_wipe(const PtDev *d, uint64_t start, uint64_t count, PtProgressFn progress, void *ctx)
+{
+    if (!d->write)
+        return PAL_EROFS;
+    if (!count || start >= d->nblocks || count > d->nblocks - start)
+        return PAL_EINVAL;
+    uint32_t per = WIPE_CHUNK / d->bsize; /* blocks per chunk */
+    uint64_t *buf = xmalloc(WIPE_CHUNK);
+    uint64_t seed[4];
+    do
+        d->random(d->ctx, seed, sizeof(seed));
+    while (!(seed[0] | seed[1] | seed[2] | seed[3]));
+    int rc = 0;
+    for (int pass = 1; pass <= 2 && !rc; pass++) {
+        if (pass == 2)
+            memset(buf, 0, WIPE_CHUNK);
+        if (progress && !progress(ctx, pass, 0, count)) {
+            rc = PAL_EABORT;
+            break;
+        }
+        for (uint64_t done = 0; done < count && !rc;) {
+            uint32_t n = (uint32_t)MIN((uint64_t)per, count - done);
+            if (pass == 1)
+                for (size_t i = 0; i < (size_t)n * d->bsize / 8; i++)
+                    buf[i] = next_random(seed);
+            rc = wr(d, start + done, n, buf);
+            done += n;
+            if (!rc && progress && !progress(ctx, pass, done, count))
+                rc = PAL_EABORT;
+        }
+    }
+    free(buf);
+    return rc;
 }

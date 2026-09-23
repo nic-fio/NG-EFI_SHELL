@@ -5,7 +5,7 @@
 #include "con.h"
 
 #define NESH_NAME "NESH"
-#define NESH_VERSION "0.2.0"
+#define NESH_VERSION "0.2.1"
 #define SCRIPT_EXT ".nsb"
 
 /* Exit codes */

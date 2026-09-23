@@ -16,7 +16,7 @@
 <nav class="sidebar" aria-label="Table of contents">
   <div class="brand">
     <div class="brand-logo">{ }</div>
-    <div class="brand-text"><strong>NESH Developer Manual</strong><span>New EFI Shell 0.2.0</span></div>
+    <div class="brand-text"><strong>NESH Developer Manual</strong><span>New EFI Shell 0.2.1</span></div>
   </div>
   <div class="search">
     <input type="search" placeholder="Search  ( / )" aria-label="Search">
@@ -37,7 +37,7 @@
   <p class="lead">Everything a programmer needs to understand, build, test and extend NESH: architecture, build
   pipeline, platform layer, shell core, the BASIC interpreter, the UEFI modules and the project's conventions.</p>
   <div class="meta">
-    <span><b>Version</b> 0.2.0</span>
+    <span><b>Version</b> 0.2.1</span>
     <span><b>Language</b> C (gnu11), Python 3 tools</span>
     <span><b>Size</b> ~23,400 lines of C</span>
     <span><b>Target</b> UEFI x86-64 · Linux host build for tests</span>
@@ -938,8 +938,8 @@ fec0::/64, a TFTP server) and an HTTP server on the host, and loads the firmware
 installs QEMU, OVMF, iPXE's option ROMs and dosfstools on Ubuntu, enables KVM, and runs <code>make</code>, <code>make test</code>,
 <code>make qemu-test</code> and <code>make qemu-nettest</code>; the QEMU logs and <code>nesh.efi</code> are kept as artifacts.</p>
 <p><strong>Releases</strong> are made by pushing a version tag:</p>
-<pre class="terminal">$ git tag -a v0.2.0 -m "NESH 0.2.0"
-$ git push origin v0.2.0</pre>
+<pre class="terminal">$ git tag -a v0.2.1 -m "NESH 0.2.1"
+$ git push origin v0.2.1</pre>
 <p>The same workflow builds and tests the tagged source, then publishes a GitHub Release with <code>nesh.efi</code> and
 <code>SHA256SUMS</code>. Update <code>NESH_VERSION</code> in <code>src/core/shell.h</code> (and the version shown in the manuals) before
 tagging.</p>
@@ -1146,7 +1146,7 @@ captured.</p>
 <div id="index-list"></div>
 
 <footer class="doc-footer">
-  NESH Developer Manual — for NESH 0.2.0. See also the <a href="user-manual.html">user manual</a> and the
+  NESH Developer Manual — for NESH 0.2.1. See also the <a href="user-manual.html">user manual</a> and the
   <a href="https://github.com/nic-fio/NG-EFI_SHELL/blob/main/docs/decisions-and-history.md">design decisions and project history</a>.
   <br>Copyright (c) 2026 nic-fio, licensed
   <a href="https://github.com/nic-fio/NG-EFI_SHELL/blob/main/LICENSE">Apache 2.0 with the Commons

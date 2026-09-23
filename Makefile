@@ -1,15 +1,12 @@
 # NESH - New EFI Shell
 #
-#   make            build build/nesh.efi (UEFI x86_64), build/partmgr.efi and build/nesh-host
-#                   (Linux test build)
-#   make test       run the language/command tests with the host build, the partition
-#                   table tests, check the docs
+#   make            build build/nesh.efi (UEFI x86_64) and build/nesh-host (Linux test build)
+#   make test       run the language/command tests with the host build, check the docs
 #   make docs       regenerate the command reference of docs/user-manual.html
 #   make usb        build/nesh-usb.img, a bootable disk image (dd it to a USB stick)
 #   make qemu       boot build/nesh.efi in QEMU/OVMF (interactive, serial console)
 #   make qemu-test  run the automated tests inside QEMU
 #   make qemu-sbtest  run the Secure Boot tests inside QEMU (own test keys)
-#   make qemu-partmgr run partmgr.efi inside QEMU on test disks
 
 CC      ?= gcc
 LD      ?= ld
@@ -32,12 +29,6 @@ EFI_SRC := $(COMMON_SRC) src/lib/libc.c src/lib/fmt.c src/pal/pal_efi.c \
 
 HOST_SRC := $(COMMON_SRC) src/pal/pal_host.c src/platform/host.c
 
-# partmgr.efi, the partition manager: its table code is also tested on Linux with disk images
-PARTMGR_SRC := src/partmgr/ptable.c src/partmgr/ptedit.c src/partmgr/ptwrite.c src/partmgr/units.c \
-	src/lib/crc32.c src/lib/util.c
-PARTMGR_EFI_SRC := $(PARTMGR_SRC) src/partmgr/main.c src/partmgr/diskview.c src/partmgr/ui.c src/partmgr/disks_efi.c \
-	src/lib/libc.c src/lib/fmt.c src/pal/pal_efi.c src/pal/pal_common.c
-
 WARN := -Wall -Wextra -Wno-unused-parameter -Wno-missing-field-initializers
 
 EFI_CFLAGS := -std=gnu11 -O2 $(WARN) -ffreestanding -fno-stack-protector -fno-stack-check \
@@ -50,10 +41,9 @@ EFI_LDFLAGS := -nostdlib -znocombreloc -shared -Bsymbolic --no-undefined --build
 HOST_CFLAGS := -std=gnu11 -O1 -g $(WARN) -DNESH_HOST -Iinclude -fsanitize=address,undefined
 
 EFI_OBJ  := $(EFI_SRC:%.c=$(BUILD)/efi/%.o)
-PARTMGR_OBJ := $(PARTMGR_EFI_SRC:%.c=$(BUILD)/efi/%.o)
 HOST_OBJ := $(HOST_SRC:%.c=$(BUILD)/host/%.o)
 
-all: $(BUILD)/nesh.efi $(BUILD)/partmgr.efi $(BUILD)/nesh-host
+all: $(BUILD)/nesh.efi $(BUILD)/nesh-host
 
 $(BUILD)/efi/%.o: %.c
 	@mkdir -p $(dir $@)
@@ -70,25 +60,11 @@ $(BUILD)/nesh.efi: $(BUILD)/nesh.so tools/elf2efi.py
 	$(PYTHON) tools/elf2efi.py $< $@
 	@ls -l $@ | awk '{print "nesh.efi: " $$5 " bytes"}'
 
-$(BUILD)/partmgr.so: $(PARTMGR_OBJ) tools/efi.lds
-	$(LD) $(EFI_LDFLAGS) $(PARTMGR_OBJ) -o $@
-
-$(BUILD)/partmgr.efi: $(BUILD)/partmgr.so tools/elf2efi.py
-	$(PYTHON) tools/elf2efi.py $< $@
-	@ls -l $@ | awk '{print "partmgr.efi: " $$5 " bytes"}'
-
 $(BUILD)/nesh-host: $(HOST_OBJ)
 	$(CC) $(HOST_CFLAGS) $(HOST_OBJ) -o $@
 
-# drives partmgr's table code on a disk image (tests/partmgr/run-tests.py)
-$(BUILD)/tests/pttool: tests/partmgr/pttool.c $(PARTMGR_SRC) src/partmgr/ptable.h src/partmgr/ptint.h src/partmgr/units.h \
-		src/lib/crc32.h
-	@mkdir -p $(dir $@)
-	$(CC) $(HOST_CFLAGS) -D_FILE_OFFSET_BITS=64 tests/partmgr/pttool.c $(PARTMGR_SRC) -o $@
-
-test: $(BUILD)/nesh-host $(BUILD)/tests/pttool
+test: $(BUILD)/nesh-host
 	@tests/run-host-tests.sh $(BUILD)/nesh-host
-	@$(PYTHON) tests/partmgr/run-tests.py $(BUILD)/tests/pttool
 	@$(PYTHON) tools/gen-docs.py --check
 	@$(PYTHON) tools/check-doc-examples.py $(BUILD)/nesh-host
 
@@ -124,13 +100,9 @@ qemu-nettest: $(BUILD)/nesh.efi
 qemu-sbtest: $(BUILD)/nesh.efi
 	@tools/run-qemu.sh --sbtest $(OVMF) $(BUILD)/nesh.efi
 
-# partmgr.efi started from NESH, driven with keys, on disks made with sfdisk
-qemu-partmgr: $(BUILD)/nesh.efi $(BUILD)/partmgr.efi
-	@$(PYTHON) tests/partmgr/qemu-test.py $(OVMF) $(BUILD)/nesh.efi $(BUILD)/partmgr.efi
-
 clean:
 	rm -rf $(BUILD)
 
-.PHONY: all test docs usb qemu qemu-test qemu-nettest qemu-sbtest qemu-partmgr clean
+.PHONY: all test docs usb qemu qemu-test qemu-nettest qemu-sbtest clean
 
--include $(EFI_OBJ:.o=.d) $(PARTMGR_OBJ:.o=.d) $(HOST_OBJ:.o=.d)
+-include $(EFI_OBJ:.o=.d) $(HOST_OBJ:.o=.d)

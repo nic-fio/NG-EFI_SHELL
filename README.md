@@ -43,8 +43,6 @@ fs0:\> n = RECORDS(RUN$("map -data"), v$()) : PRINT n; " volumes and disks"
 |---|---|
 | [User manual](https://nic-fio.github.io/NG-EFI_SHELL/user-manual.html) | Using NESH and writing scripts: every command and function, with examples. |
 | [Developer manual](https://nic-fio.github.io/NG-EFI_SHELL/developer-manual.html) | Architecture, build, internals, testing, how to extend NESH. |
-| [partmgr user manual](https://nic-fio.github.io/NG-EFI_SHELL/partmgr-user-manual.html) | partmgr, the partition manager of the project: GPT and MBR tables, backup and restore. |
-| [partmgr technical manual](https://nic-fio.github.io/NG-EFI_SHELL/partmgr-developer-manual.html) | How partmgr works inside and how it is tested. |
 | [Design decisions and history](docs/decisions-and-history.md) | Why NESH is the way it is. |
 
 The manuals are HTML pages, so GitHub shows them as source code: read them

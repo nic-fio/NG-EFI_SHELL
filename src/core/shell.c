@@ -1,6 +1,6 @@
 /* Shell core: command registry, option parsing, canonical paths and wildcards,
  * file helpers, command-line splitting and execution, the prompt (REPL) and
- * app_main, the portable entry point. */
+ * nesh_main, the portable entry point. */
 #include "shell.h"
 #include "../basic/basic.h"
 
@@ -938,9 +938,7 @@ static void usage(void)
              "  -n        do not run startup" SCRIPT_EXT "\n");
 }
 
-const char app_name[] = "nesh";
-
-int app_main(int argc, char **argv)
+int nesh_main(int argc, char **argv)
 {
     basic_core_funcs_init();
     cmds_core_init();

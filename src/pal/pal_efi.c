@@ -75,9 +75,7 @@ void pal_free(void *p)
 
 void rt_fatal(const char *msg)
 {
-    pal_con_write("\n", 1);
-    pal_con_write(app_name, strlen(app_name));
-    pal_con_write(": fatal: ", 9);
+    pal_con_write("\nnesh: fatal: ", 14);
     pal_con_write(msg, strlen(msg));
     pal_con_write("\n", 1);
     pal_exit(1);
@@ -961,7 +959,7 @@ static void setup_args(void)
     }
     pal_argc = 1;
     pal_argv = xmalloc(sizeof(char *) * 2);
-    pal_argv[0] = xstrdup(app_name);
+    pal_argv[0] = xstrdup("nesh");
     pal_argv[1] = NULL;
 }
 
@@ -971,7 +969,7 @@ static int main_rc;
 
 static void main_on_stack(void)
 {
-    main_rc = app_main(pal_argc, pal_argv);
+    main_rc = nesh_main(pal_argc, pal_argv);
 }
 
 /* Calls fn with rsp = top (16-byte aligned), then restores the original stack. */
@@ -1012,7 +1010,7 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image, EFI_SYSTEM_TABLE *st)
         rc = main_rc;
         gBS->FreePages(stack, STACK_PAGES);
     } else {
-        rc = app_main(pal_argc, pal_argv);
+        rc = nesh_main(pal_argc, pal_argv);
     }
     if (efi_exit_hook)
         efi_exit_hook(); /* nothing may point into this image after it exits */

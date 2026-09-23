@@ -19,8 +19,6 @@ qemu-system-x86:qemu-system-x86_64:the tests inside a virtual machine
 ovmf:-:UEFI firmware for QEMU (/usr/share/ovmf/OVMF.fd)
 ipxe-qemu:-:network ROM used by make qemu-nettest
 dosfstools:mkfs.fat:the FAT filesystem of the disk image (>= 4.2)
-fdisk:sfdisk:reference for the partition table tests of partmgr
-parted:parted:second reader of the tables partmgr writes
 mtools:mcopy:writing files into the image without being root
 sbsigntool:sbsign:signing nesh.efi for the Secure Boot tests
 python3-virt-firmware:virt-fw-vars:enrolling the test keys into OVMF

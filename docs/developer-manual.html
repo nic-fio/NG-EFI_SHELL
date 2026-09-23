@@ -81,14 +81,14 @@ explained where they are needed, and the <a href="#glossary">glossary</a> summar
 <table>
   <thead><tr><th>Area</th><th>Directory</th><th>Lines</th><th>Content</th></tr></thead>
   <tbody>
-    <tr><td>Runtime library</td><td><code>src/lib</code></td><td>1,562</td><td>libc subset, printf, string buffer, UTF-8, UEFI compression, CRC-32</td></tr>
-    <tr><td>Platform layer</td><td><code>src/pal</code></td><td>1,837</td><td>PAL interface, UEFI and Linux implementations</td></tr>
-    <tr><td>Shell core</td><td><code>src/core</code></td><td>2,784</td><td>command execution, console, environment, aliases, line editor, menus</td></tr>
+    <tr><td>Runtime library</td><td><code>src/lib</code></td><td>1,523</td><td>libc subset, printf, string buffer, UTF-8, UEFI compression</td></tr>
+    <tr><td>Platform layer</td><td><code>src/pal</code></td><td>1,831</td><td>PAL interface, UEFI and Linux implementations</td></tr>
+    <tr><td>Shell core</td><td><code>src/core</code></td><td>2,782</td><td>command execution, console, environment, aliases, line editor, menus</td></tr>
     <tr><td>BASIC</td><td><code>src/basic</code></td><td>4,019</td><td>lexer, parser, interpreter, built-in functions</td></tr>
     <tr><td>Portable commands</td><td><code>src/cmd</code></td><td>3,336</td><td>files, text, utilities, editors</td></tr>
     <tr><td>UEFI modules</td><td><code>src/platform/efi</code></td><td>10,215</td><td>shell protocol, variables, boot, drivers, disks, hardware, network</td></tr>
-    <tr><td>UEFI definitions</td><td><code>include</code></td><td>734</td><td>UEFI types and protocols used by NESH</td></tr>
-    <tr><td>Tools and tests</td><td><code>tools</code>, <code>tests</code></td><td>4,519</td><td>ELF→PE converter, QEMU runner, doc generators, test scripts</td></tr>
+    <tr><td>UEFI definitions</td><td><code>include</code></td><td>724</td><td>UEFI types and protocols used by NESH</td></tr>
+    <tr><td>Tools and tests</td><td><code>tools</code>, <code>tests</code></td><td>3,104</td><td>ELF→PE converter, QEMU runner, doc generators, test scripts</td></tr>
   </tbody>
 </table>
 <p>The resulting <code>nesh.efi</code> is about 360 KB. The line counts here and in the
@@ -106,10 +106,10 @@ without a row in the map fails as well.</p>
     <tr><td><code>Makefile</code></td><td>All build and test targets.</td></tr>
     <tr><td><code>include/efi.h</code>, <code>include/efi_shell.h</code></td><td>UEFI types, services and protocols (written for NESH), EFI_SHELL_PROTOCOL.</td></tr>
     <tr><td><code>src/lib/</code></td><td>Runtime: <code>rt.h</code> (the C subset every module includes), <code>libc.c</code>, <code>fmt.c</code> (vsnprintf),
-        <code>util.c</code> (Sbuf, UTF-8, glob, parse_int), <code>eficomp.c</code> (UEFI compression), <code>crc32.c</code>.</td></tr>
+        <code>util.c</code> (Sbuf, UTF-8, glob, parse_int), <code>eficomp.c</code> (UEFI compression).</td></tr>
     <tr><td><code>src/pal/</code></td><td><code>pal.h</code> (the platform interface), <code>pal_efi.c</code>, <code>pal_host.c</code>, <code>pal_common.c</code>,
         <code>efi_glue.h</code> (UEFI globals for EFI-only modules).</td></tr>
-    <tr><td><code>src/core/</code></td><td><code>shell.c</code> (registry, execution, paths, REPL, <code>app_main</code>), <code>con.c</code> (output sinks, keys),
+    <tr><td><code>src/core/</code></td><td><code>shell.c</code> (registry, execution, paths, REPL, <code>nesh_main</code>), <code>con.c</code> (output sinks, keys),
         <code>env.c</code>, <code>alias.c</code>, <code>lineedit.c</code>, <code>ui.c</code> (menu).</td></tr>
     <tr><td><code>src/basic/</code></td><td><code>lexer.c</code>, <code>parser.c</code>, <code>interp.c</code>, <code>bfuncs.c</code>, <code>basic.h</code>, <code>interp_int.h</code>.</td></tr>
     <tr><td><code>src/cmd/</code></td><td>Portable commands: <code>cmd_core.c</code> (help, ver, echo…), <code>cmd_fs.c</code> (files, map…), <code>cmd_text.c</code>,
@@ -206,12 +206,12 @@ flowchart TB
 sequenceDiagram
   participant FW as UEFI firmware
   participant EM as efi_main (pal_efi.c)
-  participant NM as app_main (shell.c)
+  participant NM as nesh_main (shell.c)
   participant PC as platform_cmds_init
   FW->>EM: StartImage(nesh.efi)
   EM->>EM: globals gST/gBS/gRT, watchdog off,&lt;br/&gt;TSC calibration, volumes, arguments
   EM->>EM: allocate a 1 MiB stack and switch to it
-  EM->>NM: app_main(argc, argv)
+  EM->>NM: nesh_main(argc, argv)
   NM->>NM: register BASIC functions and portable commands
   NM->>PC: platform_cmds_init()
   PC->>PC: install EFI_SHELL_PROTOCOL,&lt;br/&gt;register UEFI commands and functions
@@ -225,12 +225,9 @@ sequenceDiagram
 <figcaption>From the firmware to the prompt</figcaption>
 </figure>
 <p>Two details matter. First, UEFI only guarantees 128 KiB of stack and the interpreter is recursive, so
-<code>efi_main</code> allocates 1 MiB of pages and calls <code>app_main</code> on that stack (<code>call_on_stack</code>).
+<code>efi_main</code> allocates 1 MiB of pages and calls <code>nesh_main</code> on that stack (<code>call_on_stack</code>).
 Second, when NESH exits nothing may keep pointing into its image: <code>efi_exit_hook</code> uninstalls (or restores) the
 shell protocol.</p>
-<p>The platform layer does not know which program it starts: it calls <code>app_main</code> and names the program
-<code>app_name</code> in fatal errors. NESH defines both in <code>src/core/shell.c</code>; any other program linked with
-<code>pal_efi.c</code> defines its own.</p>
 <pre class="code" data-lang="c" data-title="src/pal/pal_efi.c">EFI_STATUS EFIAPI efi_main(EFI_HANDLE image, EFI_SYSTEM_TABLE *st)
 {
     gImage = image;
@@ -822,7 +819,7 @@ void cmds_sum_init(void)
       last.</li>
 </ul>
 <p><strong>2. Register it.</strong> Declare the init function in <code>src/core/shell.h</code> next to the others
-(<code>void cmds_sum_init(void);</code>), call it from <code>app_main</code> in <code>src/core/shell.c</code> after
+(<code>void cmds_sum_init(void);</code>), call it from <code>nesh_main</code> in <code>src/core/shell.c</code> after
 <code>cmds_edit_init()</code>, and add <code>src/cmd/cmd_sum.c</code> to <code>COMMON_SRC</code> in the <code>Makefile</code>. (A UEFI-only
 command goes in <code>src/platform/efi</code> instead: add its table to one of the modules or register it from
 <code>platform_cmds_init</code>.)</p>
@@ -1060,7 +1057,7 @@ captured.</p>
 <table>
   <thead><tr><th>File</th><th>Lines</th><th>Purpose</th></tr></thead>
   <tbody>
-    <tr><td><code>include/efi.h</code></td><td>579</td><td>Minimal UEFI definitions (UEFI Specification 2.10), written for NESH</td></tr>
+    <tr><td><code>include/efi.h</code></td><td>569</td><td>Minimal UEFI definitions (UEFI Specification 2.10), written for NESH</td></tr>
     <tr><td><code>include/efi_shell.h</code></td><td>155</td><td>UEFI Shell 2.2 protocols (from the UEFI Shell Specification), plus the few extra UEFI protocols the shell implementation needs</td></tr>
     <tr><td><code>src/basic/basic.h</code></td><td>187</td><td>NESH BASIC: lexer, parser (AST) and tree-walking interpreter</td></tr>
     <tr><td><code>src/basic/bfuncs.c</code></td><td>816</td><td>Core built-in functions of NESH BASIC (portable)</td></tr>
@@ -1078,11 +1075,9 @@ captured.</p>
     <tr><td><code>src/core/con.h</code></td><td>50</td><td>Console services used by the whole shell: output sinks (console, capture buffer, file), colors, key input with type-ahead buffer, Ctrl-C handling</td></tr>
     <tr><td><code>src/core/env.c</code></td><td>269</td><td>Shell environment variables (separate from BASIC variables)</td></tr>
     <tr><td><code>src/core/lineedit.c</code></td><td>644</td><td>Line editor: cursor movement, history (persistent), Ctrl-R search, Tab completion</td></tr>
-    <tr><td><code>src/core/shell.c</code></td><td>1036</td><td>Shell core: command registry, option parsing, canonical paths and wildcards, file helpers, command-line splitting and execution, the prompt (REPL) and app_main, the portable entry point</td></tr>
+    <tr><td><code>src/core/shell.c</code></td><td>1034</td><td>Shell core: command registry, option parsing, canonical paths and wildcards, file helpers, command-line splitting and execution, the prompt (REPL) and nesh_main, the portable entry point</td></tr>
     <tr><td><code>src/core/shell.h</code></td><td>135</td><td>Shell core: command registry, execution, paths, file helpers</td></tr>
     <tr><td><code>src/core/ui.c</code></td><td>109</td><td>Interactive selection menu (MENU function)</td></tr>
-    <tr><td><code>src/lib/crc32.c</code></td><td>29</td><td>CRC-32 (IEEE 802.3), the checksum of GPT headers and entry arrays</td></tr>
-    <tr><td><code>src/lib/crc32.h</code></td><td>10</td><td>CRC-32 (IEEE 802.3)</td></tr>
     <tr><td><code>src/lib/eficomp.c</code></td><td>547</td><td>UEFI compression format (EFI 1.1 / "version 1"): LZ77 with an 8 KiB window and canonical Huffman codes, as decoded by EFI_DECOMPRESS_PROTOCOL</td></tr>
     <tr><td><code>src/lib/eficomp.h</code></td><td>12</td><td>UEFI (EFI 1.1) compression format</td></tr>
     <tr><td><code>src/lib/fmt.c</code></td><td>192</td><td>vsnprintf for the EFI build: %d %i %u %x %X %o %c %s %p %%, flags '-' '0' '+' ' ', width/precision (also '*'), length hh h l ll z j t</td></tr>
@@ -1090,9 +1085,9 @@ captured.</p>
     <tr><td><code>src/lib/rt.h</code></td><td>115</td><td>NESH runtime: standard C subset + shared helpers</td></tr>
     <tr><td><code>src/lib/util.c</code></td><td>337</td><td>Shared helpers: allocation wrappers, string buffer, UTF-8, globbing</td></tr>
     <tr><td><code>src/pal/efi_glue.h</code></td><td>38</td><td>Access to UEFI services for EFI-only modules</td></tr>
-    <tr><td><code>src/pal/pal.h</code></td><td>160</td><td>Platform abstraction layer: everything the portable core needs from the machine</td></tr>
+    <tr><td><code>src/pal/pal.h</code></td><td>156</td><td>Platform abstraction layer: everything the portable core needs from the machine</td></tr>
     <tr><td><code>src/pal/pal_common.c</code></td><td>25</td><td>Parts of the platform layer shared by the UEFI and Linux builds: error names</td></tr>
-    <tr><td><code>src/pal/pal_efi.c</code></td><td>1021</td><td>Platform layer for UEFI</td></tr>
+    <tr><td><code>src/pal/pal_efi.c</code></td><td>1019</td><td>Platform layer for UEFI</td></tr>
     <tr><td><code>src/pal/pal_host.c</code></td><td>593</td><td>Platform layer for Linux: used for fast development and automated tests</td></tr>
     <tr><td><code>src/platform/efi/efi_boot.c</code></td><td>1572</td><td>Boot manager: Boot#### / BootOrder / BootNext / Timeout</td></tr>
     <tr><td><code>src/platform/efi/efi_cmds.h</code></td><td>48</td><td>Shared declarations of the EFI-only command modules</td></tr>
@@ -1112,11 +1107,11 @@ captured.</p>
     <tr><td><code>tools/check-doc-examples.py</code></td><td>69</td><td>Runs the NESH BASIC examples of the user manual with the host build and compares their output with the output printed in the manual</td></tr>
     <tr><td><code>tools/efi.lds</code></td><td>26</td><td>Linker script for NESH: ELF image at base 0, page-aligned sections</td></tr>
     <tr><td><code>tools/elf2efi.py</code></td><td>172</td><td>Convert an x86_64 ELF shared object (linked with tools/efi.lds) into a PE32+ EFI application with native base relocations</td></tr>
-    <tr><td><code>tools/gen-docs.py</code></td><td>318</td><td>Generates the command reference of the user manual from the command tables in the C sources, and the line counts of this manual from the files themselves, so that neither can disagree with the code</td></tr>
+    <tr><td><code>tools/gen-docs.py</code></td><td>302</td><td>Generates the command reference of the user manual from the command tables in the C sources, and the line counts of this manual from the files themselves, so that neither can disagree with the code</td></tr>
     <tr><td><code>tools/mkusb.sh</code></td><td>102</td><td>Builds build/nesh-usb.img, a bootable disk image (GPT + EFI system partition) with NESH, the examples, the licence (LICENSE.txt and NOTICE.txt) and a README on it</td></tr>
     <tr><td><code>tools/record-demo.py</code></td><td>188</td><td>Records the animation of the README: drives a QEMU session through the monitor (sendkey/screendump) and turns the frames into a GIF</td></tr>
     <tr><td><code>tools/backup.sh</code></td><td>32</td><td>Packs the repository into one git bundle, with every branch, tag and commit, for a restore without a network</td></tr>
-    <tr><td><code>tools/setup-dev.sh</code></td><td>91</td><td>Checks (or installs) the packages a clone needs and sets the git identity of the working copy, which is not cloned</td></tr>
+    <tr><td><code>tools/setup-dev.sh</code></td><td>89</td><td>Checks (or installs) the packages a clone needs and sets the git identity of the working copy, which is not cloned</td></tr>
     <tr><td><code>tools/run-qemu.sh</code></td><td>158</td><td>Boots nesh.efi in QEMU/OVMF: interactive, --test and --nettest modes</td></tr>
     <tr><td><code>tools/make-previews.py</code></td><td>636</td><td>Builds docs-preview/: the ten design proposals the look of the manuals was chosen from</td></tr>
   </tbody>

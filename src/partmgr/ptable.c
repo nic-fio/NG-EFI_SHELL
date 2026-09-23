@@ -12,13 +12,9 @@
  * partition (relative to itself) and the next record (relative to the start
  * of the extended partition). Logical partitions are numbered from 5, as
  * Linux and sfdisk do. */
-#include "ptable.h"
+#include "ptint.h"
 #include "../lib/crc32.h"
 #include "../pal/pal.h"
-
-static uint16_t le16(const uint8_t *p) { return (uint16_t)(p[0] | p[1] << 8); }
-static uint32_t le32(const uint8_t *p) { return p[0] | p[1] << 8 | p[2] << 16 | (uint32_t)p[3] << 24; }
-static uint64_t le64(const uint8_t *p) { return le32(p) | (uint64_t)le32(p + 4) << 32; }
 
 static void note(PtTable *t, const char *fmt, ...) __attribute__((format(printf, 2, 3)));
 static void note(PtTable *t, const char *fmt, ...)
@@ -57,6 +53,20 @@ void pt_guid_str(const uint8_t g[16], char out[37])
              g[8], g[9], g[10], g[11], g[12], g[13], g[14], g[15]);
 }
 
+bool pt_guid_parse(const char *s, uint8_t g[16])
+{
+    static const int pos[16] = { 6, 4, 2, 0, 11, 9, 16, 14, 19, 21, 24, 26, 28, 30, 32, 34 };
+    if (strlen(s) != 36 || s[8] != '-' || s[13] != '-' || s[18] != '-' || s[23] != '-')
+        return false;
+    for (int i = 0; i < 16; i++) {
+        char h[3] = { s[pos[i]], s[pos[i] + 1], 0 };
+        if (!isxdigit((uint8_t)h[0]) || !isxdigit((uint8_t)h[1]))
+            return false;
+        g[i] = (uint8_t)strtoul(h, NULL, 16);
+    }
+    return true;
+}
+
 static bool guid_zero(const uint8_t g[16])
 {
     for (int i = 0; i < 16; i++)
@@ -66,11 +76,6 @@ static bool guid_zero(const uint8_t g[16])
 }
 
 /* ---- MBR ---- */
-
-static bool mbr_extended(uint8_t type)
-{
-    return type == 0x05 || type == 0x0F || type == 0x85;
-}
 
 /* A file system written on the whole disk, without a partition table (a
  * "superfloppy"): its boot sector also ends in 55 AA. */
@@ -114,7 +119,7 @@ static void mbr_logicals(const PtDev *d, PtTable *t, const PtPart *ext)
             if (p->start + p->size > end)
                 note(t, "logical partition %d goes beyond its extended partition", p->num);
         }
-        uint64_t next = mbr_extended(e2[4]) && le32(e2 + 12) ? ext->start + le32(e2 + 8) : 0;
+        uint64_t next = pt_mbr_extended(e2[4]) && le32(e2 + 12) ? ext->start + le32(e2 + 8) : 0;
         free(b);
         if (!next)
             return;
@@ -141,7 +146,7 @@ static void read_mbr(const PtDev *d, PtTable *t, const uint8_t *b)
         p->active = e[0] == 0x80;
         p->start = le32(e + 8);
         p->size = le32(e + 12);
-        p->role = mbr_extended(e[4]) ? PT_EXTENDED : PT_PRIMARY;
+        p->role = pt_mbr_extended(e[4]) ? PT_EXTENDED : PT_PRIMARY;
         if (p->start + p->size > d->nblocks)
             note(t, "partition %d goes beyond the end of the disk", p->num);
         if (p->role == PT_EXTENDED && next++)
@@ -240,6 +245,7 @@ static void read_gpt(const PtDev *d, PtTable *t)
     t->entry_size = le32(h + 84);
     t->primary_entries_lba = t->primary_ok ? le64(ph + 72) : 2;
     t->backup_lba = alt;
+    t->backup_entries_lba = t->backup_ok ? le64(bh + 72) : 0;
     for (uint32_t i = 0; i < t->max_entries; i++) {
         const uint8_t *en = e + (size_t)i * t->entry_size;
         if (guid_zero(en))
@@ -277,6 +283,7 @@ int pt_read(const PtDev *d, PtTable *t)
     uint8_t *b = read_blocks(d, 0, 1);
     if (!b)
         return PAL_EIO;
+    memcpy(t->lba0, b, 512);
     bool sig = b[510] == 0x55 && b[511] == 0xAA;
     bool valid = sig, protective = false, others = false;
     for (int i = 0; i < 4 && sig; i++) {

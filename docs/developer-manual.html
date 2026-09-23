@@ -87,9 +87,9 @@ explained where they are needed, and the <a href="#glossary">glossary</a> summar
     <tr><td>BASIC</td><td><code>src/basic</code></td><td>4,019</td><td>lexer, parser, interpreter, built-in functions</td></tr>
     <tr><td>Portable commands</td><td><code>src/cmd</code></td><td>3,336</td><td>files, text, utilities, editors</td></tr>
     <tr><td>UEFI modules</td><td><code>src/platform/efi</code></td><td>10,215</td><td>shell protocol, variables, boot, drivers, disks, hardware, network</td></tr>
-    <tr><td>Partition manager</td><td><code>src/partmgr</code></td><td>448</td><td><code>partmgr.efi</code>, in progress: the partition table reader</td></tr>
+    <tr><td>Partition manager</td><td><code>src/partmgr</code></td><td>1,363</td><td><code>partmgr.efi</code>, in progress: reading, changing and writing partition tables</td></tr>
     <tr><td>UEFI definitions</td><td><code>include</code></td><td>724</td><td>UEFI types and protocols used by NESH</td></tr>
-    <tr><td>Tools and tests</td><td><code>tools</code>, <code>tests</code></td><td>3,519</td><td>ELF→PE converter, QEMU runner, doc generators, test scripts</td></tr>
+    <tr><td>Tools and tests</td><td><code>tools</code>, <code>tests</code></td><td>3,968</td><td>ELF→PE converter, QEMU runner, doc generators, test scripts</td></tr>
   </tbody>
 </table>
 <p>The resulting <code>nesh.efi</code> is about 360 KB. The line counts here and in the
@@ -116,7 +116,8 @@ without a row in the map fails as well.</p>
     <tr><td><code>src/cmd/</code></td><td>Portable commands: <code>cmd_core.c</code> (help, ver, echo…), <code>cmd_fs.c</code> (files, map…), <code>cmd_text.c</code>,
         <code>cmd_util.c</code>, <code>cmd_edit.c</code> (edit, hexedit).</td></tr>
     <tr><td><code>src/partmgr/</code></td><td><code>partmgr.efi</code>, the partition manager (in progress, <a href="https://github.com/nic-fio/NG-EFI_SHELL/blob/main/docs/decisions-and-history.md">decision D21</a>):
-        <code>ptable.c</code> reads GPT and MBR tables. Not part of <code>nesh.efi</code>.</td></tr>
+        <code>ptable.c</code> reads GPT and MBR tables, <code>ptedit.c</code> changes them in memory, <code>ptwrite.c</code> writes them and
+        makes and restores backups. Not part of <code>nesh.efi</code>.</td></tr>
     <tr><td><code>src/platform/efi/</code></td><td>UEFI-only modules (see <a href="#efi-modules">UEFI modules</a>).</td></tr>
     <tr><td><code>src/platform/host.c</code></td><td>Stubs of the platform hooks for the Linux build.</td></tr>
     <tr><td><code>tools/</code></td><td><code>efi.lds</code>, <code>elf2efi.py</code>, <code>run-qemu.sh</code>, <code>gen-docs.py</code>, <code>check-doc-examples.py</code>, <code>mkusb.sh</code>, <code>record-demo.py</code>, <code>setup-dev.sh</code>, <code>backup.sh</code>.</td></tr>
@@ -891,7 +892,7 @@ documentation checks, and QEMU tests for everything that needs firmware.</p>
 flowchart LR
   subgraph T1["make test (seconds)"]
     H["tests/host/*.nsb&lt;br/&gt;vs *.out"]
-    P["tests/partmgr&lt;br/&gt;vs sfdisk"]
+    P["tests/partmgr&lt;br/&gt;vs sfdisk, parted"]
     G["gen-docs.py --check"]
     X["check-doc-examples.py"]
   end
@@ -913,21 +914,34 @@ flowchart LR
 AddressSanitizer and UBSan, so memory errors and undefined behavior make tests fail loudly.</p>
 
 <h3 id="partmgr-tests">Partition table tests</h3>
-<p><code>tests/partmgr/run-tests.py</code> checks the partition table reader of <code>partmgr.efi</code>
-(<code>src/partmgr/ptable.c</code>) on Linux, with disk image files instead of disks. <code>build/tests/ptdump</code> is the reader
-compiled for Linux with AddressSanitizer and UBSan; it prints what it finds in an image as <code>key=value</code> lines.
-The script builds images with <code>sfdisk</code> and requires the reader to find exactly what <code>sfdisk --json</code>
-reports: table type, disk identifier, usable area, and for every partition its number, start, size, type, identifier,
-name, attributes and boot flag. The images cover GPT with 512- and 4096-byte blocks, gaps and entries out of disk order,
-MBR with primary, extended and logical partitions, and empty tables. The 4096-byte case needs an <code>sfdisk</code> with
-<code>--sector-size</code> (not in util-linux 2.39, the version of Ubuntu 24.04 and of CI): an older one skips it and
-the script prints <code>SKIPPED</code> with the reason.</p>
-<p>Then the images are damaged on purpose and the reader must cope and say so in a note: a broken primary GPT header or
-entry array (the backup copy is used and gives the same partitions), a broken backup, both copies broken, a wiped
-protective MBR, a hybrid MBR, a disk enlarged after partitioning, a chain of logical partitions that loops, an extended
-boot record without its signature, a partition beyond the end of the disk, a FAT file system on the whole disk, and
-invalid MBR entries. The tests were checked by breaking the reader on purpose (logical numbering, GPT sizes off by one,
-the boot flag): each break makes them fail.</p>
+<p><code>tests/partmgr/run-tests.py</code> checks the partition table code of <code>partmgr.efi</code> (<code>src/partmgr</code>) on
+Linux, with disk image files instead of disks. <code>build/tests/pttool</code> is that code compiled for Linux with
+AddressSanitizer and UBSan: it reads the table of an image, runs commands on it (<code>new</code>, <code>add</code>,
+<code>del</code>, <code>type</code>, <code>name</code>, <code>active</code>, <code>free</code>, <code>write</code>,
+<code>backup</code>, <code>restore</code>) and prints the result as <code>key=value</code> lines.</p>
+<p><strong>Reading.</strong> The script builds images with <code>sfdisk</code> and requires the reader to find exactly what
+<code>sfdisk --json</code> reports: table type, disk identifier, usable area, and for every partition its number, start,
+size, type, identifier, name, attributes and boot flag. The images cover GPT with 512- and 4096-byte blocks, gaps and
+entries out of disk order, MBR with primary, extended and logical partitions, and empty tables. Then they are damaged on
+purpose and the reader must cope and say so in a note: a broken primary GPT header or entry array (the backup copy is
+used and gives the same partitions), a broken backup, both copies broken, a wiped protective MBR, a hybrid MBR, a disk
+enlarged after partitioning, a chain of logical partitions that loops, an extended boot record without its signature, a
+partition beyond the end of the disk, a FAT file system on the whole disk, and invalid MBR entries.</p>
+<p><strong>Writing.</strong> Tables made or changed by partmgr are read back by <code>sfdisk</code>, which must find what was
+asked and report no problem with <code>--verify</code>, and by <code>parted</code>, which must print them without warnings.
+The cases: new GPT and MBR tables (with 4096-byte blocks too), logical partitions creating the extended one, changes to
+tables made by <code>sfdisk</code> (identifiers of untouched partitions must not change), deleting the first logical
+partition and refilling the space, deleting the extended partition, GPT to MBR and back, deleting the table, repairing a
+damaged GPT, an enlarged disk, boot code kept on changes and cleared on a new table, a hybrid MBR left alone, and the
+refusals (overlaps, a fifth primary partition, MBR beyond 2 TiB, names too long). A check written in Python, independent
+of partmgr, reads every MBR it wrote byte by byte: CHS fields and the chain of extended boot records; it agrees with the
+MBRs <code>sfdisk</code> writes. <strong>Backups</strong> are restored over a disk changed in the meantime, which must then be
+identical, byte for byte, to the original image; backups made on another disk, damaged ones, and disks without a table
+are refused.</p>
+<p>The tests were checked by breaking the code on purpose (logical numbering, GPT sizes off by one, the boot flag, the
+backup GPT checksum, the links and CHS fields of the MBR chain): each break makes them fail. The 4096-byte cases compared
+with <code>sfdisk</code> need an <code>sfdisk</code> with <code>--sector-size</code> (not in util-linux 2.39, the version of
+Ubuntu 24.04 and of CI): an older one skips them and the script prints <code>SKIPPED</code> with the reason.</p>
 
 <h3 id="qemu-tests">QEMU tests</h3>
 <p><code>tools/run-qemu.sh --test</code> builds a virtual FAT disk (<code>build/esp</code>, read-only, becomes <code>fs0:</code>) with
@@ -1113,8 +1127,11 @@ captured.</p>
     <tr><td><code>src/pal/pal_common.c</code></td><td>25</td><td>Parts of the platform layer shared by the UEFI and Linux builds: error names</td></tr>
     <tr><td><code>src/pal/pal_efi.c</code></td><td>1019</td><td>Platform layer for UEFI</td></tr>
     <tr><td><code>src/pal/pal_host.c</code></td><td>593</td><td>Platform layer for Linux: used for fast development and automated tests</td></tr>
-    <tr><td><code>src/partmgr/ptable.c</code></td><td>377</td><td>partmgr: reads GPT (both copies checked, the backup used when the primary is damaged) and MBR tables, extended and logical partitions included; partition type names</td></tr>
-    <tr><td><code>src/partmgr/ptable.h</code></td><td>71</td><td>partmgr: the description of a disk's partition table, read through a function so that disks and image files work alike</td></tr>
+    <tr><td><code>src/partmgr/ptable.c</code></td><td>384</td><td>partmgr: reads GPT (both copies checked, the backup used when the primary is damaged) and MBR tables, extended and logical partitions included; partition type names</td></tr>
+    <tr><td><code>src/partmgr/ptedit.c</code></td><td>420</td><td>partmgr: changes to a table in memory (new table, add, delete, type, name, active flag) and the free areas, with the rules for logical partitions and their boot records</td></tr>
+    <tr><td><code>src/partmgr/ptint.h</code></td><td>22</td><td>partmgr internals: little-endian fields, extended partition types</td></tr>
+    <tr><td><code>src/partmgr/ptwrite.c</code></td><td>408</td><td>partmgr: writing GPT (both copies, protective MBR) and MBR (chain of logical partitions, CHS fields), deleting a table, backup files and restore</td></tr>
+    <tr><td><code>src/partmgr/ptable.h</code></td><td>129</td><td>partmgr: the description of a disk's partition table, read through a function so that disks and image files work alike</td></tr>
     <tr><td><code>src/platform/efi/efi_boot.c</code></td><td>1572</td><td>Boot manager: Boot#### / BootOrder / BootNext / Timeout</td></tr>
     <tr><td><code>src/platform/efi/efi_cmds.h</code></td><td>48</td><td>Shared declarations of the EFI-only command modules</td></tr>
     <tr><td><code>src/platform/efi/efi_disk.c</code></td><td>449</td><td>Block devices and disk-level commands: blkN: names, dblk, timezone, getmtc</td></tr>
@@ -1129,8 +1146,8 @@ captured.</p>
     <tr><td><code>src/platform/efi/efi_var.c</code></td><td>1268</td><td>UEFI variables: the "var" command and the BASIC functions VAR$, VAREXISTS</td></tr>
     <tr><td><code>src/platform/host.c</code></td><td>122</td><td>Platform-specific commands for the Linux test build: firmware features are not available, so only a minimal set is provided</td></tr>
     <tr><td><code>tests/apps/shelltest.c</code></td><td>293</td><td>Test application for NESH's EFI_SHELL_PROTOCOL implementation</td></tr>
-    <tr><td><code>tests/partmgr/ptdump.c</code></td><td>78</td><td>Prints what partmgr's table reader finds in a disk image file (Linux only)</td></tr>
-    <tr><td><code>tests/partmgr/run-tests.py</code></td><td>336</td><td>Partition table tests: images built with sfdisk, the reader compared with sfdisk --json, then damaged images</td></tr>
+    <tr><td><code>tests/partmgr/pttool.c</code></td><td>208</td><td>Drives partmgr's table code on a disk image file: reads, changes, writes, backs up, restores (Linux only)</td></tr>
+    <tr><td><code>tests/partmgr/run-tests.py</code></td><td>655</td><td>Partition table tests: the reader and the writer compared with sfdisk and parted on disk images, damaged images, backups restored byte for byte</td></tr>
     <tr><td><code>tests/run-host-tests.sh</code></td><td>25</td><td>Runs tests/host/*.nsb with the host build and compares the output with the .out files</td></tr>
     <tr><td><code>tools/check-doc-examples.py</code></td><td>69</td><td>Runs the NESH BASIC examples of the user manual with the host build and compares their output with the output printed in the manual</td></tr>
     <tr><td><code>tools/efi.lds</code></td><td>26</td><td>Linker script for NESH: ELF image at base 0, page-aligned sections</td></tr>

@@ -31,7 +31,7 @@ EFI_SRC := $(COMMON_SRC) src/lib/libc.c src/lib/fmt.c src/pal/pal_efi.c \
 HOST_SRC := $(COMMON_SRC) src/pal/pal_host.c src/platform/host.c
 
 # partmgr.efi (in progress): the partition table code, tested on Linux with disk images
-PARTMGR_SRC := src/partmgr/ptable.c src/lib/crc32.c src/lib/util.c
+PARTMGR_SRC := src/partmgr/ptable.c src/partmgr/ptedit.c src/partmgr/ptwrite.c src/lib/crc32.c src/lib/util.c
 
 WARN := -Wall -Wextra -Wno-unused-parameter -Wno-missing-field-initializers
 
@@ -67,14 +67,14 @@ $(BUILD)/nesh.efi: $(BUILD)/nesh.so tools/elf2efi.py
 $(BUILD)/nesh-host: $(HOST_OBJ)
 	$(CC) $(HOST_CFLAGS) $(HOST_OBJ) -o $@
 
-# reads a disk image with partmgr's table code (tests/partmgr/run-tests.py)
-$(BUILD)/tests/ptdump: tests/partmgr/ptdump.c $(PARTMGR_SRC) src/partmgr/ptable.h src/lib/crc32.h
+# drives partmgr's table code on a disk image (tests/partmgr/run-tests.py)
+$(BUILD)/tests/pttool: tests/partmgr/pttool.c $(PARTMGR_SRC) src/partmgr/ptable.h src/partmgr/ptint.h src/lib/crc32.h
 	@mkdir -p $(dir $@)
-	$(CC) $(HOST_CFLAGS) -D_FILE_OFFSET_BITS=64 tests/partmgr/ptdump.c $(PARTMGR_SRC) -o $@
+	$(CC) $(HOST_CFLAGS) -D_FILE_OFFSET_BITS=64 tests/partmgr/pttool.c $(PARTMGR_SRC) -o $@
 
-test: $(BUILD)/nesh-host $(BUILD)/tests/ptdump
+test: $(BUILD)/nesh-host $(BUILD)/tests/pttool
 	@tests/run-host-tests.sh $(BUILD)/nesh-host
-	@$(PYTHON) tests/partmgr/run-tests.py $(BUILD)/tests/ptdump
+	@$(PYTHON) tests/partmgr/run-tests.py $(BUILD)/tests/pttool
 	@$(PYTHON) tools/gen-docs.py --check
 	@$(PYTHON) tools/check-doc-examples.py $(BUILD)/nesh-host
 

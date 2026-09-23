@@ -337,6 +337,84 @@ From it came the working rules of the project:
   interpreted case by case. Third-party components keep their own licenses
   (`NOTICE.md`).
 
+### D21. Partition management: a separate `partmgr.efi`, not a NESH command
+
+*Status: designed, not implemented.*
+
+- **Context.** The owner proposed adding "un paio di funzioni utili, come un
+  partition manager". The EDK2 shell has nothing for it; people who prepare
+  service sticks (the Win-Raid audience) usually boot a Linux live system to
+  do it.
+- **First design, inside NESH.** A `partmgr` command with subcommands (`list`,
+  `delete`, `create`, `backup`, `restore`) was designed step by step. The
+  compact form `partmgr create blk2 gpt esp:512M linux:rest` was rejected as
+  "decisamente criptico"; a `parted`-like form with one `add` per partition
+  and options such as `-type primary|extended` followed, and with it MBR
+  extended partitions. The design kept growing beyond "a couple of useful
+  functions", and the owner stopped it: "Niente gestione delle partizioni da
+  nesh".
+- **Decision.** Partition management is a **separate application,
+  `partmgr.efi`, with a full-screen interface**, "una utility, non una
+  funzione di nesh". It lives **in this repository** and ships in the same
+  release as `nesh.efi` — owner: "alla fine nesh e' pur sempre una applet
+  .efi". It reuses the platform layer, the screen code of `edit`/`hexedit` and
+  the MBR/GPT decoding of `dblk`; the Linux build can work on disk image files,
+  so it can be tested without real disks.
+- **D5 is unchanged.** `nesh.efi` stays one file with everything built in and
+  no partition management. `partmgr.efi` is a second product, started like any
+  EFI application (from NESH, another shell or the firmware boot menu), and is
+  signed separately for Secure Boot.
+- **Words.** To *delete* a partition removes it from the table; to *wipe* it
+  destroys its contents. In the owner's Italian: *eliminare* and *cancellare*.
+  "Zap", the first name proposed for wiping, was dropped: in `gdisk`/`sgdisk`
+  it means destroying the partition *table*, the opposite meaning.
+- **Functions.** Show disks and partitions; delete the whole table; create an
+  empty GPT or MBR table; add a partition in any free space; delete one
+  partition; change a partition's type and name; set the MBR active flag;
+  back up the partition table to a file and restore it; wipe a partition.
+  Out of scope: resizing, moving, formatting, and any change to data inside a
+  partition other than wiping.
+- **GPT and MBR, MBR complete.** Both formats are read and created. Owner, on
+  creating MBR tables without extended partitions: "sarebbe una
+  contraddizione". So MBR includes extended and logical partitions (adding on
+  an MBR disk asks Primary or Logical and creates the extended partition when
+  needed), the active flag and the CHS fields.
+- **A new table starts from zero.** Creating a table is destructive: the whole
+  MBR sector is rebuilt and its 440-byte boot code area is zeroed, the GPT
+  protective MBR included, and the disk gets new identifiers (MBR signature,
+  GPT disk GUID). Owner: "la gestione dell'mbr e' roba da bootloader, che non
+  riguarda partmgr". The alternative of keeping the old boot code, or writing
+  an own MBR boot program, was rejected.
+- **Changes are written all together.** As in `cfdisk` and `gdisk`, the screen
+  shows the table as it will be and marks unwritten changes; nothing reaches
+  the disk until **Write**. Quitting without Write leaves the disk untouched.
+- **Safety.** Before every destructive operation a very readable warning, then
+  the disk name must be typed to confirm. **No dry run**: the confirmation
+  already shows what will be written. **No automatic backup**: owner, "se uno
+  vuole fa' prima il backup"; Backup is an explicit function. The disk the
+  program was started from is shown but always read-only, with no override.
+  Writes are allowed with Secure Boot active: writing a partition table is a
+  disk write, like `hexedit` on disk blocks, and does not get around the
+  protection (D6 unchanged).
+- **Wipe.** Two passes over the whole partition: random data, then zeros (owner's
+  choice). It cannot be staged, so it runs at once, with its own warning and
+  confirmation, a progress bar, and Esc to stop. The manual must say that on
+  SSD, NVMe and USB flash overwriting does not guarantee that the old data is
+  gone (wear levelling, reserve cells); the drives' own ATA Secure Erase and
+  NVMe Sanitize work only on whole disks and are left out.
+- **Interface.** Screen 1 lists the disks (model, size, table type, number of
+  partitions). Screen 2 shows the partitions and the free space in disk order,
+  with a key bar at the bottom (New, Delete, Type, Rename, Active, Wipe,
+  Backup, Restore, New table, Delete table, Write, Back). Types are chosen from
+  a list, never typed as codes; the Microsoft Reserved Partition is called
+  `msreserved`, not `msr`, to avoid confusion with D13. A new partition is
+  given by **start and size** (owner's choice over start and end): the start
+  defaults to the beginning of the selected free space, the size to all of it,
+  with 1 MiB alignment and sizes such as `512M` or `20G`.
+- **No command line.** `partmgr.efi` has only the full-screen interface, so it
+  cannot be driven by scripts; a proposal for `list`/`backup`/`restore` on the
+  command line was declined.
+
 ---
 
 ## 3. History
@@ -376,4 +454,5 @@ listing), `bootmgr scan`, and the language's `ON ERROR`.
 | `https` | Needs a TLS driver in the firmware; untested. Host names in `http` URLs (DNS) are untested. |
 | UEFI Shell options not supported | `time -tz/-d`; `-l LANG` of `devices`/`devtree` is accepted and ignored. |
 | Not implemented | See "The original plan" above. |
+| `partmgr.efi` | Designed (D21), not implemented yet. |
 | License | Settled: Apache 2.0 with the Commons Clause (see D20). Not "open source" by the OSI definition, so some distributions and catalogues will not accept the project. Commercial licences are granted on request. |

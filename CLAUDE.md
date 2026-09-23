@@ -35,6 +35,7 @@ user brings them up. The reasoning for each is in
 | **`msr` stays out** | Reading MSRs hangs with #GP on the firmware; the user decided against it. |
 | **No legacy EDK1 shell interface** | User: *"lasciamo riposare in pace il vecchiume"*. |
 | **Secure Boot: reads yes, writes no** | Low-level hardware writes (`mm` on I/O and PCI config, `hexedit -m`) are refused while Secure Boot is active. The **clock and the serial port stay allowed** — the user ruled they are not a security risk. |
+| **Partition management is `partmgr.efi`**, not a NESH command | A separate full-screen utility in this repository, same release; `nesh.efi` stays one file. Designed in D21, not built yet. |
 | **Light documentation only** | No dark themes, no dark-mode media queries, no theme toggle, no dark code blocks. |
 | **Apache 2.0 + Commons Clause** | Free to use and share, selling it needs a commercial licence, asked for by opening an issue. Not OSI open source, and the project says so up front. |
 
@@ -82,5 +83,5 @@ Secure Boot state were not recorded. Broader hardware coverage is still the
 main open item, and the reason for the announcement on the OSDev forum asking
 for reports. Also open:
 `find`, `crc32`, `sha256`, `efiinfo`, a `secureboot` key listing,
-`bootmgr scan`, `ON ERROR`; `https` and host names in `http` are untested;
-ARM64 and IA32 builds do not exist yet.
+`bootmgr scan`, `ON ERROR`, `partmgr.efi` (designed, D21); `https` and host
+names in `http` are untested; ARM64 and IA32 builds do not exist yet.

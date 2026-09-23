@@ -464,6 +464,8 @@ try:
     if sfdisk_knows_sector_size():
         same_as_sfdisk("new gpt 4K (sfdisk)", w4, 4096)
         sfdisk_verify("new gpt 4K", w4, 4096)
+    else:
+        skipped.append("new GPT with 4096-byte blocks read back by sfdisk (no --sector-size)")
 
     # a new MBR: a primary partition, then logical ones, which create the extended partition
     wm = image("w-mbr", 1024)

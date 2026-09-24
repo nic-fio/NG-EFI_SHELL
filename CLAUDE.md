@@ -84,3 +84,17 @@ for reports. Also open:
 `find`, `crc32`, `sha256`, `efiinfo`, a `secureboot` key listing,
 `bootmgr scan`, `ON ERROR`; `https` and host names in `http` are untested;
 ARM64 and IA32 builds do not exist yet.
+
+## Announcements
+
+Posted to find testers on real hardware; check them for replies and reports.
+
+| Where | When | Link | Status |
+|---|---|---|---|
+| OSDev forum, Announcements | 2026-09-20 | https://forum.osdev.org/viewtopic.php?p=354826 | No replies; the user closed the subject. |
+| Win-Raid, BIOS Modding/Flashing Tools | 2026-09-23 | https://winraid.level1techs.com/t/119449 | Posted by Claude at the user's request. |
+
+The user chose not to use Reddit. Other places considered, only if the user
+brings them up again: the edk2 mailing list, ServeTheHome, Hacker News (Show
+HN), Phoronix forums, Arch "Community Contributions". Claude never types
+forum passwords: the user logs in.
